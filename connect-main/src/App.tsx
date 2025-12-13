@@ -1,0 +1,111 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import ShiftForm from "./pages/ShiftForm";
+import DrillLocations from "./pages/DrillLocations";
+import SafetyFiles from "./pages/SafetyFiles";
+import SafetyEvents from "./pages/SafetyEvents";
+import TrainingVideos from "./pages/TrainingVideos";
+import Procedures from "./pages/Procedures";
+import MyReports from "./pages/MyReports";
+import AdminDashboard from "./pages/AdminDashboard";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shift-form"
+              element={
+                <ProtectedRoute>
+                  <ShiftForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/drill-locations"
+              element={
+                <ProtectedRoute>
+                  <DrillLocations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/safety-files"
+              element={
+                <ProtectedRoute>
+                  <SafetyFiles />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/safety-events"
+              element={
+                <ProtectedRoute>
+                  <SafetyEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/training-videos"
+              element={
+                <ProtectedRoute>
+                  <TrainingVideos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/procedures"
+              element={
+                <ProtectedRoute>
+                  <Procedures />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-reports"
+              element={
+                <ProtectedRoute>
+                  <MyReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;

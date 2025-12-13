@@ -1,0 +1,4 @@
+project_id = "rapaezkfrbsswbwyvbfr"
+
+[functions.send-shift-alerts]
+verify_jwt = false
