@@ -19,7 +19,7 @@ interface Procedure {
 
 const procedureFields: FieldConfig[] = [
   { name: "title", label: "שם הנוהל", type: "text", required: true, placeholder: "הזן שם נוהל..." },
-  { name: "file_url", label: "קישור לקובץ PDF", type: "url", placeholder: "https://..." },
+  { name: "file_url", label: "קובץ PDF (העלאה או קישור)", type: "media", mediaTypes: ["pdf", "file"] },
   { name: "description", label: "תיאור", type: "textarea", placeholder: "תיאור הנוהל..." },
 ];
 

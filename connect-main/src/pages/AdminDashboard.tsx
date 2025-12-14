@@ -17,7 +17,9 @@ import { ShiftStatsCard } from '@/components/admin/ShiftStatsCard';
 import { OutpostStatsCard } from '@/components/admin/OutpostStatsCard';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { IncompleteReportsCard } from '@/components/admin/IncompleteReportsCard';
+import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
 import unitLogo from '@/assets/unit-logo.png';
+import { toast } from 'sonner';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -37,7 +39,8 @@ import {
   Star,
   Zap,
   Award,
-  Gem
+  Gem,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -90,6 +93,9 @@ export default function AdminDashboard() {
   const [filterDate, setFilterDate] = useState<string>('');
   const [selectedReport, setSelectedReport] = useState<ShiftReport | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<ShiftReport | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -134,6 +140,27 @@ export default function AdminDashboard() {
     setFilterOutpost('all');
     setFilterDate('');
     setSearchQuery('');
+  };
+
+  const handleDeleteReport = async () => {
+    if (!reportToDelete) return;
+    setIsDeleting(true);
+    
+    const { error } = await supabase
+      .from('shift_reports')
+      .delete()
+      .eq('id', reportToDelete.id);
+
+    if (error) {
+      toast.error('שגיאה במחיקת הדיווח');
+      console.error(error);
+    } else {
+      toast.success('הדיווח נמחק בהצלחה');
+      setDeleteDialogOpen(false);
+      setReportToDelete(null);
+      fetchReports();
+    }
+    setIsDeleting(false);
   };
 
   const filteredReports = reports.filter((report) => {
@@ -400,7 +427,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50/80 hover:bg-slate-50">
                         <TableHead className="text-right font-black text-slate-700">תאריך</TableHead>
@@ -409,19 +436,15 @@ export default function AdminDashboard() {
                         <TableHead className="text-right font-black text-slate-700">רכב</TableHead>
                         <TableHead className="text-right font-black text-slate-700">משמרת</TableHead>
                         <TableHead className="text-right font-black text-slate-700">סטטוס</TableHead>
-                        <TableHead className="text-right font-black text-slate-700">פרטים</TableHead>
+                        <TableHead className="text-right font-black text-slate-700">פעולות</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredReports.map((report, index) => (
                         <TableRow 
                           key={report.id} 
-                          className="hover:bg-primary/5 cursor-pointer transition-all duration-300 animate-slide-up"
+                          className="hover:bg-primary/5 transition-all duration-300 animate-slide-up"
                           style={{ animationDelay: `${index * 30}ms` }}
-                          onClick={() => {
-                            setSelectedReport(report);
-                            setIsDetailOpen(true);
-                          }}
                         >
                           <TableCell className="font-bold text-slate-700">
                             {format(new Date(report.report_date), 'dd/MM/yyyy', { locale: he })}
@@ -455,13 +478,31 @@ export default function AdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-10 w-10 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:scale-110"
-                            >
-                              <Eye className="w-5 h-5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all duration-300"
+                                onClick={() => {
+                                  setSelectedReport(report);
+                                  setIsDetailOpen(true);
+                                }}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all duration-300"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReportToDelete(report);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -481,6 +522,15 @@ export default function AdminDashboard() {
           setIsDetailOpen(open);
           if (!open) setSelectedReport(null);
         }}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="מחיקת דיווח"
+        description={`האם אתה בטוח שברצונך למחוק את הדיווח של ${reportToDelete?.driver_name} מתאריך ${reportToDelete ? format(new Date(reportToDelete.report_date), 'dd/MM/yyyy', { locale: he }) : ''}? פעולה זו לא ניתנת לביטול.`}
+        onConfirm={handleDeleteReport}
+        isLoading={isDeleting}
       />
     </AppLayout>
   );

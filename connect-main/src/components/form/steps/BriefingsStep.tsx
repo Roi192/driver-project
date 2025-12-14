@@ -14,12 +14,12 @@ interface BriefingItemProps {
 
 function BriefingItem({ icon: Icon, label, value, onChange, accentColor }: BriefingItemProps) {
   return (
-    <div className="bg-white rounded-2xl p-5 border border-border/30 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in">
+    <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-in">
       <div className="flex items-center gap-4 mb-5">
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-${accentColor}/15 to-${accentColor}/5 flex items-center justify-center`}>
+        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-${accentColor}/15 to-${accentColor}/5 flex items-center justify-center border border-slate-200`}>
           <Icon className={`w-6 h-6 text-${accentColor}`} />
         </div>
-        <Label className="text-lg font-bold flex-1 text-foreground">{label}</Label>
+        <Label className="text-lg font-bold flex-1 text-slate-800">{label}</Label>
       </div>
       
       <div className="grid grid-cols-2 gap-3">
@@ -30,10 +30,10 @@ function BriefingItem({ icon: Icon, label, value, onChange, accentColor }: Brief
             "h-14 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-3 border-2",
             value === true
               ? "bg-green-50 text-green-600 border-green-300 shadow-sm"
-              : "bg-muted/30 text-muted-foreground border-transparent hover:border-green-200 hover:bg-green-50/50"
+              : "bg-slate-50 text-slate-600 border-slate-200 hover:border-green-200 hover:bg-green-50/50"
           )}
         >
-          <Check className={cn("w-5 h-5", value === true && "")} />
+          <Check className="w-5 h-5" />
           בוצע
         </button>
         <button
@@ -43,7 +43,7 @@ function BriefingItem({ icon: Icon, label, value, onChange, accentColor }: Brief
             "h-14 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-3 border-2",
             value === false
               ? "bg-red-50 text-red-600 border-red-300 shadow-sm"
-              : "bg-muted/30 text-muted-foreground border-transparent hover:border-red-200 hover:bg-red-50/50"
+              : "bg-slate-50 text-slate-600 border-slate-200 hover:border-red-200 hover:bg-red-50/50"
           )}
         >
           <X className="w-5 h-5" />
@@ -84,8 +84,8 @@ export function BriefingsStep() {
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="text-sm font-bold text-primary">שלב 2 מתוך 5</span>
         </div>
-        <h2 className="text-3xl font-black mb-3 text-foreground">תדריכים ותחקירים</h2>
-        <p className="text-muted-foreground">סמן האם בוצעו התדריכים הנדרשים</p>
+        <h2 className="text-3xl font-black mb-3 text-slate-800">תדריכים ותחקירים</h2>
+        <p className="text-slate-500">סמן האם בוצעו התדריכים הנדרשים</p>
       </div>
 
       <div className="space-y-5">
