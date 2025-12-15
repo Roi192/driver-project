@@ -27,18 +27,49 @@ export function useShiftReport() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const compressImageBlob = async (
+    input: Blob,
+    options: { maxDimension: number; quality: number } = { maxDimension: 1600, quality: 0.75 }
+  ): Promise<Blob> => {
+    try {
+      const bitmap = await createImageBitmap(input);
+      const ratio = Math.min(1, options.maxDimension / Math.max(bitmap.width, bitmap.height));
+      const targetW = Math.max(1, Math.round(bitmap.width * ratio));
+      const targetH = Math.max(1, Math.round(bitmap.height * ratio));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return input;
+
+      ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+      bitmap.close?.();
+
+      const output = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", options.quality)
+      );
+
+      return output ?? input;
+    } catch {
+      return input;
+    }
+  };
+
   const uploadPhoto = async (
     base64Data: string,
     photoType: string,
     reportId: string
   ): Promise<string | null> => {
     try {
-      // Convert base64 to blob
+      // Convert base64 to blob, then compress for storage savings
       const base64Response = await fetch(base64Data);
-      const blob = await base64Response.blob();
-      
+      const originalBlob = await base64Response.blob();
+      const blob = await compressImageBlob(originalBlob);
+
       const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.jpg`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from("shift-photos")
         .upload(fileName, blob, {
@@ -51,9 +82,9 @@ export function useShiftReport() {
         return null;
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("shift-photos")
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("shift-photos").getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error) {
@@ -63,8 +94,16 @@ export function useShiftReport() {
   };
 
   const mapShiftType = (shiftType: string): "morning" | "afternoon" | "evening" => {
-    if (shiftType === "משמרת בוקר") return "morning";
-    if (shiftType === "משמרת צהריים") return "afternoon";
+    // Current UI stores english enum values
+    if (shiftType === "morning" || shiftType === "afternoon" || shiftType === "evening") {
+      return shiftType;
+    }
+
+    // Backwards compatibility (old UI stored hebrew labels)
+    if (shiftType.includes("בוקר")) return "morning";
+    if (shiftType.includes("צהריים")) return "afternoon";
+    if (shiftType.includes("ערב")) return "evening";
+
     return "evening";
   };
 

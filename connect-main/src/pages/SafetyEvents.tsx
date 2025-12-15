@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
-import { ArrowRight, Flag, MapPin, Users, Calendar, Plus, Pencil, Trash2, Loader2, Play, FileText, Image, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowRight, Flag, MapPin, Users, Calendar, Plus, Pencil, Trash2, Loader2, Play, FileText, Image, AlertTriangle, Sparkles, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
@@ -71,6 +73,7 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
   if (category === "flag_investigations") {
     return [
       ...baseFields,
+      { name: "image_url", label: "תמונה ממוזערת", type: "image" },
       { name: "video_url", label: "סרטון (קובץ / YouTube / קישור)", type: "media", mediaTypes: ["video", "youtube", "file"] },
     ];
   }
@@ -341,18 +344,24 @@ export default function SafetyEvents() {
       if (loading) {
         return (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
+              <Loader2 className="w-10 h-10 animate-spin text-primary relative" />
+            </div>
           </div>
         );
       }
 
       if (items.length === 0) {
         return (
-          <div className="text-center py-12 glass-card">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Flag className="w-10 h-10 text-primary" />
+          <div className="text-center py-12 animate-slide-up">
+            <div className="relative inline-block mb-6">
+              <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl" />
+              <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
+                <Flag className="w-10 h-10 text-primary" />
+              </div>
             </div>
-            <p className="text-muted-foreground text-lg">אין תוכן להצגה</p>
+            <p className="text-muted-foreground text-lg font-medium">אין תוכן להצגה</p>
             {isAdmin && (
               <p className="text-sm text-muted-foreground mt-2">
                 לחץ על "הוסף" להוספת תוכן חדש
@@ -362,17 +371,104 @@ export default function SafetyEvents() {
         );
       }
 
+      // For flag_investigations and monthly_summaries, use video card style
+      const isVideoStyle = selectedCategory === "flag_investigations" || selectedCategory === "monthly_summaries";
+      const defaultThumbnail = selectedCategory === "flag_investigations" ? flagInvestigationThumbnail : monthlySummaryThumbnail;
+
+      if (isVideoStyle) {
+        return (
+          <div className="grid gap-4">
+            {items.map((item, index) => (
+              <div
+                key={item.id}
+                className="group relative overflow-hidden rounded-2xl bg-card/80 backdrop-blur-sm border border-border/30 cursor-pointer hover:border-primary/40 hover:shadow-luxury transition-all duration-500 animate-slide-up"
+                style={{ animationDelay: `${(index + 2) * 50}ms` }}
+                onClick={() => handleItemSelect(item)}
+              >
+                {/* Hover gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                
+                {isAdmin && (
+                  <div className="absolute top-3 left-3 z-10 flex gap-2">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="w-9 h-9 rounded-xl backdrop-blur-sm bg-card/80 border border-border/30 hover:bg-primary/20 hover:border-primary/40 transition-all duration-300"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedItem(item);
+                        setEditDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="w-9 h-9 rounded-xl"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedItem(item);
+                        setDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="relative">
+                  <img
+                    src={item.image_url || defaultThumbnail}
+                    alt={item.title}
+                    className="w-full h-44 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-primary/50 rounded-full blur-xl animate-pulse" />
+                      <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-emblem group-hover:scale-110 transition-transform duration-300">
+                        <Play className="w-8 h-8 text-primary-foreground mr-[-3px]" />
+                      </div>
+                    </div>
+                  </div>
+                  {item.event_date && (
+                    <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-lg bg-background/90 backdrop-blur-sm text-xs font-bold flex items-center gap-1.5 border border-border/30">
+                      <Clock className="w-3.5 h-3.5 text-primary" />
+                      {formatDate(item.event_date)}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="p-5">
+                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300">
+                    {item.title}
+                  </h3>
+                  {item.description && (
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      // For sector_events and neighbor_events, use existing card style
       return (
         <div className="grid gap-4">
           {items.map((item, index) => (
             <div
               key={item.id}
-              className={`glass-card p-4 cursor-pointer hover:border-primary/50 transition-all duration-300 animate-slide-up stagger-${(index % 5) + 1}`}
+              className="group relative overflow-hidden rounded-2xl bg-card/80 backdrop-blur-sm border border-border/30 cursor-pointer hover:border-primary/40 hover:shadow-lg transition-all duration-500 animate-slide-up p-4"
+              style={{ animationDelay: `${(index + 2) * 50}ms` }}
               onClick={() => handleItemSelect(item)}
             >
               <div className="flex gap-4">
                 {item.image_url && (
-                  <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                  <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-border/30">
                     <img 
                       src={item.image_url} 
                       alt={item.title}
@@ -380,20 +476,15 @@ export default function SafetyEvents() {
                     />
                   </div>
                 )}
-                {item.video_url && !item.image_url && (
-                  <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Play className="w-8 h-8 text-primary" />
-                  </div>
-                )}
-                {item.file_url && !item.image_url && !item.video_url && (
-                  <div className="w-20 h-20 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-8 h-8 text-accent" />
+                {!item.image_url && (
+                  <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center flex-shrink-0 border border-border/30">
+                    <MapPin className="w-8 h-8 text-primary" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold mb-1 truncate">{item.title}</h3>
+                  <h3 className="font-bold mb-1 truncate group-hover:text-primary transition-colors">{item.title}</h3>
                   {item.event_date && (
-                    <p className="text-sm text-primary mb-2">
+                    <p className="text-sm text-primary font-medium mb-2">
                       {formatDate(item.event_date)}
                     </p>
                   )}

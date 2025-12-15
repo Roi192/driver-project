@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import trainingVideoThumbnail from "@/assets/training-video-thumbnail.jpg";
 
 interface TrainingVideo {
   id: string;
@@ -234,7 +235,7 @@ export default function TrainingVideos() {
                 
                 <div className="relative">
                   <img
-                    src={video.thumbnail_url || "/placeholder.svg"}
+                    src={video.thumbnail_url || trainingVideoThumbnail}
                     alt={video.title}
                     className="w-full h-44 object-cover"
                   />
