@@ -202,23 +202,31 @@ export default function SafetyFiles() {
 
     return (
       <div className="mb-6 animate-slide-up">
-        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2">
+        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2 text-foreground">
           <ArrowRight className="w-5 h-5" />
           חזרה
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-1">
-              {view === "categories"
-                ? selectedOutpost
-                : view === "points"
-                ? categoryLabel
-                : selectedPoint?.title}
-            </h1>
-            {view === "categories" && <p className="text-muted-foreground">בחר קטגוריה</p>}
-            {view === "points" && <p className="text-muted-foreground">{selectedOutpost}</p>}
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-gradient-to-r from-primary/20 to-accent/10 border border-primary/30">
+              <Navigation className="w-4 h-4 text-primary" />
+              <h1 className="text-xl font-black text-foreground">
+                {view === "categories"
+                  ? selectedOutpost
+                  : view === "points"
+                  ? categoryLabel
+                  : selectedPoint?.title}
+              </h1>
+            </div>
+            {view === "categories" && <p className="text-muted-foreground text-sm">בחר קטגוריה</p>}
+            {view === "points" && (
+              <p className="text-sm text-primary font-medium flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                {selectedOutpost}
+              </p>
+            )}
             {view === "pointDetail" && (
-              <p className="text-muted-foreground">
+              <p className="text-sm text-primary font-medium">
                 {selectedOutpost} • {categoryLabel}
               </p>
             )}
@@ -328,7 +336,7 @@ export default function SafetyFiles() {
               className="glass-card p-4 cursor-pointer hover:bg-primary/5 transition-colors"
               onClick={() => handlePointSelect(point)}
             >
-              <h3 className="font-bold mb-1">{point.title}</h3>
+              <h3 className="font-bold mb-1 text-slate-800">{point.title}</h3>
               {point.content && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {point.content}
@@ -359,7 +367,7 @@ export default function SafetyFiles() {
                   {selectedOutpost}
                 </div>
               </div>
-              <h2 className="text-xl font-bold mb-3">{selectedPoint.title}</h2>
+              <h2 className="text-xl font-bold mb-3 text-slate-800">{selectedPoint.title}</h2>
               {selectedPoint.content && (
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {selectedPoint.content}
@@ -378,7 +386,7 @@ export default function SafetyFiles() {
 
   return (
     <AppLayout>
-      <div className="px-4 py-6 max-w-lg mx-auto">
+      <div className="px-3 md:px-4 py-5 md:py-6 max-w-lg mx-auto">
         {renderHeader()}
         {renderContent()}
       </div>

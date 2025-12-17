@@ -147,23 +147,23 @@ export default function TrainingVideos() {
 
   return (
     <AppLayout>
-      <div className="px-4 py-6 max-w-lg mx-auto">
-        {/* Premium Header */}
-        <div className="relative text-center mb-8 animate-slide-up">
+      <div className="px-3 md:px-4 py-5 md:py-6 max-w-lg mx-auto">
+        {/* Premium Header - Mobile Optimized */}
+        <div className="relative text-center mb-6 md:mb-8 animate-slide-up">
           {/* Glowing background elements */}
-          <div className="absolute top-10 left-8 w-32 h-32 bg-gradient-to-br from-primary/15 to-accent/10 rounded-full blur-3xl animate-float" />
-          <div className="absolute top-16 right-6 w-24 h-24 bg-accent/20 rounded-full blur-2xl animate-float" style={{ animationDelay: '1.5s' }} />
+          <div className="absolute top-8 left-4 md:left-8 w-24 md:w-32 h-24 md:h-32 bg-gradient-to-br from-primary/15 to-accent/10 rounded-full blur-3xl animate-float" />
+          <div className="absolute top-12 right-4 md:right-6 w-20 md:w-24 h-20 md:h-24 bg-accent/20 rounded-full blur-2xl animate-float" style={{ animationDelay: '1.5s' }} />
           
-          <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
-            <Film className="w-5 h-5 text-primary animate-bounce-soft" />
-            <span className="text-sm font-black text-primary">סרטוני הדרכה</span>
-            <Sparkles className="w-4 h-4 text-accent animate-pulse" />
+          <div className="relative inline-flex items-center gap-2 px-5 md:px-6 py-2.5 md:py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-4 md:mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
+            <Film className="w-4 h-4 md:w-5 md:h-5 text-primary animate-bounce-soft" />
+            <span className="text-xs md:text-sm font-black text-primary">סרטוני הדרכה</span>
+            <Sparkles className="w-3 h-3 md:w-4 md:h-4 text-accent animate-pulse" />
           </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-3">
+          <h1 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-2 md:mb-3">
             סרטוני הדרכה
           </h1>
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <Play className="w-4 h-4 text-accent" />
+          <p className="text-sm md:text-base text-muted-foreground flex items-center justify-center gap-2">
+            <Play className="w-3 h-3 md:w-4 md:h-4 text-accent" />
             צפה בסרטוני הדרכה ולמידה
           </p>
         </div>
@@ -257,7 +257,7 @@ export default function TrainingVideos() {
                 </div>
                 
                 <div className="p-5">
-                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300">
+                  <h3 className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors duration-300">
                     {video.title}
                   </h3>
                 </div>

@@ -56,6 +56,36 @@ export type Database = {
         }
         Relationships: []
       }
+      procedure_signatures: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          items_checked: string[]
+          procedure_type: string
+          signature: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id?: string
+          items_checked?: string[]
+          procedure_type: string
+          signature: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          items_checked?: string[]
+          procedure_type?: string
+          signature?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       procedures: {
         Row: {
           created_at: string

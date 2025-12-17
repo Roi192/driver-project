@@ -283,17 +283,26 @@ export default function DrillLocations() {
 
     return (
       <div className="mb-6 animate-slide-up">
-        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2">
+        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2 text-foreground">
           <ArrowRight className="w-5 h-5" />
           חזרה
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-1">
-              {view === "drills" ? selectedOutpost : drillTypeLabels[selectedDrillType || ""]}
-            </h1>
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-gradient-to-r from-primary/20 to-accent/10 border border-primary/30">
+              <MapPin className="w-4 h-4 text-primary" />
+              <h1 className="text-xl font-black text-foreground">
+                {view === "drills" ? selectedOutpost : drillTypeLabels[selectedDrillType || ""]}
+              </h1>
+            </div>
             {view === "drills" && (
-              <p className="text-muted-foreground">בחר סוג תרגולת</p>
+              <p className="text-muted-foreground text-sm">בחר סוג תרגולת</p>
+            )}
+            {view === "detail" && selectedOutpost && (
+              <p className="text-sm text-primary font-medium flex items-center gap-1">
+                <Target className="w-3 h-3" />
+                {selectedOutpost}
+              </p>
             )}
           </div>
           {isAdmin && view === "detail" && (
@@ -439,7 +448,7 @@ export default function DrillLocations() {
                   {selectedOutpost}
                 </span>
               </div>
-              <h2 className="text-xl font-bold mb-3">{location.name}</h2>
+              <h2 className="text-xl font-bold mb-3 text-slate-800">{location.name}</h2>
               {location.description && (
                 <p className="text-muted-foreground leading-relaxed mb-4">
                   {location.description}
@@ -471,7 +480,7 @@ export default function DrillLocations() {
                 <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
                   <Info className="w-6 h-6 text-accent" />
                 </div>
-                <h3 className="font-bold text-lg">הוראות ביצוע התרגולת</h3>
+                <h3 className="font-bold text-lg text-slate-800">הוראות ביצוע התרגולת</h3>
               </div>
               {isAdmin && drillLocations.length > 0 && (
                 <Button

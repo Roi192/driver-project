@@ -82,6 +82,8 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
     return [
       ...baseFields,
       { name: "image_url", label: "תמונה", type: "image" },
+      { name: "file_url", label: "קובץ PDF", type: "media", mediaTypes: ["pdf", "file"] },
+      { name: "video_url", label: "סרטון (קובץ / YouTube)", type: "media", mediaTypes: ["video", "youtube"] },
     ];
   }
 
@@ -272,17 +274,21 @@ export default function SafetyEvents() {
 
     return (
       <div className="mb-6 animate-slide-up">
-        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2">
+        <Button variant="ghost" onClick={goBack} className="mb-4 hover:bg-primary/10 rounded-xl gap-2 text-foreground">
           <ArrowRight className="w-5 h-5" />
           חזרה
         </Button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent mb-1">
-              {view === "items" ? categoryLabel : selectedItem?.title}
-            </h1>
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-2 rounded-xl bg-gradient-to-r from-primary/20 to-accent/10 border border-primary/30">
+              <Flag className="w-4 h-4 text-primary" />
+              <h1 className="text-xl font-black text-foreground">
+                {view === "items" ? categoryLabel : selectedItem?.title}
+              </h1>
+            </div>
             {view === "itemDetail" && selectedItem?.event_date && (
-              <p className="text-muted-foreground">
+              <p className="text-sm text-primary font-medium flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
                 {formatDate(selectedItem.event_date)}
               </p>
             )}
@@ -441,11 +447,11 @@ export default function SafetyEvents() {
                 </div>
                 
                 <div className="p-5">
-                  <h3 className="font-bold text-lg group-hover:text-primary transition-colors duration-300">
+                  <h3 className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors duration-300">
                     {item.title}
                   </h3>
                   {item.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                    <p className="text-sm text-slate-600 mt-2 line-clamp-2">
                       {item.description}
                     </p>
                   )}
@@ -482,7 +488,7 @@ export default function SafetyEvents() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold mb-1 truncate group-hover:text-primary transition-colors">{item.title}</h3>
+                  <h3 className="font-bold mb-1 truncate text-slate-800 group-hover:text-primary transition-colors">{item.title}</h3>
                   {item.event_date && (
                     <p className="text-sm text-primary font-medium mb-2">
                       {formatDate(item.event_date)}
@@ -532,7 +538,7 @@ export default function SafetyEvents() {
 
           {/* Content */}
           <div className="glass-card p-6">
-            <h2 className="text-2xl font-black mb-3 text-gradient">{selectedItem.title}</h2>
+            <h2 className="text-2xl font-black mb-3 text-slate-800">{selectedItem.title}</h2>
             {selectedItem.event_date && (
               <p className="text-sm text-primary font-bold mb-4 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
@@ -558,7 +564,7 @@ export default function SafetyEvents() {
                 <FileText className="w-7 h-7 text-accent" />
               </div>
               <div>
-                <p className="font-bold">צפה בקובץ PDF</p>
+                <p className="font-bold text-slate-800">צפה בקובץ PDF</p>
                 <p className="text-sm text-muted-foreground">לחץ לפתיחה בחלון חדש</p>
               </div>
             </a>

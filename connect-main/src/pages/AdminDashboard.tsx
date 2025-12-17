@@ -17,6 +17,7 @@ import { ShiftStatsCard } from '@/components/admin/ShiftStatsCard';
 import { OutpostStatsCard } from '@/components/admin/OutpostStatsCard';
 import { ExportButton } from '@/components/admin/ExportButton';
 import { IncompleteReportsCard } from '@/components/admin/IncompleteReportsCard';
+import { ProcedureSignaturesCard } from '@/components/admin/ProcedureSignaturesCard';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
 import unitLogo from '@/assets/unit-logo.png';
 import { toast } from 'sonner';
@@ -63,7 +64,9 @@ interface ShiftReport {
   has_personal_weapon: boolean;
   has_ammunition: boolean;
   pre_movement_checks_completed: boolean;
+  pre_movement_items_checked?: string[] | null;
   driver_tools_checked: boolean;
+  driver_tools_items_checked?: string[] | null;
   descent_drill_completed: boolean;
   rollover_drill_completed: boolean;
   fire_drill_completed: boolean;
@@ -265,16 +268,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <h1 className="text-4xl font-black bg-gradient-to-r from-slate-800 via-primary to-slate-800 bg-clip-text text-transparent animate-shimmer bg-[length:200%_auto]">
+                <h1 className="text-4xl font-black text-slate-800">
                   ניהול דיווחים
                 </h1>
-                
-                {/* Decorative divider */}
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent to-primary/50" />
-                  <Star className="w-4 h-4 text-accent" />
-                  <div className="w-16 h-0.5 bg-gradient-to-l from-transparent to-accent/50" />
-                </div>
               </div>
               
               <div className="w-28" />
@@ -320,6 +316,7 @@ export default function AdminDashboard() {
                 setIsDetailOpen(true);
               }}
             />
+            <ProcedureSignaturesCard />
           </div>
 
           {/* Weekly Reports Chart */}
