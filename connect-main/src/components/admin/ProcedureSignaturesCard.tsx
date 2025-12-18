@@ -5,9 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
-import { FileSignature, ChevronDown, Users, Calendar, Loader2 } from "lucide-react";
+import { FileSignature, Users, Calendar, Loader2, CheckCircle2, XCircle, ChevronLeft, Search } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
+import unitLogo from "@/assets/unit-logo.png";
 
 interface SignatureRecord {
   id: string;
@@ -19,11 +21,11 @@ interface SignatureRecord {
 }
 
 interface SignatureStats {
-  total: number;
+  totalSigners: number;
   byProcedure: {
-    routine: number;
-    shift: number;
-    aluf70: number;
+    routine: { signed: number; signers: SignatureRecord[] };
+    shift: { signed: number; signers: SignatureRecord[] };
+    aluf70: { signed: number; signers: SignatureRecord[] };
   };
 }
 
@@ -33,14 +35,31 @@ const procedureLabels: Record<string, string> = {
   aluf70: "נוהל אלוף 70",
 };
 
+const procedureColors: Record<string, string> = {
+  routine: "from-blue-500 to-blue-600",
+  shift: "from-emerald-500 to-emerald-600",
+  aluf70: "from-amber-500 to-amber-600",
+};
+
+const procedureIcons: Record<string, string> = {
+  routine: "📋",
+  shift: "🚗",
+  aluf70: "⚠️",
+};
+
 export function ProcedureSignaturesCard() {
   const [signatures, setSignatures] = useState<SignatureRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProcedure, setSelectedProcedure] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [stats, setStats] = useState<SignatureStats>({
-    total: 0,
-    byProcedure: { routine: 0, shift: 0, aluf70: 0 }
+    totalSigners: 0,
+    byProcedure: {
+      routine: { signed: 0, signers: [] },
+      shift: { signed: 0, signers: [] },
+      aluf70: { signed: 0, signers: [] }
+    }
   });
 
   useEffect(() => {
@@ -49,9 +68,13 @@ export function ProcedureSignaturesCard() {
 
   const fetchSignatures = async () => {
     setLoading(true);
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1).toISOString();
+    
     const { data, error } = await supabase
       .from("procedure_signatures")
       .select("*")
+      .gte("created_at", startOfYear)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -59,28 +82,47 @@ export function ProcedureSignaturesCard() {
     } else {
       setSignatures(data || []);
       
-      // Calculate stats
+      // Get unique latest signatures per user per procedure
+      const latestSignatures = new Map<string, SignatureRecord>();
+      data?.forEach(sig => {
+        const key = `${sig.user_id}-${sig.procedure_type}`;
+        if (!latestSignatures.has(key)) {
+          latestSignatures.set(key, sig);
+        }
+      });
+
+      const uniqueSignatures = Array.from(latestSignatures.values());
+      
       const byProcedure = {
-        routine: data?.filter(s => s.procedure_type === "routine").length || 0,
-        shift: data?.filter(s => s.procedure_type === "shift").length || 0,
-        aluf70: data?.filter(s => s.procedure_type === "aluf70").length || 0,
+        routine: {
+          signed: uniqueSignatures.filter(s => s.procedure_type === "routine").length,
+          signers: uniqueSignatures.filter(s => s.procedure_type === "routine")
+        },
+        shift: {
+          signed: uniqueSignatures.filter(s => s.procedure_type === "shift").length,
+          signers: uniqueSignatures.filter(s => s.procedure_type === "shift")
+        },
+        aluf70: {
+          signed: uniqueSignatures.filter(s => s.procedure_type === "aluf70").length,
+          signers: uniqueSignatures.filter(s => s.procedure_type === "aluf70")
+        },
       };
       
-      // Get unique users who signed all 3 procedures
+      // Count users who signed all 3
       const userSignatures = new Map<string, Set<string>>();
-      data?.forEach(sig => {
+      uniqueSignatures.forEach(sig => {
         if (!userSignatures.has(sig.user_id)) {
           userSignatures.set(sig.user_id, new Set());
         }
         userSignatures.get(sig.user_id)?.add(sig.procedure_type);
       });
       
-      const completeSignatures = Array.from(userSignatures.values()).filter(
+      const completeSigners = Array.from(userSignatures.values()).filter(
         procedures => procedures.size === 3
       ).length;
       
       setStats({
-        total: completeSignatures,
+        totalSigners: completeSigners,
         byProcedure
       });
     }
@@ -89,12 +131,18 @@ export function ProcedureSignaturesCard() {
 
   const openProcedureSignatures = (procedureType: string) => {
     setSelectedProcedure(procedureType);
+    setSearchTerm("");
     setDialogOpen(true);
   };
 
-  const filteredSignatures = selectedProcedure
-    ? signatures.filter(s => s.procedure_type === selectedProcedure)
-    : signatures;
+  const getFilteredSigners = () => {
+    if (!selectedProcedure) return [];
+    const signers = stats.byProcedure[selectedProcedure as keyof typeof stats.byProcedure]?.signers || [];
+    if (!searchTerm) return signers;
+    return signers.filter(s => 
+      s.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: he });
@@ -128,92 +176,136 @@ export function ProcedureSignaturesCard() {
         </CardHeader>
         
         <CardContent className="relative space-y-4">
-          {/* Summary */}
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-accent/10 to-primary/5 border border-accent/20">
-            <div className="flex items-center gap-3">
-              <Users className="w-6 h-6 text-accent" />
-              <div>
-                <p className="text-2xl font-black text-slate-800">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">חתמו על כל הנהלים</p>
-              </div>
+          {/* Summary Card */}
+          <div className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-accent/5 to-primary/5 border border-primary/20">
+            <div className="absolute top-2 left-2 opacity-10">
+              <img src={unitLogo} alt="" className="w-16 h-16" />
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSelectedProcedure(null);
-                setDialogOpen(true);
-              }}
-              className="rounded-xl"
-            >
-              צפה בכל
-            </Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30">
+                  <Users className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-3xl font-black text-slate-800">{stats.totalSigners}</p>
+                  <p className="text-sm text-slate-600">חתמו על כל הנהלים</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                {new Date().getFullYear()}
+              </Badge>
+            </div>
           </div>
 
-          {/* Procedure breakdown */}
-          <div className="grid gap-2">
-            {Object.entries(stats.byProcedure).map(([key, count]) => (
-              <div
-                key={key}
-                onClick={() => openProcedureSignatures(key)}
-                className="flex items-center justify-between p-3 rounded-xl bg-secondary/30 hover:bg-primary/10 cursor-pointer transition-colors"
-              >
-                <span className="font-medium text-slate-700">{procedureLabels[key]}</span>
-                <Badge variant="secondary" className="bg-primary/10 text-primary">
-                  {count} חתימות
-                </Badge>
-              </div>
-            ))}
+          {/* Procedure Cards */}
+          <div className="space-y-3">
+            {(["routine", "shift", "aluf70"] as const).map((key) => {
+              const data = stats.byProcedure[key];
+              return (
+                <div
+                  key={key}
+                  onClick={() => openProcedureSignatures(key)}
+                  className="group/item relative overflow-hidden p-4 rounded-2xl bg-slate-50 hover:bg-white border border-slate-200 hover:border-primary/30 cursor-pointer transition-all duration-300 hover:shadow-lg"
+                >
+                  <div className={`absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b ${procedureColors[key]}`} />
+                  
+                  <div className="flex items-center gap-4 pr-2">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${procedureColors[key]} flex items-center justify-center text-xl shadow-md group-hover/item:scale-110 transition-transform`}>
+                      {procedureIcons[key]}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-800">{procedureLabels[key]}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm text-slate-600">{data.signed} חתימות</span>
+                      </div>
+                    </div>
+                    
+                    <ChevronLeft className="w-5 h-5 text-slate-400 group-hover/item:text-primary transition-colors" />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
 
       {/* Signatures Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md max-h-[80vh]" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-slate-800">
-              {selectedProcedure 
-                ? `חתימות על ${procedureLabels[selectedProcedure]}`
-                : "כל החתימות על נהלים"
-              }
-            </DialogTitle>
-          </DialogHeader>
-          
-          <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-3 pr-4">
-              {filteredSignatures.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">אין חתימות להצגה</p>
-              ) : (
-                filteredSignatures.map(sig => (
-                  <div
-                    key={sig.id}
-                    className="p-4 rounded-xl bg-secondary/30 border border-border/30"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-bold text-slate-800">{sig.full_name}</p>
-                        {!selectedProcedure && (
-                          <Badge variant="outline" className="mt-1">
-                            {procedureLabels[sig.procedure_type]}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {formatDate(sig.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      חתימה: {sig.signature}
+        <DialogContent className="max-w-md max-h-[85vh] p-0 overflow-hidden" dir="rtl">
+          {selectedProcedure && (
+            <>
+              {/* Header */}
+              <div className={`p-6 bg-gradient-to-br ${procedureColors[selectedProcedure]} text-white`}>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">
+                    {procedureIcons[selectedProcedure]}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-white text-xl font-bold mb-1">
+                      {procedureLabels[selectedProcedure]}
+                    </DialogTitle>
+                    <p className="text-white/80 text-sm">
+                      {stats.byProcedure[selectedProcedure as keyof typeof stats.byProcedure]?.signed || 0} חתימות
                     </p>
                   </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+                </div>
+              </div>
+              
+              {/* Search */}
+              <div className="p-4 border-b border-slate-100">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="חיפוש לפי שם..."
+                    className="pr-10 bg-slate-50 border-slate-200 rounded-xl"
+                  />
+                </div>
+              </div>
+              
+              {/* Signers List */}
+              <ScrollArea className="max-h-[50vh]">
+                <div className="p-4 space-y-3">
+                  {getFilteredSigners().length === 0 ? (
+                    <div className="text-center py-12">
+                      <XCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-500">לא נמצאו חתימות</p>
+                    </div>
+                  ) : (
+                    getFilteredSigners().map(sig => (
+                      <div
+                        key={sig.id}
+                        className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                              <span className="text-sm font-bold text-primary">
+                                {sig.full_name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-800">{sig.full_name}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">חתימה: {sig.signature}</p>
+                            </div>
+                          </div>
+                          <div className="text-left">
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              <Calendar className="w-3 h-3" />
+                              {formatDate(sig.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

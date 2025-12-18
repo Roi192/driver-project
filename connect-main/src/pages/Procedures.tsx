@@ -1,25 +1,17 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { FileText, Check, ChevronDown, ChevronUp, BookOpen, Sparkles, CheckCircle2, Loader2, Send, History } from "lucide-react";
+import { FileText, Check, BookOpen, Sparkles, CheckCircle2, Loader2, ArrowRight, Shield, Award, Calendar, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import unitLogo from "@/assets/unit-logo.png";
 
 interface ProcedureItem {
   id: string;
   text: string;
   checked: boolean;
-}
-
-interface ProcedureSection {
-  id: string;
-  title: string;
-  items: ProcedureItem[];
-  isOpen: boolean;
 }
 
 interface SignatureRecord {
@@ -33,6 +25,8 @@ interface SignatureRecord {
 const proceduresData = {
   routine: {
     title: "נהלי שגרה",
+    icon: "📋",
+    color: "from-blue-500 to-blue-600",
     items: [
       "בכל שבוע בימי ראשון ושני יתקיימו שיחות פלוגה בשעה 11:00 בחטיבה",
       "כל אירוע שקורה גם בבית על החייל לדווח למפקדיו",
@@ -55,6 +49,8 @@ const proceduresData = {
   },
   shift: {
     title: "נהלים במהלך משמרת",
+    icon: "🚗",
+    color: "from-emerald-500 to-emerald-600",
     items: [
       "יש להגיע בזמן שהוגדר ע\"י הפלוגה לנוהל קרב למשימה.",
       "יש לבצע תחקיר ע\"י רמה ממונה ותדריך נהיגה ע\"י מפקד גזרה.",
@@ -79,6 +75,8 @@ const proceduresData = {
   },
   aluf70: {
     title: "נוהל אלוף 70",
+    icon: "⚠️",
+    color: "from-amber-500 to-amber-600",
     items: [
       "הגעה מהבית עד השעה 11:00 כך שיהיה 9 שעות שינה טרם עלייה למשימה כפי שמוגדר בנוהל אלוף 70.",
       "חל איסור על ביצוע פרסות ברכב ממוגן.",
@@ -88,53 +86,36 @@ const proceduresData = {
   }
 };
 
+type ProcedureType = keyof typeof proceduresData;
+
 export default function Procedures() {
   const { user } = useAuth();
-  const [sections, setSections] = useState<ProcedureSection[]>([]);
+  const [selectedProcedure, setSelectedProcedure] = useState<ProcedureType | null>(null);
+  const [items, setItems] = useState<ProcedureItem[]>([]);
   const [fullName, setFullName] = useState("");
   const [signature, setSignature] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mySignatures, setMySignatures] = useState<SignatureRecord[]>([]);
   const [loadingSignatures, setLoadingSignatures] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
+  const [readAndUnderstood, setReadAndUnderstood] = useState(false);
 
   useEffect(() => {
-    // Initialize sections from proceduresData
-    const initialSections: ProcedureSection[] = [
-      {
-        id: "routine",
-        title: proceduresData.routine.title,
-        items: proceduresData.routine.items.map((text, idx) => ({
-          id: `routine-${idx}`,
-          text,
-          checked: false
-        })),
-        isOpen: false
-      },
-      {
-        id: "shift",
-        title: proceduresData.shift.title,
-        items: proceduresData.shift.items.map((text, idx) => ({
-          id: `shift-${idx}`,
-          text,
-          checked: false
-        })),
-        isOpen: false
-      },
-      {
-        id: "aluf70",
-        title: proceduresData.aluf70.title,
-        items: proceduresData.aluf70.items.map((text, idx) => ({
-          id: `aluf70-${idx}`,
-          text,
-          checked: false
-        })),
-        isOpen: false
-      }
-    ];
-    setSections(initialSections);
     fetchMySignatures();
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedProcedure) {
+      const procedureItems = proceduresData[selectedProcedure].items.map((text, idx) => ({
+        id: `${selectedProcedure}-${idx}`,
+        text,
+        checked: false
+      }));
+      setItems(procedureItems);
+      setReadAndUnderstood(false);
+      setFullName("");
+      setSignature("");
+    }
+  }, [selectedProcedure]);
 
   const fetchMySignatures = async () => {
     if (!user) return;
@@ -153,269 +134,347 @@ export default function Procedures() {
     setLoadingSignatures(false);
   };
 
-  const toggleSection = (sectionId: string) => {
-    setSections(prev => prev.map(section => 
-      section.id === sectionId 
-        ? { ...section, isOpen: !section.isOpen }
-        : section
+  const toggleItem = (itemId: string) => {
+    setItems(prev => prev.map(item =>
+      item.id === itemId ? { ...item, checked: !item.checked } : item
     ));
   };
 
-  const toggleItem = (sectionId: string, itemId: string) => {
-    setSections(prev => prev.map(section => 
-      section.id === sectionId
-        ? {
-            ...section,
-            items: section.items.map(item =>
-              item.id === itemId ? { ...item, checked: !item.checked } : item
-            )
-          }
-        : section
-    ));
-  };
+  const allItemsChecked = items.every(item => item.checked);
+  const canSubmit = allItemsChecked && readAndUnderstood && fullName.trim() && signature.trim();
 
-  const isSectionComplete = (section: ProcedureSection) => {
-    return section.items.every(item => item.checked);
+  const getLatestSignature = (procedureType: string) => {
+    const currentYear = new Date().getFullYear();
+    return mySignatures.find(sig => {
+      const sigYear = new Date(sig.created_at).getFullYear();
+      return sig.procedure_type === procedureType && sigYear === currentYear;
+    });
   };
-
-  const allSectionsComplete = sections.every(isSectionComplete);
-  const canSubmit = allSectionsComplete && fullName.trim() && signature.trim();
 
   const handleSubmit = async () => {
-    if (!user || !canSubmit) return;
+    if (!user || !canSubmit || !selectedProcedure) return;
     setIsSubmitting(true);
 
-    // Submit signature for each procedure type
-    const signaturePromises = sections.map(section => 
-      supabase.from("procedure_signatures").insert({
-        user_id: user.id,
-        procedure_type: section.id,
-        full_name: fullName.trim(),
-        signature: signature.trim(),
-        items_checked: section.items.map(item => item.id)
-      })
-    );
+    const { error } = await supabase.from("procedure_signatures").insert({
+      user_id: user.id,
+      procedure_type: selectedProcedure,
+      full_name: fullName.trim(),
+      signature: signature.trim(),
+      items_checked: items.map(item => item.id)
+    });
 
-    const results = await Promise.all(signaturePromises);
-    const hasError = results.some(r => r.error);
-
-    if (hasError) {
+    if (error) {
       toast.error("שגיאה בשמירת החתימה");
-      console.error(results);
+      console.error(error);
     } else {
-      toast.success("הנהלים נחתמו בהצלחה!");
-      // Reset form
-      setSections(prev => prev.map(section => ({
-        ...section,
-        items: section.items.map(item => ({ ...item, checked: false })),
-        isOpen: false
-      })));
-      setFullName("");
-      setSignature("");
+      toast.success("הנוהל נחתם בהצלחה!");
       fetchMySignatures();
+      setSelectedProcedure(null);
     }
     setIsSubmitting(false);
-  };
-
-  const getProcedureLabel = (type: string) => {
-    switch (type) {
-      case "routine": return "נהלי שגרה";
-      case "shift": return "נהלים במהלך משמרת";
-      case "aluf70": return "נוהל אלוף 70";
-      default: return type;
-    }
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("he-IL", {
       year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+      month: "long",
+      day: "numeric"
     });
   };
 
-  return (
-    <AppLayout>
-      <div className="px-4 py-6 max-w-lg mx-auto">
-        {/* Header */}
-        <div className="relative text-center mb-8 animate-slide-up">
-          <div className="absolute top-8 left-10 w-28 h-28 bg-gradient-to-br from-primary/12 to-accent/8 rounded-full blur-3xl animate-float" />
-          <div className="absolute top-14 right-8 w-20 h-20 bg-accent/15 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }} />
-          
-          <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
-            <BookOpen className="w-5 h-5 text-primary animate-bounce-soft" />
-            <span className="text-sm font-black text-primary">נהלים</span>
-            <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-slate-800 via-primary to-slate-800 bg-clip-text text-transparent mb-3">
-            נהלים לחתימה
-          </h1>
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <FileText className="w-4 h-4 text-accent" />
-            סמן וי על כל סעיף וחתום בסוף
-          </p>
-        </div>
+  // Procedure Detail View
+  if (selectedProcedure) {
+    const procedure = proceduresData[selectedProcedure];
+    const checkedCount = items.filter(i => i.checked).length;
+    const progress = (checkedCount / items.length) * 100;
 
-        {/* History Toggle */}
-        <Button
-          variant="outline"
-          onClick={() => setShowHistory(!showHistory)}
-          className="w-full mb-6 h-12 rounded-xl gap-2 border-primary/30 hover:bg-primary/10"
-        >
-          <History className="w-5 h-5" />
-          {showHistory ? "הסתר היסטוריית חתימות" : "הצג היסטוריית חתימות"}
-        </Button>
+    return (
+      <AppLayout>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+          <div className="px-4 py-6 max-w-lg mx-auto">
+            {/* Back Button */}
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedProcedure(null)}
+              className="mb-4 gap-2 text-slate-600 hover:text-slate-800"
+            >
+              <ArrowRight className="w-4 h-4" />
+              חזרה לנהלים
+            </Button>
 
-        {/* Signature History */}
-        {showHistory && (
-          <div className="mb-6 space-y-3 animate-fade-in">
-            <h3 className="font-bold text-slate-800 mb-3">החתימות שלי</h3>
-            {loadingSignatures ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            {/* Document Header */}
+            <div className="relative bg-white rounded-3xl shadow-xl overflow-hidden mb-6 border border-slate-200">
+              {/* Top Banner */}
+              <div className={`h-3 bg-gradient-to-r ${procedure.color}`} />
+              
+              {/* Logo & Title Section */}
+              <div className="p-6 text-center border-b border-slate-100">
+                <div className="flex justify-center mb-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+                    <img 
+                      src={unitLogo} 
+                      alt="סמל הפלוגה" 
+                      className="relative w-20 h-20 object-contain drop-shadow-lg"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-slate-500">פלנ"ג בנימין</p>
+                  <h1 className="text-2xl font-black text-slate-800">{procedure.title}</h1>
+                  <p className="text-xs text-slate-400">מערכת נהגי בט"ש</p>
+                </div>
               </div>
-            ) : mySignatures.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">אין חתימות קודמות</p>
-            ) : (
-              <div className="space-y-2">
-                {mySignatures.map(sig => (
-                  <div key={sig.id} className="p-3 rounded-xl bg-card/80 border border-border/30">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-800">{getProcedureLabel(sig.procedure_type)}</span>
-                      <span className="text-xs text-muted-foreground">{formatDate(sig.created_at)}</span>
+
+              {/* Progress Bar */}
+              <div className="px-6 py-4 bg-slate-50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-600">התקדמות קריאה</span>
+                  <span className="text-sm font-bold text-primary">{checkedCount}/{items.length}</span>
+                </div>
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full bg-gradient-to-r ${procedure.color} transition-all duration-500`}
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Procedure Items */}
+            <div className="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden mb-6">
+              <div className="p-4 border-b border-slate-100 bg-slate-50">
+                <h2 className="font-bold text-slate-700 flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-primary" />
+                  סעיפי הנוהל
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">סמן כל סעיף שקראת והבנת</p>
+              </div>
+              
+              <div className="divide-y divide-slate-100">
+                {items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleItem(item.id)}
+                    className={`p-4 cursor-pointer transition-all duration-300 ${
+                      item.checked 
+                        ? 'bg-emerald-50' 
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all duration-300 ${
+                        item.checked 
+                          ? 'bg-emerald-500 border-emerald-500 shadow-lg shadow-emerald-500/30' 
+                          : 'border-slate-300 hover:border-primary'
+                      }`}>
+                        {item.checked && <Check className="w-4 h-4 text-white" />}
+                      </div>
+                      <div className="flex-1">
+                        <span className={`text-sm leading-relaxed ${
+                          item.checked ? 'text-emerald-700' : 'text-slate-700'
+                        }`}>
+                          <span className="font-bold text-slate-500">{index + 1}.</span> {item.text}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">נחתם על ידי: {sig.full_name}</p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
 
-        {/* Procedure Sections */}
-        <div className="space-y-4 mb-6">
-          {sections.map((section, sectionIndex) => (
-            <Collapsible 
-              key={section.id} 
-              open={section.isOpen} 
-              onOpenChange={() => toggleSection(section.id)}
-              className="animate-slide-up"
-              style={{ animationDelay: `${sectionIndex * 100}ms` }}
-            >
-              <div className="rounded-2xl bg-card/80 backdrop-blur-sm border border-border/30 overflow-hidden">
-                <CollapsibleTrigger asChild>
-                  <div className="p-4 cursor-pointer hover:bg-primary/5 transition-colors flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        isSectionComplete(section) 
-                          ? 'bg-green-500/20 border-green-500/30' 
-                          : 'bg-primary/20 border-primary/30'
-                      } border`}>
-                        {isSectionComplete(section) ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-primary" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800">{section.title}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {section.items.filter(i => i.checked).length} / {section.items.length} סעיפים
-                        </p>
-                      </div>
-                    </div>
-                    {section.isOpen ? (
-                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </CollapsibleTrigger>
+            {/* Confirmation & Signature Section */}
+            {allItemsChecked && (
+              <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden animate-fade-in">
+                <div className={`h-2 bg-gradient-to-r ${procedure.color}`} />
                 
-                <CollapsibleContent>
-                  <div className="px-4 pb-4 space-y-2 border-t border-border/20 pt-3">
-                    {section.items.map((item, index) => (
-                      <div
-                        key={item.id}
-                        onClick={() => toggleItem(section.id, item.id)}
-                        className={`p-3 rounded-xl cursor-pointer transition-all duration-200 flex items-start gap-3 ${
-                          item.checked 
-                            ? 'bg-green-500/10 border border-green-500/30' 
-                            : 'bg-secondary/30 border border-transparent hover:border-primary/30'
+                <div className="p-6 space-y-6">
+                  {/* Read and Understood Button */}
+                  <div 
+                    onClick={() => setReadAndUnderstood(!readAndUnderstood)}
+                    className={`p-4 rounded-2xl cursor-pointer transition-all duration-300 flex items-center gap-4 ${
+                      readAndUnderstood 
+                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' 
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                      readAndUnderstood ? 'bg-white/20' : 'bg-white'
+                    }`}>
+                      {readAndUnderstood ? (
+                        <CheckCircle2 className="w-5 h-5 text-white" />
+                      ) : (
+                        <Shield className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="font-bold text-lg">קראתי והבנתי את כל הסעיפים</span>
+                  </div>
+
+                  {readAndUnderstood && (
+                    <div className="space-y-4 animate-fade-in">
+                      {/* Name Input */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          שם מלא
+                        </label>
+                        <Input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="הזן שם מלא"
+                          className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-primary text-slate-800 text-right"
+                        />
+                      </div>
+
+                      {/* Signature Input */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                          <PenLine className="w-4 h-4" />
+                          חתימה
+                        </label>
+                        <Input
+                          value={signature}
+                          onChange={(e) => setSignature(e.target.value)}
+                          placeholder="הזן חתימה"
+                          className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-primary text-slate-800 text-right"
+                        />
+                      </div>
+
+                      {/* Submit Button */}
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={!canSubmit || isSubmitting}
+                        className={`w-full h-14 rounded-2xl text-lg font-bold transition-all duration-300 ${
+                          canSubmit 
+                            ? `bg-gradient-to-r ${procedure.color} hover:opacity-90 shadow-lg` 
+                            : 'bg-slate-200 text-slate-400'
                         }`}
                       >
-                        <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          item.checked 
-                            ? 'bg-green-500 border-green-500' 
-                            : 'border-slate-400'
-                        }`}>
-                          {item.checked && <Check className="w-3.5 h-3.5 text-white" />}
-                        </div>
-                        <span className={`text-sm leading-relaxed ${
-                          item.checked ? 'text-green-700' : 'text-slate-700'
-                        }`}>
-                          {index + 1}. {item.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
+                        {isSubmitting ? (
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                        ) : (
+                          <>
+                            <Award className="w-5 h-5 ml-2" />
+                            חתום על הנוהל
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </Collapsible>
-          ))}
+            )}
+          </div>
         </div>
+      </AppLayout>
+    );
+  }
 
-        {/* Signature Section */}
-        <div className="rounded-2xl bg-card/80 backdrop-blur-sm border border-border/30 p-5 space-y-4 animate-slide-up" style={{ animationDelay: '0.3s' }}>
-          <h3 className="font-bold text-slate-800 text-center">חתימה על הנהלים</h3>
-          
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">שם מלא</label>
-              <Input
-                placeholder="הזן את שמך המלא..."
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="h-12 rounded-xl bg-white/80 border-slate-200"
-              />
+  // Procedures List View
+  return (
+    <AppLayout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="px-4 py-6 max-w-lg mx-auto">
+          {/* Header */}
+          <div className="relative text-center mb-8 animate-slide-up">
+            <div className="absolute top-8 left-10 w-28 h-28 bg-gradient-to-br from-primary/12 to-accent/8 rounded-full blur-3xl animate-float" />
+            <div className="absolute top-14 right-8 w-20 h-20 bg-accent/15 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }} />
+            
+            {/* Unit Logo */}
+            <div className="flex justify-center mb-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
+                <img 
+                  src={unitLogo} 
+                  alt="סמל הפלוגה" 
+                  className="relative w-24 h-24 object-contain drop-shadow-lg"
+                />
+              </div>
             </div>
             
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">חתימה</label>
-              <Input
-                placeholder="הזן את חתימתך..."
-                value={signature}
-                onChange={(e) => setSignature(e.target.value)}
-                className="h-12 rounded-xl bg-white/80 border-slate-200"
-              />
+            <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
+              <BookOpen className="w-5 h-5 text-primary animate-bounce-soft" />
+              <span className="text-sm font-black text-primary">נהלים</span>
+              <Sparkles className="w-4 h-4 text-accent animate-pulse" />
             </div>
+            <h1 className="text-3xl font-black bg-gradient-to-r from-slate-800 via-primary to-slate-800 bg-clip-text text-transparent mb-3">
+              נהלים לחתימה
+            </h1>
+            <p className="text-slate-600 flex items-center justify-center gap-2">
+              <FileText className="w-4 h-4 text-accent" />
+              בחר נוהל לקריאה וחתימה
+            </p>
           </div>
 
-          {!allSectionsComplete && (
-            <p className="text-center text-sm text-amber-600 bg-amber-50 rounded-xl p-3">
-              יש לסמן וי על כל הסעיפים בכל הנהלים לפני החתימה
-            </p>
-          )}
+          {/* Procedures Cards */}
+          <div className="space-y-4">
+            {(Object.keys(proceduresData) as ProcedureType[]).map((key, index) => {
+              const procedure = proceduresData[key];
+              const latestSignature = getLatestSignature(key);
+              const isSigned = !!latestSignature;
 
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit || isSubmitting}
-            className="w-full h-14 text-base font-bold rounded-xl bg-gradient-to-r from-primary to-accent shadow-emblem hover:shadow-luxury transition-all duration-300 disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 ml-2 animate-spin" />
-                שולח...
-              </>
-            ) : (
-              <>
-                <Send className="w-5 h-5 ml-2" />
-                שלח חתימה
-              </>
-            )}
-          </Button>
+              return (
+                <div
+                  key={key}
+                  onClick={() => setSelectedProcedure(key)}
+                  className="group relative bg-white rounded-3xl shadow-lg hover:shadow-xl transition-all duration-500 overflow-hidden cursor-pointer border border-slate-200 hover:border-primary/30 animate-slide-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  {/* Color Strip */}
+                  <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${procedure.color}`} />
+                  
+                  <div className="p-5 pr-6">
+                    <div className="flex items-center gap-4">
+                      {/* Icon */}
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${procedure.color} flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                        {procedure.icon}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg text-slate-800 mb-1">{procedure.title}</h3>
+                        <p className="text-sm text-slate-500">{procedure.items.length} סעיפים</p>
+                        
+                        {/* Signature Status */}
+                        {isSigned ? (
+                          <div className="mt-2 flex items-center gap-2 text-emerald-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span className="text-xs font-medium">
+                              נחתם ב-{formatDate(latestSignature.created_at)}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-2 flex items-center gap-2 text-amber-600">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs font-medium">טרם נחתם השנה</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Arrow */}
+                      <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                        <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary rotate-180 transition-colors" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Annual Reminder Notice */}
+          <div className="mt-8 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <Calendar className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-amber-800">חידוש חתימות שנתי</h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  יש לחתום על הנהלים מחדש בתחילת כל שנה. וודא שכל הנהלים חתומים.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </AppLayout>
