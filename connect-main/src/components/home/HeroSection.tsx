@@ -216,12 +216,9 @@ export function HeroSection() {
           <h1 className="text-4xl md:text-6xl font-black mb-3 tracking-tight">
             <span className="block text-slate-800 drop-shadow-sm">מערכת ניהול</span>
           </h1>
-          <div className="relative inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary via-accent to-primary blur-2xl opacity-40 animate-pulse" style={{ animationDuration: '4s' }} />
-            <span className="relative block text-4xl md:text-6xl font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-shimmer">
-              נהגי בט"ש
-            </span>
-          </div>
+          <span className="block text-4xl md:text-6xl font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent bg-[length:200%_auto] animate-shimmer">
+            נהגי בט"ש
+          </span>
         </div>
 
         {/* Decorative Divider - Enhanced */}

@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
@@ -11,10 +11,12 @@ import {
   MapPin,
   Shield,
   FileText,
-  Image
+  Image,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
+import { COMBAT_EQUIPMENT, PRE_MOVEMENT_CHECKS, DRIVER_TOOLS } from "@/lib/constants";
 
 interface ShiftReport {
   id: string;
@@ -34,7 +36,9 @@ interface ShiftReport {
   has_personal_weapon: boolean;
   has_ammunition: boolean;
   pre_movement_checks_completed: boolean;
+  pre_movement_items_checked?: string[] | null;
   driver_tools_checked: boolean;
+  driver_tools_items_checked?: string[] | null;
   descent_drill_completed: boolean;
   rollover_drill_completed: boolean;
   fire_drill_completed: boolean;
@@ -71,6 +75,61 @@ const CheckItem = ({ label, checked }: { label: string; checked: boolean }) => (
   </div>
 );
 
+interface DetailedChecklistProps {
+  title: string;
+  allItems: readonly string[];
+  checkedItems: string[] | null | undefined;
+  icon: React.ElementType;
+}
+
+const DetailedChecklist = ({ title, allItems, checkedItems, icon: Icon }: DetailedChecklistProps) => {
+  const checked = checkedItems || [];
+  const missingItems = allItems.filter(item => !checked.includes(item));
+  const hasAll = missingItems.length === 0;
+  
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-bold text-slate-700 flex items-center gap-2">
+          <Icon className="w-4 h-4 text-primary" />
+          {title}
+        </h4>
+        {hasAll ? (
+          <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200">הושלם</Badge>
+        ) : (
+          <Badge className="bg-red-50 text-red-600 border-red-200">חסר {missingItems.length}</Badge>
+        )}
+      </div>
+      
+      <div className="space-y-1.5">
+        {allItems.map((item) => {
+          const isChecked = checked.includes(item);
+          return (
+            <div 
+              key={item} 
+              className={`flex items-center justify-between py-2 px-3 rounded-lg text-sm ${
+                isChecked ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'
+              }`}
+            >
+              <span className={isChecked ? 'text-slate-700' : 'text-red-700 font-medium'}>
+                {item}
+              </span>
+              {isChecked ? (
+                <CheckCircle className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span className="text-xs text-red-600 font-bold">חסר</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export function ReportDetailDialog({ report, open, onOpenChange }: ReportDetailDialogProps) {
   if (!report) return null;
 
@@ -82,6 +141,13 @@ export function ReportDetailDialog({ report, open, onOpenChange }: ReportDetailD
     { label: "הגה הרכב", url: report.photo_steering_wheel },
   ].filter(p => p.url);
 
+  // Build combat equipment checked items based on boolean flags
+  const combatEquipmentChecked: string[] = [];
+  if (report.has_ceramic_vest) combatEquipmentChecked.push("ווסט קרמי");
+  if (report.has_helmet) combatEquipmentChecked.push("קסדה");
+  if (report.has_personal_weapon) combatEquipmentChecked.push("נשק אישי");
+  if (report.has_ammunition) combatEquipmentChecked.push("מחסניות");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white border-slate-200 shadow-2xl rounded-3xl">
@@ -92,6 +158,9 @@ export function ReportDetailDialog({ report, open, onOpenChange }: ReportDetailD
             </div>
             <span className="font-black text-lg">פרטי דיווח</span>
           </DialogTitle>
+          <DialogDescription className="text-slate-500">
+            צפייה בפרטי הדיווח המלאים
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
@@ -141,29 +210,48 @@ export function ReportDetailDialog({ report, open, onOpenChange }: ReportDetailD
           <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
             <h3 className="font-black text-slate-800 mb-4">תדריכים</h3>
             <div className="space-y-2">
-              <CheckItem label="השתתפות בנוהל חירום" checked={report.emergency_procedure_participation} />
-              <CheckItem label="נוכחות בתדריך מפקד" checked={report.commander_briefing_attendance} />
-              <CheckItem label="מילוי כרטיס עבודה" checked={report.work_card_completed} />
+              <CheckItem label="השתתפות בנוהל קרה" checked={report.emergency_procedure_participation} />
+              <CheckItem label='השתתפות בתדריך ותחקיר ע"י דרג ממונה' checked={report.commander_briefing_attendance} />
+              <CheckItem label="מילוי כרטיס עבודה וחתימה" checked={report.work_card_completed} />
             </div>
           </div>
 
-          {/* ציוד וכוננות */}
+          {/* ציוד קרבי - עם פירוט */}
           <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
             <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
               ציוד קרבי
             </h3>
-            <div className="space-y-2">
-              <CheckItem label="ווסט קרמי" checked={report.has_ceramic_vest} />
-              <CheckItem label="קסדה" checked={report.has_helmet} />
-              <CheckItem label="נשק אישי" checked={report.has_personal_weapon} />
-              <CheckItem label="תחמושת" checked={report.has_ammunition} />
-            </div>
-            <Separator className="my-4 bg-slate-200" />
-            <h4 className="font-bold text-slate-700 mb-3">בדיקות רכב</h4>
-            <div className="space-y-2">
-              <CheckItem label="בדיקות תל״ת לפני תנועה" checked={report.pre_movement_checks_completed} />
-              <CheckItem label="כלי נהג" checked={report.driver_tools_checked} />
+            <DetailedChecklist 
+              title="ציוד לחימה"
+              allItems={COMBAT_EQUIPMENT}
+              checkedItems={combatEquipmentChecked}
+              icon={Shield}
+            />
+          </div>
+
+          {/* בדיקות רכב - עם פירוט */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
+            <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">
+              <Truck className="w-5 h-5 text-primary" />
+              בדיקות רכב
+            </h3>
+            <div className="space-y-6">
+              <DetailedChecklist 
+                title='בדיקות טל"ת לפני תנועה'
+                allItems={PRE_MOVEMENT_CHECKS}
+                checkedItems={report.pre_movement_items_checked}
+                icon={Truck}
+              />
+              
+              <Separator className="bg-slate-200" />
+              
+              <DetailedChecklist 
+                title="כלי נהג"
+                allItems={DRIVER_TOOLS}
+                checkedItems={report.driver_tools_items_checked}
+                icon={Shield}
+              />
             </div>
           </div>
 
