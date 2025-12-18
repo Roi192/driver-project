@@ -5,11 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
-import { FileSignature, Users, Calendar, Loader2, CheckCircle2, XCircle, ChevronLeft, Search } from "lucide-react";
+import { FileSignature, Users, Calendar, Loader2, CheckCircle2, XCircle, ChevronLeft, Search, Download } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import unitLogo from "@/assets/unit-logo.png";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
 
 interface SignatureRecord {
   id: string;
@@ -144,6 +146,42 @@ export function ProcedureSignaturesCard() {
     );
   };
 
+  const handleExportToExcel = () => {
+    try {
+      const allSignatures = [
+        ...stats.byProcedure.routine.signers.map(s => ({ ...s, procedure: "נהלי שגרה" })),
+        ...stats.byProcedure.shift.signers.map(s => ({ ...s, procedure: "נהלים במהלך משמרת" })),
+        ...stats.byProcedure.aluf70.signers.map(s => ({ ...s, procedure: "נוהל אלוף 70" })),
+      ];
+
+      if (allSignatures.length === 0) {
+        toast.error("אין חתימות לייצוא");
+        return;
+      }
+
+      const exportData = allSignatures.map(sig => ({
+        "שם מלא": sig.full_name,
+        "נוהל": sig.procedure,
+        "חתימה": sig.signature,
+        "תאריך חתימה": format(new Date(sig.created_at), "dd/MM/yyyy HH:mm", { locale: he }),
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [{ wch: 20 }, { wch: 25 }, { wch: 20 }, { wch: 20 }];
+      
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "חתימות נהלים");
+      
+      const fileName = `חתימות_נהלים_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast.success("הקובץ יוצא בהצלחה");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("שגיאה בייצוא הקובץ");
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: he });
   };
@@ -191,9 +229,19 @@ export function ProcedureSignaturesCard() {
                   <p className="text-sm text-slate-600">חתמו על כל הנהלים</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                {new Date().getFullYear()}
-              </Badge>
+              <div className="flex flex-col gap-2">
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                  {new Date().getFullYear()}
+                </Badge>
+                <Button
+                  onClick={handleExportToExcel}
+                  size="sm"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                >
+                  <Download className="w-4 h-4 ml-1" />
+                  ייצוא
+                </Button>
+              </div>
             </div>
           </div>
 

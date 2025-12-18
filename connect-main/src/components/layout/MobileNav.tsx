@@ -16,7 +16,9 @@ import {
   Sparkles,
   LogOut,
   LayoutDashboard,
-  ChevronLeft
+  ChevronLeft,
+  Calendar,
+  ClipboardCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -183,24 +185,60 @@ export function MobileNav() {
         </div>
 
         <div className="p-4 space-y-2 relative z-10">
-          {/* Admin Dashboard Link - Premium Gold Style */}
+          {/* Admin Links - Premium Gold Style */}
           {isAdmin && (
-            <NavLink
-              to="/admin"
-              onClick={() => setIsOpen(false)}
-              className={cn(
-                "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-              )}
-              activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-gold via-gold-dark to-gold text-slate-900 shadow-gold group-hover:scale-110 transition-transform duration-300">
-                <LayoutDashboard className="w-6 h-6" />
-              </div>
-              <span className="font-bold text-base relative z-10 flex-1">דשבורד מנהל</span>
-              <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-gold group-hover:-translate-x-1 transition-all duration-300" />
-            </NavLink>
+            <>
+              <NavLink
+                to="/admin"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-gold via-gold-dark to-gold text-slate-900 shadow-gold group-hover:scale-110 transition-transform duration-300">
+                  <LayoutDashboard className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דשבורד מנהל</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-gold group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/annual-work-plan"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">תוכנית עבודה שנתית</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/bom-report"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <ClipboardCheck className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דו"ח בו"מ</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+            </>
           )}
 
           {navItems.map((item, index) => (

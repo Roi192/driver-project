@@ -15,6 +15,8 @@ import TrainingVideos from "./pages/TrainingVideos";
 import Procedures from "./pages/Procedures";
 import MyReports from "./pages/MyReports";
 import AdminDashboard from "./pages/AdminDashboard";
+import AnnualWorkPlan from "./pages/AnnualWorkPlan";
+import BomReport from "./pages/BomReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -97,6 +99,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/annual-work-plan"
+              element={
+                <ProtectedRoute>
+                  <AnnualWorkPlan />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bom-report"
+              element={
+                <ProtectedRoute>
+                  <BomReport />
                 </ProtectedRoute>
               }
             />
