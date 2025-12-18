@@ -68,8 +68,7 @@ export function useShiftReport() {
       const originalBlob = await base64Response.blob();
       const blob = await compressImageBlob(originalBlob);
 
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.${ext}`;
+      const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.jpg`;
 
       const { error: uploadError } = await supabase.storage
         .from("shift-photos")
