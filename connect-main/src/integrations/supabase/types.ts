@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      accidents: {
+        Row: {
+          accident_date: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          driver_type: string
+          id: string
+          location: string | null
+          notes: string | null
+          severity: string | null
+          soldier_id: string
+          updated_at: string
+          vehicle_number: string | null
+        }
+        Insert: {
+          accident_date: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_type: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          severity?: string | null
+          soldier_id: string
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Update: {
+          accident_date?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          driver_type?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          severity?: string | null
+          soldier_id?: string
+          updated_at?: string
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accidents_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_tasks: {
         Row: {
           assigned_to: string
@@ -50,6 +103,33 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      calendar_holidays: {
+        Row: {
+          category: string
+          created_at: string
+          event_date: string
+          id: string
+          is_recurring: boolean | null
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          event_date: string
+          id?: string
+          is_recurring?: boolean | null
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          event_date?: string
+          id?: string
+          is_recurring?: boolean | null
+          title?: string
         }
         Relationships: []
       }
@@ -94,6 +174,203 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      event_attendance: {
+        Row: {
+          absence_reason: string | null
+          attended: boolean | null
+          completed: boolean | null
+          created_at: string
+          event_id: string
+          id: string
+          notes: string | null
+          soldier_id: string
+          status: string
+        }
+        Insert: {
+          absence_reason?: string | null
+          attended?: boolean | null
+          completed?: boolean | null
+          created_at?: string
+          event_id: string
+          id?: string
+          notes?: string | null
+          soldier_id: string
+          status?: string
+        }
+        Update: {
+          absence_reason?: string | null
+          attended?: boolean | null
+          completed?: boolean | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          notes?: string | null
+          soldier_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendance_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "work_plan_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendance_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspections: {
+        Row: {
+          combat_debrief_by: string | null
+          combat_driver_in_debrief: boolean | null
+          combat_driver_participated: boolean | null
+          combat_score: number | null
+          commander_name: string
+          created_at: string
+          created_by: string | null
+          general_notes: string | null
+          id: string
+          inspection_date: string
+          inspector_name: string
+          platoon: string
+          procedures_combat_equipment: boolean | null
+          procedures_descent_drill: boolean | null
+          procedures_fire_drill: boolean | null
+          procedures_rollover_drill: boolean | null
+          procedures_score: number | null
+          procedures_weapon_present: boolean | null
+          routes_familiarity_score: number | null
+          routes_notes: string | null
+          safety_driver_tools_extinguisher: boolean | null
+          safety_driver_tools_jack: boolean | null
+          safety_driver_tools_license: boolean | null
+          safety_driver_tools_triangle: boolean | null
+          safety_driver_tools_vest: boolean | null
+          safety_driver_tools_wheel_key: boolean | null
+          safety_score: number | null
+          safety_ten_commandments: boolean | null
+          simulations_questions: Json | null
+          simulations_score: number | null
+          soldier_id: string
+          total_score: number | null
+          updated_at: string
+          vehicle_clean: boolean | null
+          vehicle_equipment_secured: boolean | null
+          vehicle_mission_sheet: boolean | null
+          vehicle_score: number | null
+          vehicle_tlt_nuts: boolean | null
+          vehicle_tlt_oil: boolean | null
+          vehicle_tlt_pressure: boolean | null
+          vehicle_tlt_water: boolean | null
+          vehicle_vardim_knowledge: boolean | null
+          vehicle_work_card: boolean | null
+        }
+        Insert: {
+          combat_debrief_by?: string | null
+          combat_driver_in_debrief?: boolean | null
+          combat_driver_participated?: boolean | null
+          combat_score?: number | null
+          commander_name: string
+          created_at?: string
+          created_by?: string | null
+          general_notes?: string | null
+          id?: string
+          inspection_date: string
+          inspector_name: string
+          platoon: string
+          procedures_combat_equipment?: boolean | null
+          procedures_descent_drill?: boolean | null
+          procedures_fire_drill?: boolean | null
+          procedures_rollover_drill?: boolean | null
+          procedures_score?: number | null
+          procedures_weapon_present?: boolean | null
+          routes_familiarity_score?: number | null
+          routes_notes?: string | null
+          safety_driver_tools_extinguisher?: boolean | null
+          safety_driver_tools_jack?: boolean | null
+          safety_driver_tools_license?: boolean | null
+          safety_driver_tools_triangle?: boolean | null
+          safety_driver_tools_vest?: boolean | null
+          safety_driver_tools_wheel_key?: boolean | null
+          safety_score?: number | null
+          safety_ten_commandments?: boolean | null
+          simulations_questions?: Json | null
+          simulations_score?: number | null
+          soldier_id: string
+          total_score?: number | null
+          updated_at?: string
+          vehicle_clean?: boolean | null
+          vehicle_equipment_secured?: boolean | null
+          vehicle_mission_sheet?: boolean | null
+          vehicle_score?: number | null
+          vehicle_tlt_nuts?: boolean | null
+          vehicle_tlt_oil?: boolean | null
+          vehicle_tlt_pressure?: boolean | null
+          vehicle_tlt_water?: boolean | null
+          vehicle_vardim_knowledge?: boolean | null
+          vehicle_work_card?: boolean | null
+        }
+        Update: {
+          combat_debrief_by?: string | null
+          combat_driver_in_debrief?: boolean | null
+          combat_driver_participated?: boolean | null
+          combat_score?: number | null
+          commander_name?: string
+          created_at?: string
+          created_by?: string | null
+          general_notes?: string | null
+          id?: string
+          inspection_date?: string
+          inspector_name?: string
+          platoon?: string
+          procedures_combat_equipment?: boolean | null
+          procedures_descent_drill?: boolean | null
+          procedures_fire_drill?: boolean | null
+          procedures_rollover_drill?: boolean | null
+          procedures_score?: number | null
+          procedures_weapon_present?: boolean | null
+          routes_familiarity_score?: number | null
+          routes_notes?: string | null
+          safety_driver_tools_extinguisher?: boolean | null
+          safety_driver_tools_jack?: boolean | null
+          safety_driver_tools_license?: boolean | null
+          safety_driver_tools_triangle?: boolean | null
+          safety_driver_tools_vest?: boolean | null
+          safety_driver_tools_wheel_key?: boolean | null
+          safety_score?: number | null
+          safety_ten_commandments?: boolean | null
+          simulations_questions?: Json | null
+          simulations_score?: number | null
+          soldier_id?: string
+          total_score?: number | null
+          updated_at?: string
+          vehicle_clean?: boolean | null
+          vehicle_equipment_secured?: boolean | null
+          vehicle_mission_sheet?: boolean | null
+          vehicle_score?: number | null
+          vehicle_tlt_nuts?: boolean | null
+          vehicle_tlt_oil?: boolean | null
+          vehicle_tlt_pressure?: boolean | null
+          vehicle_tlt_water?: boolean | null
+          vehicle_vardim_knowledge?: boolean | null
+          vehicle_work_card?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       procedure_signatures: {
         Row: {
@@ -178,6 +455,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      punishments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          judge: string
+          notes: string | null
+          offense: string
+          punishment: string
+          punishment_date: string
+          soldier_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          judge: string
+          notes?: string | null
+          offense: string
+          punishment: string
+          punishment_date: string
+          soldier_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          judge?: string
+          notes?: string | null
+          offense?: string
+          punishment?: string
+          punishment_date?: string
+          soldier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "punishments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       safety_content: {
         Row: {
@@ -392,6 +716,45 @@ export type Database = {
         }
         Relationships: []
       }
+      soldiers: {
+        Row: {
+          civilian_license_expiry: string | null
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          military_license_expiry: string | null
+          outpost: string | null
+          personal_number: string
+          release_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          civilian_license_expiry?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          military_license_expiry?: string | null
+          outpost?: string | null
+          personal_number: string
+          release_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          civilian_license_expiry?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          military_license_expiry?: string | null
+          outpost?: string | null
+          personal_number?: string
+          release_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       training_videos: {
         Row: {
           created_at: string
@@ -443,39 +806,54 @@ export type Database = {
       work_plan_events: {
         Row: {
           attendees: string[] | null
+          category: string | null
           color: string | null
           created_at: string
           created_by: string | null
           description: string | null
           end_date: string | null
           event_date: string
+          expected_soldiers: string[] | null
           id: string
+          is_series: boolean | null
+          series_id: string | null
+          series_pattern: string | null
           status: string
           title: string
           updated_at: string
         }
         Insert: {
           attendees?: string[] | null
+          category?: string | null
           color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           end_date?: string | null
           event_date: string
+          expected_soldiers?: string[] | null
           id?: string
+          is_series?: boolean | null
+          series_id?: string | null
+          series_pattern?: string | null
           status?: string
           title: string
           updated_at?: string
         }
         Update: {
           attendees?: string[] | null
+          category?: string | null
           color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           end_date?: string | null
           event_date?: string
+          expected_soldiers?: string[] | null
           id?: string
+          is_series?: boolean | null
+          series_id?: string | null
+          series_pattern?: string | null
           status?: string
           title?: string
           updated_at?: string

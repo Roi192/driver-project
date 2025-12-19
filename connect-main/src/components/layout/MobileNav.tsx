@@ -18,7 +18,12 @@ import {
   LayoutDashboard,
   ChevronLeft,
   Calendar,
-  ClipboardCheck
+  ClipboardCheck,
+  Users,
+  Gavel,
+  UserCheck,
+  FileSearch,
+  Car
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -237,6 +242,108 @@ export function MobileNav() {
                 </div>
                 <span className="font-bold text-base relative z-10 flex-1">דו"ח בו"מ</span>
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/soldiers-control"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">טבלת שליטה</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/attendance-tracking"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב נוכחות</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-teal-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/punishments"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Gavel className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב עונשים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-red-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/inspections"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <FileSearch className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">ביקורות</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/holidays-management"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">חגים ואזכורים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/accidents-tracking"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Car className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב תאונות</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-orange-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
             </>
           )}

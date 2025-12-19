@@ -17,6 +17,12 @@ import MyReports from "./pages/MyReports";
 import AdminDashboard from "./pages/AdminDashboard";
 import AnnualWorkPlan from "./pages/AnnualWorkPlan";
 import BomReport from "./pages/BomReport";
+import SoldiersControl from "./pages/SoldiersControl";
+import AttendanceTracking from "./pages/AttendanceTracking";
+import PunishmentsTracking from "./pages/PunishmentsTracking";
+import Inspections from "./pages/Inspections";
+import HolidaysManagement from "./pages/HolidaysManagement";
+import AccidentsTracking from "./pages/AccidentsTracking";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -115,6 +121,54 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BomReport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/soldiers-control"
+              element={
+                <ProtectedRoute>
+                  <SoldiersControl />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/attendance-tracking"
+              element={
+                <ProtectedRoute>
+                  <AttendanceTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/punishments"
+              element={
+                <ProtectedRoute>
+                  <PunishmentsTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inspections"
+              element={
+                <ProtectedRoute>
+                  <Inspections />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/holidays-management"
+              element={
+                <ProtectedRoute>
+                  <HolidaysManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accidents-tracking"
+              element={
+                <ProtectedRoute>
+                  <AccidentsTracking />
                 </ProtectedRoute>
               }
             />
