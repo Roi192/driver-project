@@ -29,12 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import * as XLSX from 'xlsx';
 
 interface Soldier {
   id: string;
@@ -44,7 +45,8 @@ interface Soldier {
 
 interface Accident {
   id: string;
-  soldier_id: string;
+  soldier_id: string | null;
+  driver_name: string | null;
   accident_date: string;
   driver_type: 'security' | 'combat';
   vehicle_number: string | null;
@@ -82,10 +84,17 @@ const AccidentsTracking = () => {
   const [editingAccident, setEditingAccident] = useState<Accident | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [accidentToDelete, setAccidentToDelete] = useState<string | null>(null);
+  
+  // Filters
   const [filterDriverType, setFilterDriverType] = useState<string>('all');
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [filterDateFrom, setFilterDateFrom] = useState<string>('');
+  const [filterDateTo, setFilterDateTo] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const [formData, setFormData] = useState({
     soldier_id: '',
+    driver_name: '',
     accident_date: format(new Date(), 'yyyy-MM-dd'),
     driver_type: 'security' as DriverType,
     vehicle_number: '',
@@ -126,14 +135,15 @@ const AccidentsTracking = () => {
   const addMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { error } = await supabase.from('accidents').insert({
-        soldier_id: data.soldier_id,
         accident_date: data.accident_date,
         driver_type: data.driver_type,
         vehicle_number: data.vehicle_number || null,
         description: data.description || null,
         severity: data.severity,
         location: data.location || null,
-        notes: data.notes || null
+        notes: data.notes || null,
+        soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
+        driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null
       });
       if (error) throw error;
     },
@@ -152,14 +162,15 @@ const AccidentsTracking = () => {
       const { error } = await supabase
         .from('accidents')
         .update({
-          soldier_id: data.soldier_id,
           accident_date: data.accident_date,
           driver_type: data.driver_type,
           vehicle_number: data.vehicle_number || null,
           description: data.description || null,
           severity: data.severity,
           location: data.location || null,
-          notes: data.notes || null
+          notes: data.notes || null,
+          soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
+          driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null
         })
         .eq('id', data.id);
       if (error) throw error;
@@ -189,6 +200,7 @@ const AccidentsTracking = () => {
   const resetForm = () => {
     setFormData({
       soldier_id: '',
+      driver_name: '',
       accident_date: format(new Date(), 'yyyy-MM-dd'),
       driver_type: 'security',
       vehicle_number: '',
@@ -202,7 +214,8 @@ const AccidentsTracking = () => {
   const openEditDialog = (accident: Accident) => {
     setEditingAccident(accident);
     setFormData({
-      soldier_id: accident.soldier_id,
+      soldier_id: accident.soldier_id || '',
+      driver_name: accident.driver_name || '',
       accident_date: accident.accident_date,
       driver_type: accident.driver_type,
       vehicle_number: accident.vehicle_number || '',
@@ -215,15 +228,30 @@ const AccidentsTracking = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.soldier_id) {
+    
+    // Validate based on driver type
+    if (formData.driver_type === 'security' && !formData.soldier_id) {
       toast.error('יש לבחור חייל');
       return;
     }
+    if (formData.driver_type === 'combat' && !formData.driver_name.trim()) {
+      toast.error('יש להזין שם נהג');
+      return;
+    }
+    
     if (editingAccident) {
       updateMutation.mutate({ ...formData, id: editingAccident.id });
     } else {
       addMutation.mutate(formData);
     }
+  };
+
+  // Get driver name for display
+  const getDriverName = (accident: Accident): string => {
+    if (accident.driver_type === 'security' && accident.soldiers) {
+      return accident.soldiers.full_name;
+    }
+    return accident.driver_name || 'לא צוין';
   };
 
   // Calculate statistics
@@ -268,39 +296,52 @@ const AccidentsTracking = () => {
 
   // Filter accidents
   const filteredAccidents = useMemo(() => {
-    if (filterDriverType === 'all') return accidents;
-    return accidents.filter(a => a.driver_type === filterDriverType);
-  }, [accidents, filterDriverType]);
+    return accidents.filter(a => {
+      if (filterDriverType !== 'all' && a.driver_type !== filterDriverType) return false;
+      if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
+      if (filterDateFrom && a.accident_date < filterDateFrom) return false;
+      if (filterDateTo && a.accident_date > filterDateTo) return false;
+      return true;
+    });
+  }, [accidents, filterDriverType, filterSeverity, filterDateFrom, filterDateTo]);
+
+  // Export to Excel
+  const exportToExcel = () => {
+    const data = filteredAccidents.map(accident => ({
+      'תאריך': format(parseISO(accident.accident_date), 'dd/MM/yyyy'),
+      'שם נהג': getDriverName(accident),
+      'סוג נהג': driverTypeLabels[accident.driver_type],
+      'מספר רכב': accident.vehicle_number || '-',
+      'חומרה': severityLabels[accident.severity],
+      'מיקום': accident.location || '-',
+      'תיאור': accident.description || '-',
+      'הערות': accident.notes || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'תאונות');
+    XLSX.writeFile(wb, `דוח_תאונות_${format(new Date(), 'dd-MM-yyyy')}.xlsx`);
+    toast.success('הקובץ יוצא בהצלחה');
+  };
+
+  // Clear filters
+  const clearFilters = () => {
+    setFilterDriverType('all');
+    setFilterSeverity('all');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+  };
 
   const FormContent = () => (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label>חייל *</Label>
-        <Select value={formData.soldier_id} onValueChange={(v) => setFormData(p => ({ ...p, soldier_id: v }))}>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר חייל" />
-          </SelectTrigger>
-          <SelectContent>
-            {soldiers.map(s => (
-              <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.personal_number})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>תאריך תאונה *</Label>
-          <Input
-            type="date"
-            value={formData.accident_date}
-            onChange={(e) => setFormData(p => ({ ...p, accident_date: e.target.value }))}
-            required
-          />
-        </div>
-        <div className="space-y-2">
           <Label>סוג נהג *</Label>
-          <Select value={formData.driver_type} onValueChange={(v: DriverType) => setFormData(p => ({ ...p, driver_type: v }))}>
+          <Select 
+            value={formData.driver_type} 
+            onValueChange={(v: DriverType) => setFormData(p => ({ ...p, driver_type: v, soldier_id: '', driver_name: '' }))}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -310,7 +351,42 @@ const AccidentsTracking = () => {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <Label>תאריך תאונה *</Label>
+          <Input
+            type="date"
+            value={formData.accident_date}
+            onChange={(e) => setFormData(p => ({ ...p, accident_date: e.target.value }))}
+            required
+          />
+        </div>
       </div>
+
+      {/* Conditional driver selection based on type */}
+      {formData.driver_type === 'security' ? (
+        <div className="space-y-2">
+          <Label>חייל (מהרשימה) *</Label>
+          <Select value={formData.soldier_id} onValueChange={(v) => setFormData(p => ({ ...p, soldier_id: v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר חייל" />
+            </SelectTrigger>
+            <SelectContent>
+              {soldiers.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.personal_number})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label>שם הנהג *</Label>
+          <Input
+            value={formData.driver_name}
+            onChange={(e) => setFormData(p => ({ ...p, driver_name: e.target.value }))}
+            placeholder="הזן שם נהג לוחם"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -374,20 +450,89 @@ const AccidentsTracking = () => {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-6" dir="rtl">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h1 className="text-2xl font-bold">מעקב תאונות</h1>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="ml-2 h-4 w-4" /> הוסף תאונה</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>הוספת תאונה חדשה</DialogTitle>
-              </DialogHeader>
-              <FormContent />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="ml-2 h-4 w-4" /> סינון
+            </Button>
+            <Button variant="outline" onClick={exportToExcel}>
+              <FileSpreadsheet className="ml-2 h-4 w-4" /> ייצוא לאקסל
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button><Plus className="ml-2 h-4 w-4" /> הוסף תאונה</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>הוספת תאונה חדשה</DialogTitle>
+                </DialogHeader>
+                <FormContent />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">סינון מתקדם</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label>סוג נהג</Label>
+                  <Select value={filterDriverType} onValueChange={setFilterDriverType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="security">נהגי בט"ש</SelectItem>
+                      <SelectItem value="combat">נהגי לוחמים</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>חומרה</Label>
+                  <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="minor">קל</SelectItem>
+                      <SelectItem value="moderate">בינוני</SelectItem>
+                      <SelectItem value="severe">חמור</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>מתאריך</Label>
+                  <Input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>עד תאריך</Label>
+                  <Input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button variant="outline" onClick={clearFilters} className="w-full">
+                    נקה סינון
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -449,19 +594,7 @@ const AccidentsTracking = () => {
         {/* Accidents Table */}
         <Card>
           <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle>רשימת תאונות</CardTitle>
-              <Select value={filterDriverType} onValueChange={setFilterDriverType}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="סנן לפי סוג נהג" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">הכל</SelectItem>
-                  <SelectItem value="security">נהגי בט"ש</SelectItem>
-                  <SelectItem value="combat">נהגי לוחמים</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <CardTitle>רשימת תאונות ({filteredAccidents.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -474,7 +607,7 @@ const AccidentsTracking = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>תאריך</TableHead>
-                      <TableHead>חייל</TableHead>
+                      <TableHead>נהג</TableHead>
                       <TableHead>סוג נהג</TableHead>
                       <TableHead>מספר רכב</TableHead>
                       <TableHead>חומרה</TableHead>
@@ -487,15 +620,17 @@ const AccidentsTracking = () => {
                     {filteredAccidents.map((accident) => (
                       <TableRow key={accident.id}>
                         <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell>{accident.soldiers?.full_name || '-'}</TableCell>
+                        <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${accident.driver_type === 'security' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            accident.driver_type === 'security' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                          }`}>
                             {driverTypeLabels[accident.driver_type]}
                           </span>
                         </TableCell>
                         <TableCell>{accident.vehicle_number || '-'}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${severityColors[accident.severity]}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
                             {severityLabels[accident.severity]}
                           </span>
                         </TableCell>
@@ -503,22 +638,13 @@ const AccidentsTracking = () => {
                         <TableCell className="max-w-xs truncate">{accident.description || '-'}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Dialog open={editingAccident?.id === accident.id} onOpenChange={(open) => { if (!open) { setEditingAccident(null); resetForm(); } }}>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => openEditDialog(accident)}>
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                  <DialogTitle>עריכת תאונה</DialogTitle>
-                                </DialogHeader>
-                                <FormContent />
-                              </DialogContent>
-                            </Dialog>
-                            <Button
-                              variant="destructive"
-                              size="sm"
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(accident)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-red-500 hover:text-red-600"
                               onClick={() => { setAccidentToDelete(accident.id); setDeleteConfirmOpen(true); }}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -534,17 +660,30 @@ const AccidentsTracking = () => {
           </CardContent>
         </Card>
 
+        {/* Edit Dialog */}
+        <Dialog open={!!editingAccident} onOpenChange={(open) => { if (!open) { setEditingAccident(null); resetForm(); } }}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>עריכת תאונה</DialogTitle>
+            </DialogHeader>
+            <FormContent />
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
         <DeleteConfirmDialog
           open={deleteConfirmOpen}
           onOpenChange={setDeleteConfirmOpen}
-          onConfirm={async () => {
+          title="מחיקת תאונה"
+          description="האם אתה בטוח שברצונך למחוק תאונה זו? פעולה זו אינה ניתנת לביטול."
+          onConfirm={() => {
             if (accidentToDelete) {
               deleteMutation.mutate(accidentToDelete);
-              setAccidentToDelete(null);
             }
+            setDeleteConfirmOpen(false);
+            setAccidentToDelete(null);
+            return Promise.resolve();
           }}
-          title="מחיקת תאונה"
-          description="האם אתה בטוח שברצונך למחוק תאונה זו?"
         />
       </div>
     </AppLayout>

@@ -24,11 +24,13 @@ import {
   Shield,
   Calendar,
   FileSpreadsheet,
-  Search
+  Search,
+  Eye
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
 import unitLogo from "@/assets/unit-logo.png";
+import { SoldierProfileDialog } from "@/components/admin/SoldierProfileDialog";
 
 interface Soldier {
   id: string;
@@ -52,6 +54,8 @@ export default function SoldiersControl() {
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [soldierToDelete, setSoldierToDelete] = useState<Soldier | null>(null);
+  const [profileSoldier, setProfileSoldier] = useState<Soldier | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     personal_number: "",
@@ -391,6 +395,15 @@ export default function SoldiersControl() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                onClick={() => { setProfileSoldier(soldier); setProfileOpen(true); }}
+                                className="rounded-xl text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                title="צפייה בפרופיל מרוכז"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => openEditDialog(soldier)}
                                 className="rounded-xl"
                               >
@@ -500,6 +513,13 @@ export default function SoldiersControl() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Soldier Profile Dialog */}
+        <SoldierProfileDialog
+          soldier={profileSoldier}
+          open={profileOpen}
+          onOpenChange={setProfileOpen}
+        />
       </div>
     </AppLayout>
   );

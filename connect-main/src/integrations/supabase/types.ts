@@ -20,12 +20,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          driver_name: string | null
           driver_type: string
           id: string
           location: string | null
           notes: string | null
           severity: string | null
-          soldier_id: string
+          soldier_id: string | null
           updated_at: string
           vehicle_number: string | null
         }
@@ -34,12 +35,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          driver_name?: string | null
           driver_type: string
           id?: string
           location?: string | null
           notes?: string | null
           severity?: string | null
-          soldier_id: string
+          soldier_id?: string | null
           updated_at?: string
           vehicle_number?: string | null
         }
@@ -48,12 +50,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          driver_name?: string | null
           driver_type?: string
           id?: string
           location?: string | null
           notes?: string | null
           severity?: string | null
-          soldier_id?: string
+          soldier_id?: string | null
           updated_at?: string
           vehicle_number?: string | null
         }
