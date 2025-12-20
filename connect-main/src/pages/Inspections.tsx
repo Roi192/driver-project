@@ -751,18 +751,16 @@ export default function Inspections() {
                         <span className="font-bold text-amber-800">עזר למפקד - נקודות תורפה ב{formData.platoon}</span>
                       </div>
                       {vulnerabilityFiles.length > 0 ? (
-                        <ScrollArea className="max-h-40">
-                          <div className="space-y-2">
-                            {vulnerabilityFiles.map((file, idx) => (
-                              <div key={idx} className="p-2 bg-white rounded-lg border border-amber-100">
-                                <p className="font-medium text-amber-900 text-sm">{file.title}</p>
-                                {file.content && (
-                                  <p className="text-xs text-slate-600 mt-1">{file.content}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
+                        <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                          {vulnerabilityFiles.map((file, idx) => (
+                            <div key={idx} className="p-2 bg-white rounded-lg border border-amber-100">
+                              <p className="font-medium text-amber-900 text-sm">{file.title}</p>
+                              {file.content && (
+                                <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap">{file.content}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       ) : (
                         <p className="text-sm text-amber-700">אין נקודות תורפה רשומות עבור {formData.platoon}</p>
                       )}
