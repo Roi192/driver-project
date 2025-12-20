@@ -928,7 +928,7 @@ export default function AnnualWorkPlan() {
 
         {/* Expected Soldiers Dialog */}
         <Dialog open={expectedSoldiersDialogOpen} onOpenChange={setExpectedSoldiersDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col min-h-0" dir="rtl">
             <DialogHeader>
               <DialogTitle>חיילים מצופים למופע: {selectedEvent?.title}</DialogTitle>
             </DialogHeader>
@@ -942,7 +942,7 @@ export default function AnnualWorkPlan() {
               <Button variant="outline" size="sm" onClick={clearAllExpected}>נקה הכל</Button>
             </div>
 
-            <ScrollArea className="flex-1 h-[50vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto max-h-[60vh] pr-1 overscroll-contain">
               <div className="space-y-2 p-1">
                 {soldiers.map(soldier => (
                   <div
@@ -970,7 +970,7 @@ export default function AnnualWorkPlan() {
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
 
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setExpectedSoldiersDialogOpen(false)}>ביטול</Button>
@@ -983,7 +983,7 @@ export default function AnnualWorkPlan() {
 
         {/* Attendance Dialog with 4 Statuses */}
         <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col min-h-0" dir="rtl">
             <DialogHeader>
               <DialogTitle>נוכחות במופע: {selectedEvent?.title}</DialogTitle>
             </DialogHeader>
@@ -997,12 +997,12 @@ export default function AnnualWorkPlan() {
               ))}
             </div>
 
-            <ScrollArea className="flex-1 h-[55vh]">
+            <div className="flex-1 min-h-0 overflow-y-auto max-h-[60vh] pr-1 overscroll-contain">
               <div className="space-y-3 p-1">
                 {soldiers.map(soldier => {
                   const soldierData = selectedSoldierAttendance[soldier.id] || { status: "not_updated" as AttendanceStatus, reason: "", completed: false };
                   const isExpected = selectedEvent?.expected_soldiers?.includes(soldier.id);
-                  
+
                   return (
                     <div
                       key={soldier.id}
@@ -1023,7 +1023,7 @@ export default function AnnualWorkPlan() {
                           {attendanceStatusLabels[soldierData.status]}
                         </Badge>
                       </div>
-                      
+
                       {/* Status Selection */}
                       <div className="grid grid-cols-4 gap-1">
                         {(["attended", "absent", "not_in_rotation", "not_updated"] as AttendanceStatus[]).map(status => (
@@ -1032,9 +1032,9 @@ export default function AnnualWorkPlan() {
                             onClick={() => {
                               setSelectedSoldierAttendance(prev => ({
                                 ...prev,
-                                [soldier.id]: { 
-                                  ...prev[soldier.id], 
-                                  status, 
+                                [soldier.id]: {
+                                  ...prev[soldier.id],
+                                  status,
                                   reason: status === "attended" || status === "not_in_rotation" ? "" : prev[soldier.id]?.reason || "",
                                   completed: status === "absent" ? prev[soldier.id]?.completed || false : false
                                 }
@@ -1054,8 +1054,8 @@ export default function AnnualWorkPlan() {
                       {/* Absence Reason & Completion */}
                       {soldierData.status === "absent" && (
                         <div className="mt-2 space-y-2">
-                          <Select 
-                            value={soldierData.reason} 
+                          <Select
+                            value={soldierData.reason}
                             onValueChange={(v) => {
                               setSelectedSoldierAttendance(prev => ({
                                 ...prev,
@@ -1097,7 +1097,7 @@ export default function AnnualWorkPlan() {
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
 
             <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setAttendanceDialogOpen(false)}>ביטול</Button>
