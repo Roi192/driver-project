@@ -67,7 +67,7 @@ export function GeneralDetails() {
             <p className="text-xs text-slate-500">בחר את המוצב שלך</p>
           </div>
         </div>
-        <Select value={watch("outpost")} onValueChange={(value) => setValue("outpost", value)}>
+        <Select value={watch("outpost")} onValueChange={(value) => setValue("outpost", value, { shouldDirty: true, shouldTouch: true })}>
           <SelectTrigger className="h-14 bg-slate-50 border-slate-200 focus:border-primary text-base rounded-xl text-slate-800">
             <SelectValue placeholder="בחר מוצב" />
           </SelectTrigger>

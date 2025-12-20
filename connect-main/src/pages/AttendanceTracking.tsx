@@ -665,7 +665,7 @@ export default function AttendanceTracking() {
                   <CardTitle className="text-slate-800">רשימת חיילים - לחץ לפרטים</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="max-h-[400px]">
+                  <ScrollArea className="h-[55vh] md:h-[65vh]">
                     <div className="space-y-3">
                       {filteredSoldiers.map(soldier => {
                         const stats = getSoldierStats(soldier.id);
@@ -751,7 +751,7 @@ export default function AttendanceTracking() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="max-h-[500px]">
+                  <ScrollArea className="h-[60vh] md:h-[70vh]">
                     <Table>
                       <TableHeader>
                         <TableRow>

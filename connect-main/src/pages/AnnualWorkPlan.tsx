@@ -942,7 +942,7 @@ export default function AnnualWorkPlan() {
               <Button variant="outline" size="sm" onClick={clearAllExpected}>נקה הכל</Button>
             </div>
 
-            <ScrollArea className="flex-1 max-h-[40vh]">
+            <ScrollArea className="flex-1 h-[50vh]">
               <div className="space-y-2 p-1">
                 {soldiers.map(soldier => (
                   <div
@@ -997,7 +997,7 @@ export default function AnnualWorkPlan() {
               ))}
             </div>
 
-            <ScrollArea className="flex-1 max-h-[50vh]">
+            <ScrollArea className="flex-1 h-[55vh]">
               <div className="space-y-3 p-1">
                 {soldiers.map(soldier => {
                   const soldierData = selectedSoldierAttendance[soldier.id] || { status: "not_updated" as AttendanceStatus, reason: "", completed: false };

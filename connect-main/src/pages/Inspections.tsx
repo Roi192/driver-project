@@ -481,7 +481,7 @@ export default function Inspections() {
               <CardTitle className="text-slate-800">רשימת ביקורות</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="max-h-[400px]">
+              <ScrollArea className="h-[55vh] md:h-[65vh]">
                 <div className="space-y-3">
                   {inspections.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
@@ -559,7 +559,7 @@ export default function Inspections() {
             </div>
             <p className="text-sm text-slate-500 text-center mb-4">{steps[currentStep]}</p>
 
-            <ScrollArea className="max-h-[50vh]">
+            <ScrollArea className="h-[55vh]">
               {/* Step 0: General Details */}
               {currentStep === 0 && (
                 <div className="space-y-4">

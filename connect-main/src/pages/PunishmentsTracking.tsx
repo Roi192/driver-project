@@ -283,7 +283,7 @@ export default function PunishmentsTracking() {
               <CardTitle className="text-slate-800">רשימת עונשים</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="max-h-[500px]">
+              <ScrollArea className="h-[60vh] md:h-[70vh]">
                 <div className="space-y-3">
                   {filteredPunishments.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">

@@ -602,7 +602,7 @@ const AccidentsTracking = () => {
             ) : filteredAccidents.length === 0 ? (
               <p className="text-center py-8 text-muted-foreground">לא נמצאו תאונות</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

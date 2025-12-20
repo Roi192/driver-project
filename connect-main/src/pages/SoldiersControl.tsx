@@ -1,3 +1,32 @@
+Skip to content
+Navigation Menu
+Roi192
+connect
+
+Type / to search
+Code
+Issues
+Pull requests
+Actions
+Projects
+Security
+Insights
+Settings
+connect/src/pages
+/SoldiersControl.tsx
+Go to file
+t
+lovable-dev[bot]
+lovable-dev[bot]
+Changes
+54170c9
+ · 
+1 hour ago
+
+Code
+
+Blame
+526 lines (480 loc) · 21.1 KB
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -329,7 +358,7 @@ export default function SoldiersControl() {
               <CardTitle className="text-slate-800">רשימת חיילים</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="max-h-[500px]">
+              <ScrollArea className="h-[60vh] md:h-[70vh]">
                 <div className="space-y-3">
                   {filteredSoldiers.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
@@ -524,3 +553,4 @@ export default function SoldiersControl() {
     </AppLayout>
   );
 }
+ 
