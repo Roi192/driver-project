@@ -127,6 +127,9 @@ export default function AttendanceTracking() {
   const [editStatus, setEditStatus] = useState<AttendanceStatus>("attended");
   const [editReason, setEditReason] = useState<AbsenceReason | "">("");
   const [editCompleted, setEditCompleted] = useState(false);
+  
+  // Low attendance soldiers dialog
+  const [lowAttendanceDialogOpen, setLowAttendanceDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -511,10 +514,14 @@ export default function AttendanceTracking() {
                 <p className="text-sm text-slate-600">ממוצע נוכחות</p>
               </CardContent>
             </Card>
-            <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50">
+            <Card 
+              className="border-0 bg-gradient-to-br from-red-50 to-orange-50 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => setLowAttendanceDialogOpen(true)}
+            >
               <CardContent className="p-4 text-center">
                 <p className="text-3xl font-black text-red-600">{lowAttendanceSoldiers.length}</p>
                 <p className="text-sm text-slate-600">נדרשים שיפור</p>
+                <p className="text-xs text-red-500 mt-1">לחץ לצפייה</p>
               </CardContent>
             </Card>
           </div>
@@ -976,6 +983,54 @@ export default function AttendanceTracking() {
                 שמור
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Low Attendance Soldiers Dialog */}
+        <Dialog open={lowAttendanceDialogOpen} onOpenChange={setLowAttendanceDialogOpen}>
+          <DialogContent className="max-w-md max-h-[90vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-800">
+                <AlertCircle className="w-5 h-5" />
+                חיילים נדרשים שיפור ({lowAttendanceSoldiers.length})
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-slate-500 mb-4">חיילים עם אחוז נוכחות נמוך מ-50%</p>
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-3">
+                {lowAttendanceSoldiers.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <CheckCircle className="w-12 h-12 mx-auto mb-3 text-emerald-500 opacity-50" />
+                    <p>אין חיילים נדרשים שיפור</p>
+                  </div>
+                ) : (
+                  lowAttendanceSoldiers.map(soldier => {
+                    const stats = getSoldierStats(soldier.id);
+                    return (
+                      <div
+                        key={soldier.id}
+                        className="p-4 rounded-2xl bg-red-50 border border-red-200 cursor-pointer hover:bg-red-100 transition-colors"
+                        onClick={() => {
+                          openSoldierDetail(soldier);
+                          setLowAttendanceDialogOpen(false);
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                            <p className="text-xs text-slate-500">{soldier.personal_number}</p>
+                          </div>
+                          <div className="text-left">
+                            <Badge className="bg-red-500 text-white text-lg">{stats.percentage}%</Badge>
+                            <p className="text-xs text-slate-500 mt-1">{stats.attended}/{stats.total} נוכחויות</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </div>

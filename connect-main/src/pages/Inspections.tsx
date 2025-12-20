@@ -83,6 +83,13 @@ export default function Inspections() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
+  
+  // KPI dialogs
+  const [outstandingDialogOpen, setOutstandingDialogOpen] = useState(false);
+  const [improvementDialogOpen, setImprovementDialogOpen] = useState(false);
+  
+  // Safety files for vulnerability helper
+  const [vulnerabilityFiles, setVulnerabilityFiles] = useState<{title: string; content: string | null}[]>([]);
 
   const [formData, setFormData] = useState({
     inspection_date: format(new Date(), "yyyy-MM-dd"),
@@ -135,6 +142,28 @@ export default function Inspections() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Fetch vulnerability files when platoon changes
+  useEffect(() => {
+    const fetchVulnerabilities = async () => {
+      if (!formData.platoon) {
+        setVulnerabilityFiles([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from("safety_files")
+        .select("title, content")
+        .eq("outpost", formData.platoon)
+        .eq("category", "vulnerability");
+      
+      if (!error && data) {
+        setVulnerabilityFiles(data);
+      }
+    };
+    
+    fetchVulnerabilities();
+  }, [formData.platoon]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -407,22 +436,30 @@ export default function Inspections() {
                 <p className="text-xs text-slate-600">ממוצע</p>
               </CardContent>
             </Card>
-            <Card className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50">
+            <Card 
+              className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => setOutstandingDialogOpen(true)}
+            >
               <CardContent className="p-3 text-center">
                 <div className="flex items-center justify-center gap-1">
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
                   <p className="text-2xl font-black text-emerald-600">{aboveAvgSoldiers.length}</p>
                 </div>
                 <p className="text-xs text-slate-600">מצטיינים</p>
+                <p className="text-[10px] text-emerald-500">לחץ לצפייה</p>
               </CardContent>
             </Card>
-            <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50">
+            <Card 
+              className="border-0 bg-gradient-to-br from-red-50 to-orange-50 cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => setImprovementDialogOpen(true)}
+            >
               <CardContent className="p-3 text-center">
                 <div className="flex items-center justify-center gap-1">
                   <TrendingDown className="w-4 h-4 text-red-600" />
                   <p className="text-2xl font-black text-red-600">{belowAvgSoldiers.length}</p>
                 </div>
                 <p className="text-xs text-slate-600">לשיפור</p>
+                <p className="text-[10px] text-red-500">לחץ לצפייה</p>
               </CardContent>
             </Card>
           </div>
@@ -705,6 +742,33 @@ export default function Inspections() {
                   <div className="p-3 bg-purple-50 rounded-xl text-center">
                     <span className="font-bold text-purple-800">הכרות עם הנתב"ים בגזרה - 15 נקודות</span>
                   </div>
+                  
+                  {/* Vulnerability Helper */}
+                  {formData.platoon && (
+                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <MapPin className="w-5 h-5 text-amber-600" />
+                        <span className="font-bold text-amber-800">עזר למפקד - נקודות תורפה ב{formData.platoon}</span>
+                      </div>
+                      {vulnerabilityFiles.length > 0 ? (
+                        <ScrollArea className="max-h-40">
+                          <div className="space-y-2">
+                            {vulnerabilityFiles.map((file, idx) => (
+                              <div key={idx} className="p-2 bg-white rounded-lg border border-amber-100">
+                                <p className="font-medium text-amber-900 text-sm">{file.title}</p>
+                                {file.content && (
+                                  <p className="text-xs text-slate-600 mt-1">{file.content}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      ) : (
+                        <p className="text-sm text-amber-700">אין נקודות תורפה רשומות עבור {formData.platoon}</p>
+                      )}
+                    </div>
+                  )}
+                  
                   <div>
                     <Label>ציון (0-15)</Label>
                     <Input 
@@ -762,6 +826,90 @@ export default function Inspections() {
                 <Button onClick={handleSubmit} className="bg-emerald-500">שמור ביקורת</Button>
               )}
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Outstanding Soldiers Dialog */}
+        <Dialog open={outstandingDialogOpen} onOpenChange={setOutstandingDialogOpen}>
+          <DialogContent className="max-w-md max-h-[90vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-emerald-800">
+                <TrendingUp className="w-5 h-5" />
+                חיילים מצטיינים ({aboveAvgSoldiers.length})
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-slate-500 mb-4">חיילים עם ציון ממוצע מעל 80</p>
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-3">
+                {aboveAvgSoldiers.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>אין חיילים מצטיינים</p>
+                  </div>
+                ) : (
+                  aboveAvgSoldiers.map(soldier => {
+                    const soldierInspections = inspections.filter(i => i.soldier_id === soldier.id);
+                    const avgSoldierScore = soldierInspections.length > 0 
+                      ? Math.round(soldierInspections.reduce((sum, i) => sum + i.total_score, 0) / soldierInspections.length)
+                      : 0;
+                    return (
+                      <div key={soldier.id} className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                            <p className="text-xs text-slate-500">{soldier.personal_number}</p>
+                            <p className="text-xs text-slate-500">{soldierInspections.length} ביקורות</p>
+                          </div>
+                          <Badge className="bg-emerald-500 text-white text-lg">{avgSoldierScore}</Badge>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        {/* Improvement Soldiers Dialog */}
+        <Dialog open={improvementDialogOpen} onOpenChange={setImprovementDialogOpen}>
+          <DialogContent className="max-w-md max-h-[90vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-800">
+                <TrendingDown className="w-5 h-5" />
+                חיילים לשיפור ({belowAvgSoldiers.length})
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-slate-500 mb-4">חיילים עם ציון ממוצע מתחת ל-60</p>
+            <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-3">
+                {belowAvgSoldiers.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>אין חיילים לשיפור</p>
+                  </div>
+                ) : (
+                  belowAvgSoldiers.map(soldier => {
+                    const soldierInspections = inspections.filter(i => i.soldier_id === soldier.id);
+                    const avgSoldierScore = soldierInspections.length > 0 
+                      ? Math.round(soldierInspections.reduce((sum, i) => sum + i.total_score, 0) / soldierInspections.length)
+                      : 0;
+                    return (
+                      <div key={soldier.id} className="p-4 rounded-2xl bg-red-50 border border-red-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                            <p className="text-xs text-slate-500">{soldier.personal_number}</p>
+                            <p className="text-xs text-slate-500">{soldierInspections.length} ביקורות</p>
+                          </div>
+                          <Badge className="bg-red-500 text-white text-lg">{avgSoldierScore}</Badge>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </div>

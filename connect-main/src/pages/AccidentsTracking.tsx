@@ -91,6 +91,10 @@ const AccidentsTracking = () => {
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // KPI dialogs for filtered accident lists
+  const [securityAccidentsDialogOpen, setSecurityAccidentsDialogOpen] = useState(false);
+  const [combatAccidentsDialogOpen, setCombatAccidentsDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     soldier_id: '',
@@ -333,7 +337,8 @@ const AccidentsTracking = () => {
     setFilterDateTo('');
   };
 
-  const FormContent = () => (
+  // Form content as JSX element instead of function to prevent re-renders and focus loss
+  const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -467,7 +472,7 @@ const AccidentsTracking = () => {
                 <DialogHeader>
                   <DialogTitle>הוספת תאונה חדשה</DialogTitle>
                 </DialogHeader>
-                <FormContent />
+                {formContent}
               </DialogContent>
             </Dialog>
           </div>
@@ -536,23 +541,31 @@ const AccidentsTracking = () => {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setSecurityAccidentsDialogOpen(true)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">תאונות נהגי בט"ש</CardTitle>
               <Shield className="h-5 w-5 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">{stats.security}</div>
+              <p className="text-xs text-blue-500 mt-1">לחץ לצפייה ברשימה</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => setCombatAccidentsDialogOpen(true)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">תאונות נהגי לוחמים</CardTitle>
               <Car className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600">{stats.combat}</div>
+              <p className="text-xs text-green-500 mt-1">לחץ לצפייה ברשימה</p>
             </CardContent>
           </Card>
 
@@ -666,7 +679,7 @@ const AccidentsTracking = () => {
             <DialogHeader>
               <DialogTitle>עריכת תאונה</DialogTitle>
             </DialogHeader>
-            <FormContent />
+            {formContent}
           </DialogContent>
         </Dialog>
 
@@ -685,6 +698,92 @@ const AccidentsTracking = () => {
             return Promise.resolve();
           }}
         />
+
+        {/* Security Accidents Dialog */}
+        <Dialog open={securityAccidentsDialogOpen} onOpenChange={setSecurityAccidentsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-blue-800">
+                <Shield className="w-5 h-5" />
+                תאונות נהגי בט"ש ({accidents.filter(a => a.driver_type === 'security').length})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>תאריך</TableHead>
+                    <TableHead>נהג</TableHead>
+                    <TableHead>מספר רכב</TableHead>
+                    <TableHead>חומרה</TableHead>
+                    <TableHead>מיקום</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accidents.filter(a => a.driver_type === 'security').map(accident => (
+                    <TableRow key={accident.id}>
+                      <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
+                      <TableCell>{accident.vehicle_number || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
+                          {severityLabels[accident.severity]}
+                        </span>
+                      </TableCell>
+                      <TableCell>{accident.location || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {accidents.filter(a => a.driver_type === 'security').length === 0 && (
+                <p className="text-center py-8 text-muted-foreground">אין תאונות של נהגי בט"ש</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Combat Accidents Dialog */}
+        <Dialog open={combatAccidentsDialogOpen} onOpenChange={setCombatAccidentsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-green-800">
+                <Car className="w-5 h-5" />
+                תאונות נהגי לוחמים ({accidents.filter(a => a.driver_type === 'combat').length})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>תאריך</TableHead>
+                    <TableHead>נהג</TableHead>
+                    <TableHead>מספר רכב</TableHead>
+                    <TableHead>חומרה</TableHead>
+                    <TableHead>מיקום</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accidents.filter(a => a.driver_type === 'combat').map(accident => (
+                    <TableRow key={accident.id}>
+                      <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
+                      <TableCell>{accident.vehicle_number || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
+                          {severityLabels[accident.severity]}
+                        </span>
+                      </TableCell>
+                      <TableCell>{accident.location || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {accidents.filter(a => a.driver_type === 'combat').length === 0 && (
+                <p className="text-center py-8 text-muted-foreground">אין תאונות של נהגי לוחמים</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
