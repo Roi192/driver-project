@@ -345,14 +345,14 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
 
               {/* Accidents Tab */}
               <TabsContent value="accidents">
-                <ScrollArea className="h-[250px]">
+                <ScrollArea className="h-[350px]">
                   {accidents.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Car className="w-12 h-12 mx-auto mb-2 opacity-30" />
                       <p>אין תאונות מתועדות</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 pr-4">
                       {accidents.map((accident) => (
                         <Card key={accident.id} className="border-r-4 border-r-red-500">
                           <CardContent className="p-4">
@@ -387,14 +387,14 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
 
               {/* Punishments Tab */}
               <TabsContent value="punishments">
-                <ScrollArea className="h-[250px]">
+                <ScrollArea className="h-[350px]">
                   {punishments.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Gavel className="w-12 h-12 mx-auto mb-2 opacity-30" />
                       <p>אין עונשים מתועדים</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 pr-4">
                       {punishments.map((punishment) => (
                         <Card key={punishment.id} className="border-r-4 border-r-purple-500">
                           <CardContent className="p-4">
@@ -423,14 +423,14 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
 
               {/* Inspections Tab */}
               <TabsContent value="inspections">
-                <ScrollArea className="h-[250px]">
+                <ScrollArea className="h-[350px]">
                   {inspections.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
                       <p>אין ביקורות מתועדות</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 pr-4">
                       {inspections.map((inspection) => (
                         <Card key={inspection.id} className="border-r-4 border-r-blue-500">
                           <CardContent className="p-4">
@@ -469,7 +469,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
 
               {/* Attendance Tab */}
               <TabsContent value="attendance">
-                <ScrollArea className="h-[250px]">
+                <ScrollArea className="h-[350px]">
                   {attendance.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Calendar className="w-12 h-12 mx-auto mb-2 opacity-30" />
@@ -477,11 +477,14 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                     </div>
                   ) : (
                     (() => {
-                      // Group attendance by month
+                      // Group attendance by month - filter out "not_in_rotation"
                       const hebrewMonths = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
                       const monthlyMap = new Map<string, typeof attendance>();
                       
-                      attendance.forEach(record => {
+                      // Filter out records with status "not_in_rotation"
+                      const filteredAttendance = attendance.filter(record => record.status !== 'not_in_rotation');
+                      
+                      filteredAttendance.forEach(record => {
                         if (!record.work_plan_events?.event_date) return;
                         const date = parseISO(record.work_plan_events.event_date);
                         const key = `${getYear(date)}-${getMonth(date)}`;
@@ -498,8 +501,17 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                         return monthB - monthA;
                       });
 
+                      if (sortedMonths.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Calendar className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                            <p>אין נתוני נוכחות רלוונטיים</p>
+                          </div>
+                        );
+                      }
+
                       return (
-                        <div className="space-y-4">
+                        <div className="space-y-4 pr-4">
                           {sortedMonths.map(([key, records]) => {
                             const [year, month] = key.split('-').map(Number);
                             const attended = records.filter(r => r.attended || r.completed).length;
@@ -532,7 +544,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                                               </span>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-2 flex-wrap">
                                             {record.attended ? (
                                               <Badge className="bg-emerald-500 text-white text-xs">נכח</Badge>
                                             ) : record.completed ? (
@@ -541,7 +553,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                                               <Badge className="bg-red-500 text-white text-xs">נעדר</Badge>
                                             )}
                                             {record.absence_reason && !record.completed && (
-                                              <span className="text-xs text-slate-500">סיבה: {record.absence_reason}</span>
+                                              <span className="text-xs text-red-600 font-medium">סיבה: {record.absence_reason}</span>
                                             )}
                                           </div>
                                           {record.completed && (

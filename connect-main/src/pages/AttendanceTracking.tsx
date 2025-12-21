@@ -141,6 +141,10 @@ export default function AttendanceTracking() {
   
   // Low attendance soldiers dialog
   const [lowAttendanceDialogOpen, setLowAttendanceDialogOpen] = useState(false);
+  
+  // Summary table dialog
+  const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !isAdmin) {
@@ -753,57 +757,16 @@ export default function AttendanceTracking() {
             </Card>
           )}
 
-          {/* Summary Table */}
+          {/* Summary Table Button */}
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-slate-800">טבלה מתכללת - נוכחות חיילים</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200">
-                      <th className="text-right py-3 px-2 font-bold text-slate-700">שם חייל</th>
-                      <th className="text-center py-3 px-2 font-bold text-slate-700">מס' אישי</th>
-                      <th className="text-center py-3 px-2 font-bold text-emerald-600">נכח</th>
-                      <th className="text-center py-3 px-2 font-bold text-red-600">נעדר</th>
-                      <th className="text-center py-3 px-2 font-bold text-slate-600">אחוז</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSoldiers.map(soldier => {
-                      const stats = getSoldierStats(soldier.id);
-                      return (
-                        <tr 
-                          key={soldier.id} 
-                          className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-                          onClick={() => openSoldierDetail(soldier)}
-                        >
-                          <td className="py-3 px-2 font-medium text-slate-800">{soldier.full_name}</td>
-                          <td className="py-3 px-2 text-center text-slate-500">{soldier.personal_number}</td>
-                          <td className="py-3 px-2 text-center">
-                            <span className="inline-flex items-center gap-1 text-emerald-600">
-                              <CheckCircle className="w-4 h-4" />
-                              {stats.attended}
-                            </span>
-                          </td>
-                          <td className="py-3 px-2 text-center">
-                            <span className="inline-flex items-center gap-1 text-red-600">
-                              <XCircle className="w-4 h-4" />
-                              {stats.absent}
-                            </span>
-                          </td>
-                          <td className="py-3 px-2 text-center">
-                            <Badge className={`${getAttendanceColor(stats.percentage)} text-white`}>
-                              {stats.percentage}%
-                            </Badge>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <CardContent className="p-4">
+              <Button
+                onClick={() => setSummaryDialogOpen(true)}
+                className="w-full py-6 text-lg font-bold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+              >
+                <FileSpreadsheet className="w-5 h-5 ml-2" />
+                צפייה בטבלה מתכללת
+              </Button>
             </CardContent>
           </Card>
 
@@ -1146,6 +1109,151 @@ export default function AttendanceTracking() {
                   );
                 })
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Summary Table Dialog */}
+        <Dialog open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-slate-800">
+                <FileSpreadsheet className="w-5 h-5" />
+                טבלה מתכללת - נוכחות חיילים לפי חודשים
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-y-auto min-h-0 mt-4">
+              <div className="space-y-6">
+                {filteredSoldiers.map(soldier => {
+                  const monthlyRecords = getSoldierMonthlyRecords(soldier.id);
+                  const stats = getSoldierStats(soldier.id);
+                  const soldierKey = `soldier-${soldier.id}`;
+                  
+                  if (monthlyRecords.length === 0) return null;
+                  
+                  return (
+                    <div key={soldier.id} className="border-2 border-slate-200 rounded-2xl overflow-hidden">
+                      {/* Soldier Header */}
+                      <div className="bg-gradient-to-l from-slate-100 to-white px-4 py-3 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                              <User className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                              <p className="text-sm text-slate-500">{soldier.personal_number}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-center">
+                              <span className="text-emerald-600 font-bold">{stats.attended}</span>
+                              <span className="text-slate-400 mx-1">/</span>
+                              <span className="text-red-600 font-bold">{stats.absent}</span>
+                            </div>
+                            <Badge className={`${getAttendanceColor(stats.percentage)} text-white`}>
+                              {stats.percentage}%
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Monthly Records */}
+                      <div className="divide-y divide-slate-100">
+                        {monthlyRecords.map(record => {
+                          const monthKey = `${soldier.id}-${record.year}-${record.month}`;
+                          const isExpanded = expandedMonths.has(monthKey);
+                          
+                          return (
+                            <div key={monthKey}>
+                              {/* Month Row */}
+                              <div 
+                                className="flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedMonths);
+                                  if (isExpanded) {
+                                    newExpanded.delete(monthKey);
+                                  } else {
+                                    newExpanded.add(monthKey);
+                                  }
+                                  setExpandedMonths(newExpanded);
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <ChevronLeft className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  <span className="font-medium text-slate-700">
+                                    {hebrewMonths[record.month]} {record.year}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm">
+                                  <span className="flex items-center gap-1 text-emerald-600">
+                                    <CheckCircle className="w-4 h-4" />
+                                    {record.attended}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-red-600">
+                                    <XCircle className="w-4 h-4" />
+                                    {record.absent}
+                                  </span>
+                                  <Badge className={`${getAttendanceColor(record.attended + record.absent > 0 ? Math.round((record.attended / (record.attended + record.absent)) * 100) : 100)} text-white text-xs`}>
+                                    {record.attended + record.absent > 0 ? Math.round((record.attended / (record.attended + record.absent)) * 100) : 100}%
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              {/* Expanded Events */}
+                              {isExpanded && (
+                                <div className="bg-white px-4 py-2 space-y-2 border-t border-slate-100">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="text-slate-500 text-xs">
+                                        <th className="text-right py-1 font-medium">מופע</th>
+                                        <th className="text-center py-1 font-medium">תאריך</th>
+                                        <th className="text-center py-1 font-medium">סטטוס</th>
+                                        <th className="text-right py-1 font-medium">פרטים</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {record.events.map(eventRecord => (
+                                        <tr key={eventRecord.event.id} className="border-b border-slate-50 last:border-0">
+                                          <td className="py-2 font-medium text-slate-700">{eventRecord.event.title}</td>
+                                          <td className="py-2 text-center text-slate-500">{format(parseISO(eventRecord.event.event_date), "dd/MM/yy")}</td>
+                                          <td className="py-2 text-center">
+                                            {eventRecord.completed ? (
+                                              <Badge className="bg-emerald-100 text-emerald-800 text-xs">נכח בהשלמה</Badge>
+                                            ) : eventRecord.status === "attended" ? (
+                                              <Badge className="bg-emerald-500 text-white text-xs">נכח</Badge>
+                                            ) : eventRecord.status === "absent" ? (
+                                              <Badge className="bg-red-500 text-white text-xs">נעדר</Badge>
+                                            ) : (
+                                              <Badge className="bg-slate-400 text-white text-xs">{attendanceStatusLabels[eventRecord.status]}</Badge>
+                                            )}
+                                          </td>
+                                          <td className="py-2 text-right text-xs text-slate-500">
+                                            {eventRecord.status === "absent" && eventRecord.absenceReason && !eventRecord.completed && (
+                                              <span className="text-red-600">סיבה: {eventRecord.absenceReason}</span>
+                                            )}
+                                            {eventRecord.completed && eventRecord.completedAt && (
+                                              <span className="text-emerald-600">השלמה: {format(parseISO(eventRecord.completedAt), "dd/MM/yy")}</span>
+                                            )}
+                                            {eventRecord.status === "attended" && !eventRecord.completed && (
+                                              <span className="text-emerald-600">{format(parseISO(eventRecord.event.event_date), "dd/MM/yy")}</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
