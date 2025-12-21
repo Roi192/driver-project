@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO, differenceInDays, getYear, getMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Car, AlertTriangle, Gavel, Calendar, User, FileText, CheckCircle, XCircle, Download, Loader2, AlertCircle, TrendingDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -142,7 +142,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
     alerts.push({ type: 'warning', message: `אחוז נוכחות נמוך: ${attendanceRate}%` });
   }
   if (avgInspectionScore < 60 && inspections.length > 0) {
-    alerts.push({ type: 'warning', message: `ציון ממוצע נמוך בבדיקות: ${avgInspectionScore}` });
+    alerts.push({ type: 'warning', message: `ציון ממוצע נמוך בביקורות: ${avgInspectionScore}` });
   }
   if (punishments.length >= 3) {
     alerts.push({ type: 'warning', message: `${punishments.length} עונשים מתועדים` });
@@ -339,7 +339,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="accidents">תאונות</TabsTrigger>
                 <TabsTrigger value="punishments">עונשים</TabsTrigger>
-                <TabsTrigger value="inspections">בדיקות</TabsTrigger>
+                <TabsTrigger value="inspections">ביקורות</TabsTrigger>
                 <TabsTrigger value="attendance">נוכחות</TabsTrigger>
               </TabsList>
 
@@ -427,7 +427,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                   {inspections.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                      <p>אין בדיקות מתועדות</p>
+                      <p>אין ביקורות מתועדות</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -476,44 +476,97 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                       <p>אין נתוני נוכחות</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {attendance.map((record) => (
-                        <Card 
-                          key={record.id} 
-                          className={`border-r-4 ${record.attended ? 'border-r-green-500' : 'border-r-red-500'}`}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-bold">
-                                    {record.work_plan_events?.title || 'אירוע'}
-                                  </span>
-                                  {record.work_plan_events?.event_date && (
-                                    <span className="text-sm text-muted-foreground">
-                                      {format(parseISO(record.work_plan_events.event_date), 'dd/MM/yyyy')}
-                                    </span>
-                                  )}
+                    (() => {
+                      // Group attendance by month
+                      const hebrewMonths = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+                      const monthlyMap = new Map<string, typeof attendance>();
+                      
+                      attendance.forEach(record => {
+                        if (!record.work_plan_events?.event_date) return;
+                        const date = parseISO(record.work_plan_events.event_date);
+                        const key = `${getYear(date)}-${getMonth(date)}`;
+                        if (!monthlyMap.has(key)) {
+                          monthlyMap.set(key, []);
+                        }
+                        monthlyMap.get(key)!.push(record);
+                      });
+
+                      const sortedMonths = Array.from(monthlyMap.entries()).sort((a, b) => {
+                        const [yearA, monthA] = a[0].split('-').map(Number);
+                        const [yearB, monthB] = b[0].split('-').map(Number);
+                        if (yearA !== yearB) return yearB - yearA;
+                        return monthB - monthA;
+                      });
+
+                      return (
+                        <div className="space-y-4">
+                          {sortedMonths.map(([key, records]) => {
+                            const [year, month] = key.split('-').map(Number);
+                            const attended = records.filter(r => r.attended || r.completed).length;
+                            const absent = records.filter(r => !r.attended && !r.completed).length;
+                            
+                            return (
+                              <div key={key} className="border rounded-xl overflow-hidden">
+                                <div className="bg-gradient-to-l from-primary to-primary/80 px-4 py-2 flex items-center justify-between">
+                                  <span className="font-bold text-white">{hebrewMonths[month]} {year}</span>
+                                  <div className="flex gap-2">
+                                    <Badge className="bg-emerald-500 text-white text-xs">{attended} נכח</Badge>
+                                    <Badge className="bg-red-500 text-white text-xs">{absent} נעדר</Badge>
+                                  </div>
                                 </div>
-                                {record.absence_reason && (
-                                  <p className="text-sm text-muted-foreground">סיבה: {record.absence_reason}</p>
-                                )}
-                                {record.completed && (
-                                  <Badge variant="outline" className="text-xs">הושלם בהשלמה</Badge>
-                                )}
+                                <div className="p-2 space-y-2">
+                                  {records.map((record) => (
+                                    <div 
+                                      key={record.id} 
+                                      className={`p-3 rounded-lg border-r-4 ${record.attended || record.completed ? 'border-r-emerald-500 bg-emerald-50' : 'border-r-red-500 bg-red-50'}`}
+                                    >
+                                      <div className="flex justify-between items-center">
+                                        <div>
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-slate-800">
+                                              {record.work_plan_events?.title || 'אירוע'}
+                                            </span>
+                                            {record.work_plan_events?.event_date && (
+                                              <span className="text-sm text-slate-500">
+                                                {format(parseISO(record.work_plan_events.event_date), 'dd/MM/yyyy')}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {record.attended ? (
+                                              <Badge className="bg-emerald-500 text-white text-xs">נכח</Badge>
+                                            ) : record.completed ? (
+                                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">נכח בהשלמה</Badge>
+                                            ) : (
+                                              <Badge className="bg-red-500 text-white text-xs">נעדר</Badge>
+                                            )}
+                                            {record.absence_reason && !record.completed && (
+                                              <span className="text-xs text-slate-500">סיבה: {record.absence_reason}</span>
+                                            )}
+                                          </div>
+                                          {record.completed && (
+                                            <p className="text-xs text-emerald-600 mt-1">
+                                              תאריך השלמה: {format(parseISO(record.created_at), 'dd/MM/yyyy')}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center">
+                                          {record.attended || record.completed ? (
+                                            <CheckCircle className="w-6 h-6 text-emerald-500" />
+                                          ) : (
+                                            <XCircle className="w-6 h-6 text-red-500" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {record.attended ? (
-                                  <CheckCircle className="w-6 h-6 text-green-500" />
-                                ) : (
-                                  <XCircle className="w-6 h-6 text-red-500" />
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()
                   )}
                 </ScrollArea>
               </TabsContent>

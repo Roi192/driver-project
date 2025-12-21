@@ -25,7 +25,8 @@ import {
   Calendar,
   FileSpreadsheet,
   Search,
-  Eye
+  Eye,
+  Car
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -42,6 +43,7 @@ interface Soldier {
   outpost: string | null;
   is_active: boolean;
   created_at: string;
+  defensive_driving_passed: boolean | null;
 }
 
 export default function SoldiersControl() {
@@ -63,6 +65,7 @@ export default function SoldiersControl() {
     military_license_expiry: "",
     civilian_license_expiry: "",
     release_date: "",
+    defensive_driving_passed: false,
   });
 
   useEffect(() => {
@@ -119,6 +122,7 @@ export default function SoldiersControl() {
       military_license_expiry: formData.military_license_expiry || null,
       civilian_license_expiry: formData.civilian_license_expiry || null,
       release_date: formData.release_date || null,
+      defensive_driving_passed: formData.defensive_driving_passed,
     };
 
     if (editingSoldier) {
@@ -179,6 +183,7 @@ export default function SoldiersControl() {
       military_license_expiry: "",
       civilian_license_expiry: "",
       release_date: "",
+      defensive_driving_passed: false,
     });
     setEditingSoldier(null);
   };
@@ -191,6 +196,7 @@ export default function SoldiersControl() {
       military_license_expiry: soldier.military_license_expiry || "",
       civilian_license_expiry: soldier.civilian_license_expiry || "",
       release_date: soldier.release_date || "",
+      defensive_driving_passed: soldier.defensive_driving_passed || false,
     });
     setDialogOpen(true);
   };
@@ -205,6 +211,7 @@ export default function SoldiersControl() {
       "רשיון אזרחי": soldier.civilian_license_expiry ? format(parseISO(soldier.civilian_license_expiry), "dd/MM/yyyy") : "-",
       "סטטוס רשיון אזרחי": getLicenseStatus(soldier.civilian_license_expiry).label,
       "תאריך שחרור": soldier.release_date ? format(parseISO(soldier.release_date), "dd/MM/yyyy") : "-",
+      "נהיגה מונעת": soldier.defensive_driving_passed ? "עבר" : "לא עבר",
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -389,6 +396,15 @@ export default function SoldiersControl() {
                                   </span>
                                 </div>
                               )}
+                              
+                              {soldier.defensive_driving_passed && (
+                                <div className="flex items-center gap-1 mt-2">
+                                  <Badge className="bg-blue-500 text-white text-xs gap-1">
+                                    <Car className="w-3 h-3" />
+                                    עבר נהיגה מונעת
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                             
                             <div className="flex gap-2">
@@ -480,6 +496,20 @@ export default function SoldiersControl() {
                   value={formData.release_date}
                   onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
                 />
+              </div>
+
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200">
+                <input
+                  type="checkbox"
+                  id="defensive_driving"
+                  checked={formData.defensive_driving_passed}
+                  onChange={(e) => setFormData({ ...formData, defensive_driving_passed: e.target.checked })}
+                  className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <Label htmlFor="defensive_driving" className="cursor-pointer">
+                  <span className="font-bold text-blue-700">עבר נהיגה מונעת</span>
+                  <p className="text-xs text-blue-600">סמן אם החייל עבר הכשרת נהיגה מונעת</p>
+                </Label>
               </div>
             </div>
 

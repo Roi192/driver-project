@@ -723,6 +723,7 @@ export type Database = {
         Row: {
           civilian_license_expiry: string | null
           created_at: string
+          defensive_driving_passed: boolean | null
           full_name: string
           id: string
           is_active: boolean | null
@@ -735,6 +736,7 @@ export type Database = {
         Insert: {
           civilian_license_expiry?: string | null
           created_at?: string
+          defensive_driving_passed?: boolean | null
           full_name: string
           id?: string
           is_active?: boolean | null
@@ -747,6 +749,7 @@ export type Database = {
         Update: {
           civilian_license_expiry?: string | null
           created_at?: string
+          defensive_driving_passed?: boolean | null
           full_name?: string
           id?: string
           is_active?: boolean | null

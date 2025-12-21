@@ -171,7 +171,7 @@ export default function Auth() {
             <TabsContent value="login" className="animate-fade-in">
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email" className="text-foreground font-semibold">אימייל</Label>
+                  <Label htmlFor="login-email" className="text-slate-800 font-semibold">אימייל</Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -179,11 +179,11 @@ export default function Auth() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     dir="ltr"
-                    className="text-right bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    className="text-right bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password" className="text-foreground font-semibold">סיסמה</Label>
+                  <Label htmlFor="login-password" className="text-slate-800 font-semibold">סיסמה</Label>
                   <Input
                     id="login-password"
                     type="password"
@@ -191,7 +191,7 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     dir="ltr"
-                    className="bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                   />
                 </div>
                 <Button 
@@ -214,18 +214,18 @@ export default function Auth() {
             <TabsContent value="signup" className="animate-fade-in">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-foreground font-semibold">שם מלא *</Label>
+                  <Label htmlFor="signup-name" className="text-slate-800 font-semibold">שם מלא *</Label>
                   <Input
                     id="signup-name"
                     type="text"
                     placeholder="ישראל ישראלי"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-foreground font-semibold">אימייל *</Label>
+                  <Label htmlFor="signup-email" className="text-slate-800 font-semibold">אימייל *</Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -233,11 +233,11 @@ export default function Auth() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     dir="ltr"
-                    className="text-right bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    className="text-right bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-foreground font-semibold">סיסמה *</Label>
+                  <Label htmlFor="signup-password" className="text-slate-800 font-semibold">סיסמה *</Label>
                   <Input
                     id="signup-password"
                     type="password"
@@ -245,18 +245,7 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     dir="ltr"
-                    className="bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-outpost" className="text-foreground font-semibold">מוצב (אופציונלי)</Label>
-                  <Input
-                    id="signup-outpost"
-                    type="text"
-                    placeholder="שם המוצב"
-                    value={outpost}
-                    onChange={(e) => setOutpost(e.target.value)}
-                    className="bg-background/50 border-border/50 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                   />
                 </div>
                 <Button 
