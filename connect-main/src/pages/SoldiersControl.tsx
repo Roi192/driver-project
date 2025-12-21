@@ -46,6 +46,28 @@ interface Soldier {
   defensive_driving_passed: boolean | null;
 }
 
+// פונקציית כשירות אוטומטית
+const getFitnessStatus = (soldier: Soldier) => {
+  const today = new Date();
+  const militaryExpiry = soldier.military_license_expiry ? parseISO(soldier.military_license_expiry) : null;
+  const civilianExpiry = soldier.civilian_license_expiry ? parseISO(soldier.civilian_license_expiry) : null;
+  
+  const militaryExpired = militaryExpiry && differenceInDays(militaryExpiry, today) < 0;
+  const civilianExpired = civilianExpiry && differenceInDays(civilianExpiry, today) < 0;
+  const noDefensiveDriving = !soldier.defensive_driving_passed;
+  
+  if (militaryExpired || civilianExpired) {
+    return { status: "not_fit", label: "לא כשיר", color: "bg-red-500", icon: "❌" };
+  }
+  if (noDefensiveDriving) {
+    return { status: "partial", label: "חסר נהיגה מונעת", color: "bg-amber-500", icon: "⚠️" };
+  }
+  if (!militaryExpiry || !civilianExpiry) {
+    return { status: "unknown", label: "חסר מידע", color: "bg-slate-400", icon: "❓" };
+  }
+  return { status: "fit", label: "כשיר", color: "bg-emerald-500", icon: "✓" };
+};
+
 export default function SoldiersControl() {
   const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -264,32 +286,58 @@ export default function SoldiersControl() {
         </div>
 
         <div className="px-4 py-6 space-y-6">
-          {/* Alerts Section */}
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg">
+              <CardContent className="p-4 text-center">
+                <div className="text-3xl font-black text-emerald-600">
+                  {soldiers.filter(s => getFitnessStatus(s).status === "fit").length}
+                </div>
+                <p className="text-sm font-bold text-emerald-700">נהגים כשירים</p>
+                <p className="text-xs text-emerald-600 mt-1">
+                  {Math.round((soldiers.filter(s => getFitnessStatus(s).status === "fit").length / soldiers.length) * 100) || 0}%
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 bg-gradient-to-br from-red-50 to-amber-50 shadow-lg">
+              <CardContent className="p-4 text-center">
+                <div className="text-3xl font-black text-red-600">
+                  {soldiers.filter(s => getFitnessStatus(s).status === "not_fit").length}
+                </div>
+                <p className="text-sm font-bold text-red-700">לא כשירים</p>
+                <p className="text-xs text-red-600 mt-1">דורשים טיפול מיידי</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 30/60 Day License Alerts */}
           {expiringLicenses.length > 0 && (
             <Card className="border-0 bg-gradient-to-br from-red-50 to-amber-50 shadow-lg">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-red-800">
                   <AlertTriangle className="w-5 h-5" />
-                  התראות רשיונות ({expiringLicenses.length})
+                  התראות רשיונות - 30/60 יום ({expiringLicenses.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {expiringLicenses.slice(0, 5).map(soldier => {
                   const militaryStatus = getLicenseStatus(soldier.military_license_expiry);
                   const civilianStatus = getLicenseStatus(soldier.civilian_license_expiry);
+                  const militaryDays = soldier.military_license_expiry ? differenceInDays(parseISO(soldier.military_license_expiry), new Date()) : null;
+                  const civilianDays = soldier.civilian_license_expiry ? differenceInDays(parseISO(soldier.civilian_license_expiry), new Date()) : null;
                   return (
                     <div key={soldier.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/80 border border-red-200">
                       <div className="flex-1">
                         <p className="font-bold text-slate-800">{soldier.full_name}</p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 mt-1 flex-wrap">
                           {(militaryStatus.status === "expired" || militaryStatus.status === "warning") && (
                             <Badge className={`${militaryStatus.color} text-white text-xs`}>
-                              צבאי: {militaryStatus.label}
+                              צבאי: {militaryDays !== null && militaryDays < 0 ? "פג תוקף" : `${militaryDays} ימים`}
                             </Badge>
                           )}
                           {(civilianStatus.status === "expired" || civilianStatus.status === "warning") && (
                             <Badge className={`${civilianStatus.color} text-white text-xs`}>
-                              אזרחי: {civilianStatus.label}
+                              אזרחי: {civilianDays !== null && civilianDays < 0 ? "פג תוקף" : `${civilianDays} ימים`}
                             </Badge>
                           )}
                         </div>
@@ -356,11 +404,15 @@ export default function SoldiersControl() {
                             hasAlert ? "bg-red-50/50 border-red-200" : "bg-slate-50 border-slate-200"
                           }`}
                         >
-                          <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
                                 <Badge variant="secondary" className="text-xs font-bold">{soldier.personal_number}</Badge>
+                                {/* Fitness Badge */}
+                                <Badge className={`${getFitnessStatus(soldier).color} text-white text-xs`}>
+                                  {getFitnessStatus(soldier).icon} {getFitnessStatus(soldier).label}
+                                </Badge>
                               </div>
                               
                               {soldier.outpost && (

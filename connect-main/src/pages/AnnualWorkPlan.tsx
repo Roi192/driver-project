@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, differenceInDays, parseISO } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, differenceInDays, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import { he } from "date-fns/locale";
 import { 
   Calendar as CalendarIcon, 
@@ -25,6 +26,8 @@ import {
   Bell, 
   Users, 
   Loader2,
+  List,
+  CalendarDays,
   Edit,
   Trash2,
   Clock,
@@ -146,6 +149,8 @@ export default function AnnualWorkPlan() {
   const [attendance, setAttendance] = useState<EventAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"month" | "week" | "list">("month");
+  const [currentWeek, setCurrentWeek] = useState(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<WorkPlanEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -308,6 +313,24 @@ export default function AnnualWorkPlan() {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  // Week view rendering
+  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 0 });
+  const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  // Get events for week
+  const getEventsForWeek = () => {
+    return events.filter(event => {
+      const eventDate = parseISO(event.event_date);
+      return eventDate >= weekStart && eventDate <= weekEnd;
+    }).sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime());
+  };
+
+  // Get sorted events for list view
+  const getSortedEventsList = () => {
+    return [...events].sort((a, b) => parseISO(a.event_date).getTime() - parseISO(b.event_date).getTime());
+  };
 
   const getEventsForDate = (date: Date) => {
     return events.filter(event => isSameDay(parseISO(event.event_date), date));
@@ -534,154 +557,258 @@ export default function AnnualWorkPlan() {
             הוסף מופע חדש
           </Button>
 
-          {/* Calendar */}
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl overflow-hidden">
-            <CardHeader className="bg-gradient-to-l from-primary/10 to-teal/10 border-b border-slate-100">
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="rounded-xl">
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
-                <CardTitle className="text-slate-800">
-                  {format(currentDate, "MMMM yyyy", { locale: he })}
-                </CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, -1))} className="rounded-xl">
-                  <ChevronLeft className="w-5 h-5" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-2">
-              {/* Day Names */}
-              <div className="grid grid-cols-7 gap-1 mb-1">
-                {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map(day => (
-                  <div key={day} className="text-center text-xs font-bold text-slate-500 py-1">
-                    {day}
+          {/* View Mode Tabs */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week" | "list")} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
+              <TabsTrigger value="month" className="rounded-xl gap-2 data-[state=active]:bg-white">
+                <CalendarIcon className="w-4 h-4" />
+                חודש
+              </TabsTrigger>
+              <TabsTrigger value="week" className="rounded-xl gap-2 data-[state=active]:bg-white">
+                <CalendarDays className="w-4 h-4" />
+                שבוע
+              </TabsTrigger>
+              <TabsTrigger value="list" className="rounded-xl gap-2 data-[state=active]:bg-white">
+                <List className="w-4 h-4" />
+                רשימה
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Month View */}
+            <TabsContent value="month" className="mt-4">
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-l from-primary/10 to-teal/10 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="rounded-xl">
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                    <CardTitle className="text-slate-800">
+                      {format(currentDate, "MMMM yyyy", { locale: he })}
+                    </CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, -1))} className="rounded-xl">
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
                   </div>
-                ))}
-              </div>
-
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: monthStart.getDay() }).map((_, i) => (
-                  <div key={`empty-${i}`} className="aspect-square" />
-                ))}
-
-                {daysInMonth.map(day => {
-                  const dayEvents = getEventsForDate(day);
-                  const dayHolidays = getHolidaysForDate(day);
-                  const isCurrentDay = isToday(day);
-                  const hasContent = dayEvents.length > 0 || dayHolidays.length > 0;
-
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      onClick={() => handleDayClick(day)}
-                      className={`
-                        min-h-[60px] p-1 rounded-lg cursor-pointer transition-all duration-200 border
-                        ${isCurrentDay ? "bg-primary/10 border-primary" : "border-transparent hover:bg-slate-50 hover:border-slate-200"}
-                        ${hasContent ? "bg-slate-50/50" : ""}
-                      `}
-                    >
-                      <div className={`text-xs mb-0.5 ${isCurrentDay ? "font-bold text-primary" : "text-slate-600"}`}>
-                        {format(day, "d")}
+                </CardHeader>
+                <CardContent className="p-2">
+                  {/* Day Names */}
+                  <div className="grid grid-cols-7 gap-1 mb-1">
+                    {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map(day => (
+                      <div key={day} className="text-center text-xs font-bold text-slate-500 py-1">
+                        {day}
                       </div>
-                      
-                      {/* Holidays */}
-                      {dayHolidays.map(h => (
-                        <div key={h.id} className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 truncate mb-0.5">
-                          {h.title}
-                        </div>
-                      ))}
-                      
-                      {/* Events */}
-                      {dayEvents.slice(0, 2).map(event => (
-                        <div
-                          key={event.id}
-                          className={`text-[8px] px-1 py-0.5 rounded text-white truncate mb-0.5 ${getCategoryColor(event.category)}`}
-                        >
-                          {event.title}
-                        </div>
-                      ))}
-                      
-                      {dayEvents.length > 2 && (
-                        <div className="text-[8px] text-slate-500">+{dayEvents.length - 2}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
 
-          {/* Events List */}
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-slate-800">כל המופעים</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-[400px]">
-                <div className="space-y-3">
-                  {events.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">
-                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p>אין מופעים</p>
-                    </div>
-                  ) : (
-                    events.map(event => {
-                      const stats = getEventAttendanceStats(event.id);
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: monthStart.getDay() }).map((_, i) => (
+                      <div key={`empty-${i}`} className="aspect-square" />
+                    ))}
+
+                    {daysInMonth.map(day => {
+                      const dayEvents = getEventsForDate(day);
+                      const dayHolidays = getHolidaysForDate(day);
+                      const isCurrentDay = isToday(day);
+                      const hasContent = dayEvents.length > 0 || dayHolidays.length > 0;
+
                       return (
                         <div
-                          key={event.id}
-                          onClick={() => { setSelectedEvent(event); setDetailDialogOpen(true); }}
-                          className="p-4 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer transition-all"
+                          key={day.toISOString()}
+                          onClick={() => handleDayClick(day)}
+                          className={`
+                            min-h-[60px] p-1 rounded-lg cursor-pointer transition-all duration-200 border
+                            ${isCurrentDay ? "bg-primary/10 border-primary" : "border-transparent hover:bg-slate-50 hover:border-slate-200"}
+                            ${hasContent ? "bg-slate-50/50" : ""}
+                          `}
                         >
-                          <div className="flex items-start gap-3">
-                            <div className={`w-1.5 h-full min-h-[60px] rounded-full ${getCategoryColor(event.category)}`} />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <h4 className="font-bold text-slate-800">{event.title}</h4>
-                                <Badge className={`${statusColors[event.status]} text-white text-xs`}>
-                                  {statusLabels[event.status]}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {categoryLabels[event.category as keyof typeof categoryLabels] || "פלוגתי"}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <Clock className="w-3 h-3" />
-                                {format(parseISO(event.event_date), "dd/MM/yyyy", { locale: he })}
-                              </div>
-                              {stats.total > 0 && (
-                                <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
-                                  <span className="flex items-center gap-1">
-                                    <CheckCircle className="w-3 h-3 text-emerald-500" />
-                                    {stats.attended}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <XCircle className="w-3 h-3 text-red-500" />
-                                    {stats.absent}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <MinusCircle className="w-3 h-3 text-blue-500" />
-                                    {stats.notInRotation}
-                                  </span>
-                                </div>
-                              )}
-                              {(event.expected_soldiers?.length || 0) > 0 && (
-                                <div className="flex items-center gap-1 text-sm text-blue-600 mt-1">
-                                  <Users className="w-3 h-3" />
-                                  {event.expected_soldiers.length} מצופים
-                                </div>
-                              )}
-                            </div>
+                          <div className={`text-xs mb-0.5 ${isCurrentDay ? "font-bold text-primary" : "text-slate-600"}`}>
+                            {format(day, "d")}
                           </div>
+                          
+                          {/* Holidays */}
+                          {dayHolidays.map(h => (
+                            <div key={h.id} className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-800 truncate mb-0.5">
+                              {h.title}
+                            </div>
+                          ))}
+                          
+                          {/* Events */}
+                          {dayEvents.slice(0, 2).map(event => (
+                            <div
+                              key={event.id}
+                              className={`text-[8px] px-1 py-0.5 rounded text-white truncate mb-0.5 ${getCategoryColor(event.category)}`}
+                            >
+                              {event.title}
+                            </div>
+                          ))}
+                          
+                          {dayEvents.length > 2 && (
+                            <div className="text-[8px] text-slate-500">+{dayEvents.length - 2}</div>
+                          )}
                         </div>
                       );
-                    })
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Week View */}
+            <TabsContent value="week" className="mt-4">
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl overflow-hidden">
+                <CardHeader className="bg-gradient-to-l from-primary/10 to-teal/10 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="rounded-xl">
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                    <CardTitle className="text-slate-800 text-center">
+                      <span className="text-sm text-slate-500 block">שבוע</span>
+                      {format(weekStart, "dd/MM", { locale: he })} - {format(weekEnd, "dd/MM/yyyy", { locale: he })}
+                    </CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, -1))} className="rounded-xl">
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  {/* Week Days */}
+                  <div className="space-y-2">
+                    {daysInWeek.map(day => {
+                      const dayEvents = getEventsForDate(day);
+                      const dayHolidays = getHolidaysForDate(day);
+                      const isCurrentDay = isToday(day);
+
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          className={`p-3 rounded-2xl border transition-all ${isCurrentDay ? "bg-primary/10 border-primary" : "bg-slate-50 border-slate-200"}`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-bold ${isCurrentDay ? "text-primary" : "text-slate-700"}`}>
+                                {format(day, "EEEE", { locale: he })}
+                              </span>
+                              <span className="text-sm text-slate-500">
+                                {format(day, "dd/MM", { locale: he })}
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openAddDialogForDate(day)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Plus className="w-3 h-3 ml-1" />
+                              הוסף
+                            </Button>
+                          </div>
+                          
+                          {dayHolidays.length === 0 && dayEvents.length === 0 && (
+                            <p className="text-xs text-slate-400">אין אירועים</p>
+                          )}
+                          
+                          {dayHolidays.map(h => (
+                            <div key={h.id} className="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-800 mb-1">
+                              <Star className="w-3 h-3 inline ml-1" />
+                              {h.title}
+                            </div>
+                          ))}
+                          
+                          {dayEvents.map(event => (
+                            <div
+                              key={event.id}
+                              onClick={() => { setSelectedEvent(event); setDetailDialogOpen(true); }}
+                              className={`text-xs px-2 py-1.5 rounded-lg text-white mb-1 cursor-pointer hover:opacity-80 transition-opacity ${getCategoryColor(event.category)}`}
+                            >
+                              {event.title}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* List View */}
+            <TabsContent value="list" className="mt-4">
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-800">כל המופעים</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="max-h-[500px]">
+                    <div className="space-y-3">
+                      {events.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>אין מופעים</p>
+                        </div>
+                      ) : (
+                        getSortedEventsList().map(event => {
+                          const stats = getEventAttendanceStats(event.id);
+                          const eventDate = parseISO(event.event_date);
+                          const isPast = eventDate < new Date();
+                          
+                          return (
+                            <div
+                              key={event.id}
+                              onClick={() => { setSelectedEvent(event); setDetailDialogOpen(true); }}
+                              className={`p-4 rounded-2xl border cursor-pointer transition-all ${isPast ? "bg-slate-100/50 border-slate-200" : "bg-slate-50 hover:bg-slate-100 border-slate-200"}`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`w-1.5 h-full min-h-[60px] rounded-full ${getCategoryColor(event.category)}`} />
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    <h4 className={`font-bold ${isPast ? "text-slate-500" : "text-slate-800"}`}>{event.title}</h4>
+                                    <Badge className={`${statusColors[event.status]} text-white text-xs`}>
+                                      {statusLabels[event.status]}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {categoryLabels[event.category as keyof typeof categoryLabels] || "פלוגתי"}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                                    <Clock className="w-3 h-3" />
+                                    {format(eventDate, "dd/MM/yyyy", { locale: he })}
+                                    {isPast && <Badge variant="outline" className="text-xs">עבר</Badge>}
+                                  </div>
+                                  {stats.total > 0 && (
+                                    <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+                                      <span className="flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                        {stats.attended}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <XCircle className="w-3 h-3 text-red-500" />
+                                        {stats.absent}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <MinusCircle className="w-3 h-3 text-blue-500" />
+                                        {stats.notInRotation}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {(event.expected_soldiers?.length || 0) > 0 && (
+                                    <div className="flex items-center gap-1 text-sm text-blue-600 mt-1">
+                                      <Users className="w-3 h-3" />
+                                      {event.expected_soldiers.length} מצופים
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Add/Edit Event Dialog */}

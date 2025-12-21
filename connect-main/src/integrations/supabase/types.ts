@@ -17,6 +17,8 @@ export type Database = {
       accidents: {
         Row: {
           accident_date: string
+          checklist: Json | null
+          closed_at: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -27,11 +29,14 @@ export type Database = {
           notes: string | null
           severity: string | null
           soldier_id: string | null
+          status: string
           updated_at: string
           vehicle_number: string | null
         }
         Insert: {
           accident_date: string
+          checklist?: Json | null
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -42,11 +47,14 @@ export type Database = {
           notes?: string | null
           severity?: string | null
           soldier_id?: string | null
+          status?: string
           updated_at?: string
           vehicle_number?: string | null
         }
         Update: {
           accident_date?: string
+          checklist?: Json | null
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -57,6 +65,7 @@ export type Database = {
           notes?: string | null
           severity?: string | null
           soldier_id?: string | null
+          status?: string
           updated_at?: string
           vehicle_number?: string | null
         }

@@ -29,9 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter } from 'lucide-react';
+import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter, Eye, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
@@ -41,6 +41,12 @@ interface Soldier {
   id: string;
   full_name: string;
   personal_number: string;
+}
+
+interface AccidentChecklist {
+  debriefing: boolean;
+  driver_talk: boolean;
+  closed: boolean;
 }
 
 interface Accident {
@@ -56,10 +62,14 @@ interface Accident {
   notes: string | null;
   created_at: string;
   soldiers?: Soldier;
+  status: 'reported' | 'investigating' | 'closed';
+  checklist: AccidentChecklist;
+  closed_at: string | null;
 }
 
 type DriverType = 'security' | 'combat';
 type Severity = 'minor' | 'moderate' | 'severe';
+type AccidentStatus = 'reported' | 'investigating' | 'closed';
 
 const driverTypeLabels: Record<DriverType, string> = {
   security: 'נהג בט"ש',
@@ -76,6 +86,18 @@ const severityColors: Record<Severity, string> = {
   minor: 'bg-yellow-100 text-yellow-800',
   moderate: 'bg-orange-100 text-orange-800',
   severe: 'bg-red-100 text-red-800'
+};
+
+const statusLabels: Record<AccidentStatus, string> = {
+  reported: 'דווח',
+  investigating: 'בתחקיר',
+  closed: 'נסגר'
+};
+
+const statusColors: Record<AccidentStatus, string> = {
+  reported: 'bg-amber-100 text-amber-800',
+  investigating: 'bg-blue-100 text-blue-800',
+  closed: 'bg-emerald-100 text-emerald-800'
 };
 
 const AccidentsTracking = () => {
@@ -96,6 +118,10 @@ const AccidentsTracking = () => {
   const [securityAccidentsDialogOpen, setSecurityAccidentsDialogOpen] = useState(false);
   const [combatAccidentsDialogOpen, setCombatAccidentsDialogOpen] = useState(false);
 
+  // Detail dialog for single accident with checklist
+  const [accidentDetailOpen, setAccidentDetailOpen] = useState(false);
+  const [selectedAccident, setSelectedAccident] = useState<Accident | null>(null);
+
   const [formData, setFormData] = useState({
     soldier_id: '',
     driver_name: '',
@@ -105,7 +131,8 @@ const AccidentsTracking = () => {
     description: '',
     severity: 'minor' as Severity,
     location: '',
-    notes: ''
+    notes: '',
+    status: 'reported' as AccidentStatus
   });
 
   // Fetch soldiers
@@ -131,7 +158,11 @@ const AccidentsTracking = () => {
         .select('*, soldiers(id, full_name, personal_number)')
         .order('accident_date', { ascending: false });
       if (error) throw error;
-      return data as Accident[];
+      // Parse checklist from JSON
+      return (data || []).map(a => ({
+        ...a,
+        checklist: (a.checklist as unknown as AccidentChecklist) || { debriefing: false, driver_talk: false, closed: false }
+      })) as Accident[];
     }
   });
 
@@ -147,7 +178,9 @@ const AccidentsTracking = () => {
         location: data.location || null,
         notes: data.notes || null,
         soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
-        driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null
+        driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
+        status: data.status,
+        checklist: { debriefing: false, driver_talk: false, closed: false }
       });
       if (error) throw error;
     },
@@ -174,7 +207,8 @@ const AccidentsTracking = () => {
           location: data.location || null,
           notes: data.notes || null,
           soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
-          driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null
+          driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
+          status: data.status
         })
         .eq('id', data.id);
       if (error) throw error;
@@ -186,6 +220,26 @@ const AccidentsTracking = () => {
       resetForm();
     },
     onError: () => toast.error('שגיאה בעדכון התאונה')
+  });
+
+  // Update checklist mutation
+  const updateChecklistMutation = useMutation({
+    mutationFn: async ({ id, checklist, status, closed_at }: { id: string; checklist: AccidentChecklist; status: AccidentStatus; closed_at: string | null }) => {
+      const { error } = await supabase
+        .from('accidents')
+        .update({ 
+          checklist: JSON.parse(JSON.stringify(checklist)), 
+          status, 
+          closed_at 
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accidents'] });
+      toast.success('הצ\'קליסט עודכן');
+    },
+    onError: () => toast.error('שגיאה בעדכון הצ\'קליסט')
   });
 
   // Delete accident mutation
@@ -211,7 +265,8 @@ const AccidentsTracking = () => {
       description: '',
       severity: 'minor',
       location: '',
-      notes: ''
+      notes: '',
+      status: 'reported'
     });
   };
 
@@ -226,8 +281,27 @@ const AccidentsTracking = () => {
       description: accident.description || '',
       severity: accident.severity,
       location: accident.location || '',
-      notes: accident.notes || ''
+      notes: accident.notes || '',
+      status: accident.status || 'reported'
     });
+  };
+
+  const handleChecklistChange = (accident: Accident, field: keyof Accident['checklist'], value: boolean) => {
+    const newChecklist = { ...accident.checklist, [field]: value };
+    let newStatus: AccidentStatus = accident.status;
+    let closedAt: string | null = accident.closed_at;
+    
+    // Auto-update status based on checklist
+    if (newChecklist.closed) {
+      newStatus = 'closed';
+      closedAt = new Date().toISOString();
+    } else if (newChecklist.debriefing || newChecklist.driver_talk) {
+      newStatus = 'investigating';
+    } else {
+      newStatus = 'reported';
+    }
+    
+    updateChecklistMutation.mutate({ id: accident.id, checklist: newChecklist, status: newStatus, closed_at: closedAt });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -258,16 +332,45 @@ const AccidentsTracking = () => {
     return accident.driver_name || 'לא צוין';
   };
 
-  // Calculate statistics
+  // Calculate statistics - based on filtered accidents
+  // Filter accidents - must be before stats
+  const filteredAccidents = useMemo(() => {
+    return accidents.filter(a => {
+      if (filterDriverType !== 'all' && a.driver_type !== filterDriverType) return false;
+      if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
+      if (filterDateFrom && a.accident_date < filterDateFrom) return false;
+      if (filterDateTo && a.accident_date > filterDateTo) return false;
+      return true;
+    });
+  }, [accidents, filterDriverType, filterSeverity, filterDateFrom, filterDateTo]);
+
+  // Calculate statistics - based on filtered accidents
   const stats = useMemo(() => {
-    const securityAccidents = accidents.filter(a => a.driver_type === 'security').length;
-    const combatAccidents = accidents.filter(a => a.driver_type === 'combat').length;
+    const securityAccidents = filteredAccidents.filter(a => a.driver_type === 'security').length;
+    const combatAccidents = filteredAccidents.filter(a => a.driver_type === 'combat').length;
+    const openAccidents = filteredAccidents.filter(a => a.status !== 'closed').length;
+    const closedAccidents = filteredAccidents.filter(a => a.status === 'closed');
+    
+    // Calculate average time to close
+    let avgTimeToClose = 0;
+    if (closedAccidents.length > 0) {
+      const totalDays = closedAccidents.reduce((sum, a) => {
+        if (a.closed_at) {
+          return sum + differenceInDays(parseISO(a.closed_at), parseISO(a.accident_date));
+        }
+        return sum;
+      }, 0);
+      avgTimeToClose = Math.round(totalDays / closedAccidents.length);
+    }
+    
     return {
       security: securityAccidents,
       combat: combatAccidents,
-      total: securityAccidents + combatAccidents
+      total: securityAccidents + combatAccidents,
+      open: openAccidents,
+      avgTimeToClose
     };
-  }, [accidents]);
+  }, [filteredAccidents]);
 
   // Calculate monthly trends (last 12 months)
   const monthlyTrends = useMemo(() => {
@@ -297,17 +400,6 @@ const AccidentsTracking = () => {
     
     return months;
   }, [accidents]);
-
-  // Filter accidents
-  const filteredAccidents = useMemo(() => {
-    return accidents.filter(a => {
-      if (filterDriverType !== 'all' && a.driver_type !== filterDriverType) return false;
-      if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
-      if (filterDateFrom && a.accident_date < filterDateFrom) return false;
-      if (filterDateTo && a.accident_date > filterDateTo) return false;
-      return true;
-    });
-  }, [accidents, filterDriverType, filterSeverity, filterDateFrom, filterDateTo]);
 
   // Export to Excel
   const exportToExcel = () => {
@@ -480,53 +572,55 @@ const AccidentsTracking = () => {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <Card>
+          <Card className="bg-white border border-slate-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">סינון מתקדם</CardTitle>
+              <CardTitle className="text-lg text-slate-800">סינון מתקדם</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="space-y-2">
-                  <Label>סוג נהג</Label>
+                  <Label className="text-slate-700">סוג נהג</Label>
                   <Select value={filterDriverType} onValueChange={setFilterDriverType}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white text-slate-700 border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="security">נהגי בט"ש</SelectItem>
-                      <SelectItem value="combat">נהגי לוחמים</SelectItem>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="security" className="text-slate-700">נהגי בט"ש</SelectItem>
+                      <SelectItem value="combat" className="text-slate-700">נהגי לוחמים</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>חומרה</Label>
+                  <Label className="text-slate-700">חומרה</Label>
                   <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white text-slate-700 border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="minor">קל</SelectItem>
-                      <SelectItem value="moderate">בינוני</SelectItem>
-                      <SelectItem value="severe">חמור</SelectItem>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="minor" className="text-slate-700">קל</SelectItem>
+                      <SelectItem value="moderate" className="text-slate-700">בינוני</SelectItem>
+                      <SelectItem value="severe" className="text-slate-700">חמור</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>מתאריך</Label>
+                  <Label className="text-slate-700">מתאריך</Label>
                   <Input
                     type="date"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
+                    className="bg-white text-slate-700 border-slate-300"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>עד תאריך</Label>
+                  <Label className="text-slate-700">עד תאריך</Label>
                   <Input
                     type="date"
                     value={filterDateTo}
                     onChange={(e) => setFilterDateTo(e.target.value)}
+                    className="bg-white text-slate-700 border-slate-300"
                   />
                 </div>
                 <div className="flex items-end">
@@ -540,18 +634,17 @@ const AccidentsTracking = () => {
         )}
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Card 
             className="cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => setSecurityAccidentsDialogOpen(true)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">תאונות נהגי בט"ש</CardTitle>
+              <CardTitle className="text-sm font-medium">נהגי בט"ש</CardTitle>
               <Shield className="h-5 w-5 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">{stats.security}</div>
-              <p className="text-xs text-blue-500 mt-1">לחץ לצפייה ברשימה</p>
             </CardContent>
           </Card>
 
@@ -560,18 +653,17 @@ const AccidentsTracking = () => {
             onClick={() => setCombatAccidentsDialogOpen(true)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">תאונות נהגי לוחמים</CardTitle>
+              <CardTitle className="text-sm font-medium">נהגי לוחמים</CardTitle>
               <Car className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600">{stats.combat}</div>
-              <p className="text-xs text-green-500 mt-1">לחץ לצפייה ברשימה</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">סה"כ תאונות</CardTitle>
+              <CardTitle className="text-sm font-medium">סה"כ</CardTitle>
               <AlertTriangle className="h-5 w-5 text-red-500" />
             </CardHeader>
             <CardContent>
@@ -622,16 +714,15 @@ const AccidentsTracking = () => {
                       <TableHead>תאריך</TableHead>
                       <TableHead>נהג</TableHead>
                       <TableHead>סוג נהג</TableHead>
-                      <TableHead>מספר רכב</TableHead>
                       <TableHead>חומרה</TableHead>
-                      <TableHead>מיקום</TableHead>
-                      <TableHead>תיאור</TableHead>
+                      <TableHead>סטטוס</TableHead>
+                      <TableHead>צ'קליסט</TableHead>
                       <TableHead>פעולות</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredAccidents.map((accident) => (
-                      <TableRow key={accident.id}>
+                      <TableRow key={accident.id} className={accident.status === 'closed' ? 'bg-emerald-50/50' : ''}>
                         <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
                         <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
                         <TableCell>
@@ -641,16 +732,39 @@ const AccidentsTracking = () => {
                             {driverTypeLabels[accident.driver_type]}
                           </span>
                         </TableCell>
-                        <TableCell>{accident.vehicle_number || '-'}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
                             {severityLabels[accident.severity]}
                           </span>
                         </TableCell>
-                        <TableCell>{accident.location || '-'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{accident.description || '-'}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${statusColors[accident.status]}`}>
+                            {statusLabels[accident.status]}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.debriefing ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="תחקיר">
+                              ת
+                            </span>
+                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.driver_talk ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="שיחה עם נהג">
+                              ש
+                            </span>
+                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.closed ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="סגירה">
+                              ס
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => { setSelectedAccident(accident); setAccidentDetailOpen(true); }}
+                              title="פרטי תאונה וצ'קליסט"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => openEditDialog(accident)}>
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -782,6 +896,119 @@ const AccidentsTracking = () => {
                 <p className="text-center py-8 text-muted-foreground">אין תאונות של נהגי לוחמים</p>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Accident Detail Dialog with Checklist */}
+        <Dialog open={accidentDetailOpen} onOpenChange={setAccidentDetailOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            {selectedAccident && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                    פרטי תאונה
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
+                    <div>
+                      <p className="text-xs text-slate-500">תאריך</p>
+                      <p className="font-bold">{format(parseISO(selectedAccident.accident_date), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">נהג</p>
+                      <p className="font-bold">{getDriverName(selectedAccident)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">סוג נהג</p>
+                      <p className="font-bold">{driverTypeLabels[selectedAccident.driver_type]}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">חומרה</p>
+                      <span className={`px-2 py-1 rounded-full text-xs ${severityColors[selectedAccident.severity]}`}>
+                        {severityLabels[selectedAccident.severity]}
+                      </span>
+                    </div>
+                    {selectedAccident.vehicle_number && (
+                      <div>
+                        <p className="text-xs text-slate-500">מספר רכב</p>
+                        <p className="font-bold">{selectedAccident.vehicle_number}</p>
+                      </div>
+                    )}
+                    {selectedAccident.location && (
+                      <div>
+                        <p className="text-xs text-slate-500">מיקום</p>
+                        <p className="font-bold">{selectedAccident.location}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedAccident.description && (
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-xs text-slate-500 mb-1">תיאור</p>
+                      <p className="text-sm">{selectedAccident.description}</p>
+                    </div>
+                  )}
+
+                  {/* Status */}
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl">
+                    <p className="text-sm font-bold text-slate-700 mb-2">סטטוס</p>
+                    <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${statusColors[selectedAccident.status]}`}>
+                      {statusLabels[selectedAccident.status]}
+                    </span>
+                  </div>
+
+                  {/* Checklist */}
+                  <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl">
+                    <p className="text-sm font-bold text-slate-700 mb-3">צ'קליסט פעולות</p>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedAccident.checklist?.debriefing || false}
+                          onChange={(e) => handleChecklistChange(selectedAccident, 'debriefing', e.target.checked)}
+                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-medium">תחקיר בוצע</span>
+                        {selectedAccident.checklist?.debriefing && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
+                      </label>
+                      
+                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedAccident.checklist?.driver_talk || false}
+                          onChange={(e) => handleChecklistChange(selectedAccident, 'driver_talk', e.target.checked)}
+                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-medium">שיחה עם נהג</span>
+                        {selectedAccident.checklist?.driver_talk && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
+                      </label>
+                      
+                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={selectedAccident.checklist?.closed || false}
+                          onChange={(e) => handleChecklistChange(selectedAccident, 'closed', e.target.checked)}
+                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="font-medium">סגירת תאונה</span>
+                        {selectedAccident.checklist?.closed && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
+                      </label>
+                    </div>
+                  </div>
+
+                  {selectedAccident.notes && (
+                    <div className="p-4 bg-slate-50 rounded-xl">
+                      <p className="text-xs text-slate-500 mb-1">הערות</p>
+                      <p className="text-sm">{selectedAccident.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       </div>

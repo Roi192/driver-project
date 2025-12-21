@@ -31,7 +31,10 @@ import {
   HelpCircle,
   TrendingUp,
   TrendingDown,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Trash2,
+  Eye
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -87,6 +90,12 @@ export default function Inspections() {
   // KPI dialogs
   const [outstandingDialogOpen, setOutstandingDialogOpen] = useState(false);
   const [improvementDialogOpen, setImprovementDialogOpen] = useState(false);
+  
+  // Edit/Delete/View state
+  const [editingInspection, setEditingInspection] = useState<Inspection | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [inspectionToDelete, setInspectionToDelete] = useState<string | null>(null);
+  const [viewInspection, setViewInspection] = useState<Inspection | null>(null);
   
   // Safety files for vulnerability helper
   const [vulnerabilityFiles, setVulnerabilityFiles] = useState<{title: string; content: string | null}[]>([]);
@@ -364,6 +373,18 @@ export default function Inspections() {
     toast.success("הקובץ יוצא בהצלחה");
   };
 
+  const deleteInspection = async (id: string) => {
+    const { error } = await supabase.from("inspections").delete().eq("id", id);
+    if (error) {
+      toast.error("שגיאה במחיקת הביקורת");
+    } else {
+      toast.success("הביקורת נמחקה בהצלחה");
+      fetchData();
+    }
+    setDeleteDialogOpen(false);
+    setInspectionToDelete(null);
+  };
+
   const getScoreColor = (score: number, max: number) => {
     const percentage = (score / max) * 100;
     if (percentage >= 80) return "text-emerald-600";
@@ -538,9 +559,11 @@ export default function Inspections() {
                               {format(parseISO(inspection.inspection_date), "dd/MM/yyyy")} | {inspection.platoon}
                             </p>
                           </div>
-                          <Badge className={`${inspection.total_score >= 80 ? 'bg-emerald-500' : inspection.total_score >= 60 ? 'bg-amber-500' : 'bg-red-500'} text-white text-lg px-3`}>
-                            {inspection.total_score}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={`${inspection.total_score >= 80 ? 'bg-emerald-500' : inspection.total_score >= 60 ? 'bg-amber-500' : 'bg-red-500'} text-white text-lg px-3`}>
+                              {inspection.total_score}
+                            </Badge>
+                          </div>
                         </div>
                         
                         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -568,6 +591,28 @@ export default function Inspections() {
                             <span className={`font-bold ${getScoreColor(inspection.simulations_score, 15)}`}>{inspection.simulations_score}/15</span>
                             <p className="text-slate-500">מקתגים</p>
                           </div>
+                        </div>
+                        
+                        {/* View/Delete buttons */}
+                        <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-200">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={() => setViewInspection(inspection)}
+                          >
+                            <Eye className="w-4 h-4 ml-1" />
+                            צפייה
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => { setInspectionToDelete(inspection.id); setDeleteDialogOpen(true); }}
+                          >
+                            <Trash2 className="w-4 h-4 ml-1" />
+                            מחק
+                          </Button>
                         </div>
                       </div>
                     ))
@@ -908,6 +953,110 @@ export default function Inspections() {
                 )}
               </div>
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+        {/* View Inspection Dialog */}
+        <Dialog open={!!viewInspection} onOpenChange={(open) => !open && setViewInspection(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            {viewInspection && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <ClipboardCheck className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-base">{viewInspection.soldiers?.full_name}</p>
+                      <p className="text-xs font-normal text-slate-500">
+                        {format(parseISO(viewInspection.inspection_date), "dd/MM/yyyy")} | {viewInspection.platoon}
+                      </p>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 mt-4">
+                  {/* Total Score */}
+                  <div className="text-center p-4 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50">
+                    <p className={`text-4xl font-black ${viewInspection.total_score >= 80 ? 'text-emerald-600' : viewInspection.total_score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {viewInspection.total_score}/100
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">ציון כולל</p>
+                  </div>
+                  
+                  {/* Score Breakdown */}
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center p-3 rounded-lg bg-blue-50">
+                      <span className="font-bold text-blue-700">{viewInspection.combat_score}/10</span>
+                      <p className="text-slate-600">נוהל קרב</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-amber-50">
+                      <span className="font-bold text-amber-700">{viewInspection.vehicle_score}/30</span>
+                      <p className="text-slate-600">רכב</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-emerald-50">
+                      <span className="font-bold text-emerald-700">{viewInspection.procedures_score}/20</span>
+                      <p className="text-slate-600">נהלים</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-red-50">
+                      <span className="font-bold text-red-700">{viewInspection.safety_score}/10</span>
+                      <p className="text-slate-600">בטיחות</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-purple-50">
+                      <span className="font-bold text-purple-700">{viewInspection.routes_familiarity_score}/15</span>
+                      <p className="text-slate-600">נתבים</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-indigo-50">
+                      <span className="font-bold text-indigo-700">{viewInspection.simulations_score}/15</span>
+                      <p className="text-slate-600">סימולציות</p>
+                    </div>
+                  </div>
+                  
+                  {/* Details */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+                      <span className="text-sm text-slate-600">מפקד:</span>
+                      <span className="font-medium text-slate-800">{viewInspection.commander_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+                      <span className="text-sm text-slate-600">מבצע הביקורת:</span>
+                      <span className="font-medium text-slate-800">{viewInspection.inspector_name}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Notes */}
+                  {viewInspection.general_notes && (
+                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="text-xs font-medium text-amber-800 mb-1">הערות:</p>
+                      <p className="text-sm text-amber-900">{viewInspection.general_notes}</p>
+                    </div>
+                  )}
+                </div>
+                
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setViewInspection(null)}>סגור</Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="max-w-sm" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-red-600">אישור מחיקה</DialogTitle>
+            </DialogHeader>
+            <p className="text-slate-600">האם אתה בטוח שברצונך למחוק את הביקורת?</p>
+            <p className="text-sm text-slate-500">פעולה זו אינה ניתנת לביטול.</p>
+            <DialogFooter className="flex gap-2 mt-4">
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>ביטול</Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => inspectionToDelete && deleteInspection(inspectionToDelete)}
+              >
+                מחק
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

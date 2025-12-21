@@ -19,7 +19,7 @@ import { ExportButton } from '@/components/admin/ExportButton';
 import { IncompleteReportsCard } from '@/components/admin/IncompleteReportsCard';
 import { ProcedureSignaturesCard } from '@/components/admin/ProcedureSignaturesCard';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
-import { InspectionsCard } from '@/components/admin/InspectionsCard';
+
 import unitLogo from '@/assets/unit-logo.png';
 import { toast } from 'sonner';
 import { 
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
             <ShiftStatsCard reports={reports} />
             <VehicleReportsCard reports={reports} />
             <OutpostStatsCard reports={reports} />
-            <InspectionsCard />
+            
             <IncompleteReportsCard 
               reports={reports} 
               onViewReport={(report) => {
