@@ -715,8 +715,6 @@ const AccidentsTracking = () => {
                       <TableHead>נהג</TableHead>
                       <TableHead>סוג נהג</TableHead>
                       <TableHead>חומרה</TableHead>
-                      <TableHead>סטטוס</TableHead>
-                      <TableHead>צ'קליסט</TableHead>
                       <TableHead>פעולות</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -736,24 +734,6 @@ const AccidentsTracking = () => {
                           <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
                             {severityLabels[accident.severity]}
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${statusColors[accident.status]}`}>
-                            {statusLabels[accident.status]}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.debriefing ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="תחקיר">
-                              ת
-                            </span>
-                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.driver_talk ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="שיחה עם נהג">
-                              ש
-                            </span>
-                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs ${accident.checklist?.closed ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'}`} title="סגירה">
-                              ס
-                            </span>
-                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">

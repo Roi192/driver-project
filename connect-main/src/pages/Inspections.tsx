@@ -34,7 +34,10 @@ import {
   AlertTriangle,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  CheckCircle,
+  XCircle,
+  Sword
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -46,7 +49,7 @@ interface Soldier {
   personal_number: string;
 }
 
-interface Inspection {
+interface InspectionFull {
   id: string;
   inspection_date: string;
   platoon: string;
@@ -62,6 +65,38 @@ interface Inspection {
   total_score: number;
   general_notes: string | null;
   soldiers?: Soldier;
+  // Combat details
+  combat_debrief_by: string | null;
+  combat_driver_participated: boolean | null;
+  combat_driver_in_debrief: boolean | null;
+  // Vehicle details
+  vehicle_tlt_oil: boolean | null;
+  vehicle_tlt_water: boolean | null;
+  vehicle_tlt_nuts: boolean | null;
+  vehicle_tlt_pressure: boolean | null;
+  vehicle_vardim_knowledge: boolean | null;
+  vehicle_mission_sheet: boolean | null;
+  vehicle_work_card: boolean | null;
+  vehicle_clean: boolean | null;
+  vehicle_equipment_secured: boolean | null;
+  // Procedures details
+  procedures_descent_drill: boolean | null;
+  procedures_rollover_drill: boolean | null;
+  procedures_fire_drill: boolean | null;
+  procedures_combat_equipment: boolean | null;
+  procedures_weapon_present: boolean | null;
+  // Safety details
+  safety_ten_commandments: boolean | null;
+  safety_driver_tools_extinguisher: boolean | null;
+  safety_driver_tools_jack: boolean | null;
+  safety_driver_tools_wheel_key: boolean | null;
+  safety_driver_tools_vest: boolean | null;
+  safety_driver_tools_triangle: boolean | null;
+  safety_driver_tools_license: boolean | null;
+  // Routes details
+  routes_notes: string | null;
+  // Simulations details
+  simulations_questions: Record<string, boolean> | null;
 }
 
 const SIMULATION_QUESTIONS = [
@@ -80,7 +115,7 @@ const SIMULATION_QUESTIONS = [
 export default function Inspections() {
   const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [inspections, setInspections] = useState<InspectionFull[]>([]);
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -92,10 +127,11 @@ export default function Inspections() {
   const [improvementDialogOpen, setImprovementDialogOpen] = useState(false);
   
   // Edit/Delete/View state
-  const [editingInspection, setEditingInspection] = useState<Inspection | null>(null);
+  const [editingInspection, setEditingInspection] = useState<InspectionFull | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [inspectionToDelete, setInspectionToDelete] = useState<string | null>(null);
-  const [viewInspection, setViewInspection] = useState<Inspection | null>(null);
+  const [viewInspection, setViewInspection] = useState<InspectionFull | null>(null);
+  const [viewTab, setViewTab] = useState("overview");
   
   // Safety files for vulnerability helper
   const [vulnerabilityFiles, setVulnerabilityFiles] = useState<{title: string; content: string | null}[]>([]);
@@ -189,7 +225,7 @@ export default function Inspections() {
         .order("full_name")
     ]);
 
-    if (!inspectionsRes.error) setInspections(inspectionsRes.data || []);
+    if (!inspectionsRes.error) setInspections((inspectionsRes.data || []) as InspectionFull[]);
     if (!soldiersRes.error) setSoldiers(soldiersRes.data || []);
 
     setLoading(false);
@@ -298,16 +334,28 @@ export default function Inspections() {
       general_notes: formData.general_notes,
     };
 
-    const { error } = await supabase.from("inspections").insert(data);
-
-    if (error) {
-      toast.error("שגיאה בשמירת הביקורת");
-      console.error(error);
+    if (editingInspection) {
+      const { error } = await supabase.from("inspections").update(data).eq("id", editingInspection.id);
+      if (error) {
+        toast.error("שגיאה בעדכון הביקורת");
+        console.error(error);
+      } else {
+        toast.success("הביקורת עודכנה בהצלחה");
+        fetchData();
+        setDialogOpen(false);
+        resetForm();
+      }
     } else {
-      toast.success("הביקורת נשמרה בהצלחה");
-      fetchData();
-      setDialogOpen(false);
-      resetForm();
+      const { error } = await supabase.from("inspections").insert(data);
+      if (error) {
+        toast.error("שגיאה בשמירת הביקורת");
+        console.error(error);
+      } else {
+        toast.success("הביקורת נשמרה בהצלחה");
+        fetchData();
+        setDialogOpen(false);
+        resetForm();
+      }
     }
   };
 
@@ -348,6 +396,48 @@ export default function Inspections() {
       general_notes: "",
     });
     setCurrentStep(0);
+    setEditingInspection(null);
+  };
+
+  const openEditDialog = (inspection: InspectionFull) => {
+    setEditingInspection(inspection);
+    setFormData({
+      inspection_date: inspection.inspection_date,
+      platoon: inspection.platoon,
+      commander_name: inspection.commander_name,
+      soldier_id: inspection.soldier_id,
+      inspector_name: inspection.inspector_name,
+      combat_debrief_by: inspection.combat_debrief_by || "",
+      combat_driver_participated: inspection.combat_driver_participated || false,
+      combat_driver_in_debrief: inspection.combat_driver_in_debrief || false,
+      vehicle_tlt_oil: inspection.vehicle_tlt_oil || false,
+      vehicle_tlt_water: inspection.vehicle_tlt_water || false,
+      vehicle_tlt_nuts: inspection.vehicle_tlt_nuts || false,
+      vehicle_tlt_pressure: inspection.vehicle_tlt_pressure || false,
+      vehicle_vardim_knowledge: inspection.vehicle_vardim_knowledge || false,
+      vehicle_mission_sheet: inspection.vehicle_mission_sheet || false,
+      vehicle_work_card: inspection.vehicle_work_card || false,
+      vehicle_clean: inspection.vehicle_clean || false,
+      vehicle_equipment_secured: inspection.vehicle_equipment_secured || false,
+      procedures_descent_drill: inspection.procedures_descent_drill || false,
+      procedures_rollover_drill: inspection.procedures_rollover_drill || false,
+      procedures_fire_drill: inspection.procedures_fire_drill || false,
+      procedures_combat_equipment: inspection.procedures_combat_equipment || false,
+      procedures_weapon_present: inspection.procedures_weapon_present || false,
+      safety_ten_commandments: inspection.safety_ten_commandments || false,
+      safety_driver_tools_extinguisher: inspection.safety_driver_tools_extinguisher || false,
+      safety_driver_tools_jack: inspection.safety_driver_tools_jack || false,
+      safety_driver_tools_wheel_key: inspection.safety_driver_tools_wheel_key || false,
+      safety_driver_tools_vest: inspection.safety_driver_tools_vest || false,
+      safety_driver_tools_triangle: inspection.safety_driver_tools_triangle || false,
+      safety_driver_tools_license: inspection.safety_driver_tools_license || false,
+      routes_familiarity_score: inspection.routes_familiarity_score || 0,
+      routes_notes: inspection.routes_notes || "",
+      simulations_answers: (inspection.simulations_questions as Record<number, boolean>) || {},
+      general_notes: inspection.general_notes || "",
+    });
+    setCurrentStep(0);
+    setDialogOpen(true);
   };
 
   const exportToExcel = () => {
@@ -391,6 +481,18 @@ export default function Inspections() {
     if (percentage >= 60) return "text-amber-600";
     return "text-red-600";
   };
+
+  // Check item renderer for view dialog
+  const CheckItem = ({ label, checked }: { label: string; checked: boolean | null }) => (
+    <div className="flex items-center gap-2 p-2 rounded-lg bg-white border">
+      {checked ? (
+        <CheckCircle className="w-4 h-4 text-emerald-500" />
+      ) : (
+        <XCircle className="w-4 h-4 text-red-400" />
+      )}
+      <span className={`text-sm ${checked ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
+    </div>
+  );
 
   // KPI calculations
   const avgScore = inspections.length > 0 
@@ -593,16 +695,25 @@ export default function Inspections() {
                           </div>
                         </div>
                         
-                        {/* View/Delete buttons */}
+                        {/* View/Edit/Delete buttons */}
                         <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-200">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                            onClick={() => setViewInspection(inspection)}
+                            onClick={() => { setViewInspection(inspection); setViewTab("overview"); }}
                           >
                             <Eye className="w-4 h-4 ml-1" />
                             צפייה
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+                            onClick={() => openEditDialog(inspection)}
+                          >
+                            <Edit className="w-4 h-4 ml-1" />
+                            עריכה
                           </Button>
                           <Button
                             variant="ghost"
@@ -623,11 +734,11 @@ export default function Inspections() {
           </Card>
         </div>
 
-        {/* New Inspection Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {/* New/Edit Inspection Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setDialogOpen(open); }}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
             <DialogHeader>
-              <DialogTitle>ביקורת חדשה</DialogTitle>
+              <DialogTitle>{editingInspection ? "עריכת ביקורת" : "ביקורת חדשה"}</DialogTitle>
             </DialogHeader>
 
             {/* Steps Progress */}
@@ -705,31 +816,36 @@ export default function Inspections() {
                   <div className="p-3 bg-amber-50 rounded-xl text-center">
                     <span className="font-bold text-amber-800">רכב - 30 נקודות</span>
                   </div>
-                  <p className="text-sm font-medium text-slate-700">ביצוע טל"ת:</p>
-                  {[
-                    { key: "vehicle_tlt_oil", label: "בדיקת שמן" },
-                    { key: "vehicle_tlt_water", label: "בדיקת מים" },
-                    { key: "vehicle_tlt_nuts", label: "בדיקת אומים" },
-                    { key: "vehicle_tlt_pressure", label: "בדיקת לחץ אוויר" },
-                  ].map(item => (
-                    <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border">
-                      <Checkbox checked={formData[item.key as keyof typeof formData] as boolean} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                      <span>{item.label}</span>
+                  <div className="p-3 bg-slate-100 rounded-xl">
+                    <p className="font-bold text-slate-700 mb-2">טל"ת</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: "vehicle_tlt_oil", label: "שמן" },
+                        { key: "vehicle_tlt_water", label: "מים" },
+                        { key: "vehicle_tlt_nuts", label: "אומים" },
+                        { key: "vehicle_tlt_pressure", label: "לחץ אוויר" },
+                      ].map(item => (
+                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg">
+                          <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
+                          <span className="text-sm">{item.label}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  <p className="text-sm font-medium text-slate-700 mt-4">בדיקות נוספות:</p>
-                  {[
-                    { key: "vehicle_vardim_knowledge", label: "הכרה של נוהל ורדים" },
-                    { key: "vehicle_mission_sheet", label: "בדיקה של דף משימה עם הנהג בכח" },
-                    { key: "vehicle_work_card", label: "בדיקת כרטיס עבודה והעברת חוגר" },
-                    { key: "vehicle_clean", label: "רכב נקי" },
-                    { key: "vehicle_equipment_secured", label: "ציוד מעוגן" },
-                  ].map(item => (
-                    <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border">
-                      <Checkbox checked={formData[item.key as keyof typeof formData] as boolean} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                      <span>{item.label}</span>
-                    </div>
-                  ))}
+                  </div>
+                  <div className="space-y-2">
+                    {[
+                      { key: "vehicle_vardim_knowledge", label: "ידיעת נקודות ורדים" },
+                      { key: "vehicle_mission_sheet", label: "דף משימה" },
+                      { key: "vehicle_work_card", label: "כרטסת עבודה" },
+                      { key: "vehicle_clean", label: "רכב נקי" },
+                      { key: "vehicle_equipment_secured", label: "ציוד מקובע" },
+                    ].map(item => (
+                      <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border">
+                        <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
+                        <span>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -740,14 +856,14 @@ export default function Inspections() {
                     <span className="font-bold text-emerald-800">נהלים - 20 נקודות</span>
                   </div>
                   {[
-                    { key: "procedures_descent_drill", label: "תרגולת ירידה לשול" },
-                    { key: "procedures_rollover_drill", label: "תרגולת התהפכות" },
-                    { key: "procedures_fire_drill", label: "תרגולת שריפה" },
-                    { key: "procedures_combat_equipment", label: "בדיקת ציוד לחימה" },
-                    { key: "procedures_weapon_present", label: "הימצאות נשק של הנהג" },
+                    { key: "procedures_descent_drill", label: "תרגיל ירידה" },
+                    { key: "procedures_rollover_drill", label: "תרגיל התהפכות" },
+                    { key: "procedures_fire_drill", label: "תרגיל שריפה" },
+                    { key: "procedures_combat_equipment", label: "ציוד לחימה" },
+                    { key: "procedures_weapon_present", label: "נשק אישי" },
                   ].map(item => (
                     <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border">
-                      <Checkbox checked={formData[item.key as keyof typeof formData] as boolean} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
+                      <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
                       <span>{item.label}</span>
                     </div>
                   ))}
@@ -762,22 +878,26 @@ export default function Inspections() {
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-xl border">
                     <Checkbox checked={formData.safety_ten_commandments} onCheckedChange={c => setFormData({...formData, safety_ten_commandments: !!c})} />
-                    <span>הכרות עם עשרת הדיברות לנהג ותדריך ע"פ הענ"א</span>
+                    <span>ידיעת עשרת הדברות</span>
                   </div>
-                  <p className="text-sm font-medium text-slate-700">בדיקת כלי נהג:</p>
-                  {[
-                    { key: "safety_driver_tools_extinguisher", label: "מטף" },
-                    { key: "safety_driver_tools_jack", label: "ג'ק ומוט לג'ק" },
-                    { key: "safety_driver_tools_wheel_key", label: "מפתח גלגלים" },
-                    { key: "safety_driver_tools_vest", label: "אפודה זוהרת" },
-                    { key: "safety_driver_tools_triangle", label: "משולש אזהרה" },
-                    { key: "safety_driver_tools_license", label: "רשיון רכב" },
-                  ].map(item => (
-                    <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border">
-                      <Checkbox checked={formData[item.key as keyof typeof formData] as boolean} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                      <span>{item.label}</span>
+                  <div className="p-3 bg-slate-100 rounded-xl">
+                    <p className="font-bold text-slate-700 mb-2">כלי נהג</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: "safety_driver_tools_extinguisher", label: "מטף" },
+                        { key: "safety_driver_tools_jack", label: "ג'ק" },
+                        { key: "safety_driver_tools_wheel_key", label: "מפתח גלגל" },
+                        { key: "safety_driver_tools_vest", label: "אפוד" },
+                        { key: "safety_driver_tools_triangle", label: "משולש" },
+                        { key: "safety_driver_tools_license", label: "רישיון" },
+                      ].map(item => (
+                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg">
+                          <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
+                          <span className="text-sm">{item.label}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               )}
 
@@ -785,45 +905,33 @@ export default function Inspections() {
               {currentStep === 5 && (
                 <div className="space-y-4">
                   <div className="p-3 bg-purple-50 rounded-xl text-center">
-                    <span className="font-bold text-purple-800">הכרות עם הנתב"ים בגזרה - 15 נקודות</span>
+                    <span className="font-bold text-purple-800">נתבים - 15 נקודות</span>
                   </div>
                   
-                  {/* Vulnerability Helper */}
-                  {formData.platoon && (
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="w-5 h-5 text-amber-600" />
-                        <span className="font-bold text-amber-800">עזר למפקד - נקודות תורפה ב{formData.platoon}</span>
+                  {/* Vulnerability helper */}
+                  {vulnerabilityFiles.length > 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="font-bold text-amber-800 text-sm mb-2">פגיעויות {formData.platoon}:</p>
+                      <div className="space-y-1">
+                        {vulnerabilityFiles.map((file, idx) => (
+                          <p key={idx} className="text-xs text-amber-700">• {file.title}</p>
+                        ))}
                       </div>
-                      {vulnerabilityFiles.length > 0 ? (
-                        <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
-                          {vulnerabilityFiles.map((file, idx) => (
-                            <div key={idx} className="p-2 bg-white rounded-lg border border-amber-100">
-                              <p className="font-medium text-amber-900 text-sm">{file.title}</p>
-                              {file.content && (
-                                <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap">{file.content}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-amber-700">אין נקודות תורפה רשומות עבור {formData.platoon}</p>
-                      )}
                     </div>
                   )}
                   
                   <div>
-                    <Label>ציון (0-15)</Label>
+                    <Label>ציון היכרות נתבים (0-15)</Label>
                     <Input 
                       type="number" 
                       min="0" 
                       max="15" 
                       value={formData.routes_familiarity_score} 
-                      onChange={e => setFormData({...formData, routes_familiarity_score: Math.min(15, Math.max(0, parseInt(e.target.value) || 0))})} 
+                      onChange={e => setFormData({...formData, routes_familiarity_score: parseInt(e.target.value) || 0})} 
                     />
                   </div>
                   <div>
-                    <Label>הערות</Label>
+                    <Label>הערות נתבים</Label>
                     <Textarea value={formData.routes_notes} onChange={e => setFormData({...formData, routes_notes: e.target.value})} />
                   </div>
                 </div>
@@ -833,22 +941,19 @@ export default function Inspections() {
               {currentStep === 6 && (
                 <div className="space-y-4">
                   <div className="p-3 bg-indigo-50 rounded-xl text-center">
-                    <span className="font-bold text-indigo-800">מקת"גים וסימולציות - 15 נקודות</span>
+                    <span className="font-bold text-indigo-800">מקתגים - 15 נקודות</span>
                   </div>
-                  <p className="text-sm text-slate-600">סמן אם הנהג ענה נכון:</p>
-                  {randomQuestions.map((q, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border space-y-2">
-                      <p className="text-sm font-medium">{idx + 1}. {q}</p>
-                      <div className="flex items-center gap-3">
-                        <Checkbox 
-                          checked={formData.simulations_answers[idx] || false} 
-                          onCheckedChange={c => setFormData({
-                            ...formData, 
-                            simulations_answers: {...formData.simulations_answers, [idx]: !!c}
-                          })} 
-                        />
-                        <span className="text-sm text-slate-600">ענה נכון</span>
-                      </div>
+                  <p className="text-sm text-slate-500">סמן אם הנהג ענה נכון:</p>
+                  {randomQuestions.map((question, idx) => (
+                    <div key={idx} className="flex items-start gap-3 p-3 rounded-xl border">
+                      <Checkbox 
+                        checked={formData.simulations_answers[idx] || false} 
+                        onCheckedChange={c => setFormData({
+                          ...formData, 
+                          simulations_answers: {...formData.simulations_answers, [idx]: !!c}
+                        })} 
+                      />
+                      <span className="text-sm">{question}</span>
                     </div>
                   ))}
                   <div>
@@ -859,22 +964,25 @@ export default function Inspections() {
               )}
             </ScrollArea>
 
-            <DialogFooter className="gap-2 mt-4">
+            {/* Navigation */}
+            <div className="flex gap-2 mt-4">
               {currentStep > 0 && (
                 <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)}>הקודם</Button>
               )}
               {currentStep < steps.length - 1 ? (
-                <Button onClick={() => setCurrentStep(currentStep + 1)} className="bg-primary">הבא</Button>
+                <Button onClick={() => setCurrentStep(currentStep + 1)} className="flex-1">הבא</Button>
               ) : (
-                <Button onClick={handleSubmit} className="bg-emerald-500">שמור ביקורת</Button>
+                <Button onClick={handleSubmit} className="flex-1 bg-emerald-500 hover:bg-emerald-600">
+                  {editingInspection ? "עדכן ביקורת" : "שמור ביקורת"}
+                </Button>
               )}
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
         {/* Outstanding Soldiers Dialog */}
         <Dialog open={outstandingDialogOpen} onOpenChange={setOutstandingDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh]" dir="rtl">
+          <DialogContent className="max-w-lg max-h-[90vh]" dir="rtl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-emerald-800">
                 <TrendingUp className="w-5 h-5" />
@@ -916,7 +1024,7 @@ export default function Inspections() {
 
         {/* Improvement Soldiers Dialog */}
         <Dialog open={improvementDialogOpen} onOpenChange={setImprovementDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh]" dir="rtl">
+          <DialogContent className="max-w-lg max-h-[90vh]" dir="rtl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-800">
                 <TrendingDown className="w-5 h-5" />
@@ -955,7 +1063,8 @@ export default function Inspections() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
-        {/* View Inspection Dialog */}
+
+        {/* View Inspection Dialog - With Detailed Tabs */}
         <Dialog open={!!viewInspection} onOpenChange={(open) => !open && setViewInspection(null)}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
             {viewInspection && (
@@ -974,63 +1083,178 @@ export default function Inspections() {
                   </DialogTitle>
                 </DialogHeader>
                 
-                <div className="space-y-4 mt-4">
-                  {/* Total Score */}
-                  <div className="text-center p-4 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50">
-                    <p className={`text-4xl font-black ${viewInspection.total_score >= 80 ? 'text-emerald-600' : viewInspection.total_score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {viewInspection.total_score}/100
-                    </p>
-                    <p className="text-sm text-slate-500 mt-1">ציון כולל</p>
-                  </div>
+                <Tabs value={viewTab} onValueChange={setViewTab} className="mt-4">
+                  <TabsList className="grid grid-cols-4 h-auto">
+                    <TabsTrigger value="overview" className="text-xs py-2">סקירה</TabsTrigger>
+                    <TabsTrigger value="combat" className="text-xs py-2">קרב</TabsTrigger>
+                    <TabsTrigger value="vehicle" className="text-xs py-2">רכב</TabsTrigger>
+                    <TabsTrigger value="procedures" className="text-xs py-2">נהלים</TabsTrigger>
+                  </TabsList>
+                  <TabsList className="grid grid-cols-3 h-auto mt-1">
+                    <TabsTrigger value="safety" className="text-xs py-2">בטיחות</TabsTrigger>
+                    <TabsTrigger value="routes" className="text-xs py-2">נתבים</TabsTrigger>
+                    <TabsTrigger value="simulations" className="text-xs py-2">סימולציות</TabsTrigger>
+                  </TabsList>
                   
-                  {/* Score Breakdown */}
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="text-center p-3 rounded-lg bg-blue-50">
-                      <span className="font-bold text-blue-700">{viewInspection.combat_score}/10</span>
-                      <p className="text-slate-600">נוהל קרב</p>
+                  <TabsContent value="overview" className="space-y-4 mt-4">
+                    {/* Total Score */}
+                    <div className="text-center p-4 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50">
+                      <p className={`text-4xl font-black ${viewInspection.total_score >= 80 ? 'text-emerald-600' : viewInspection.total_score >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                        {viewInspection.total_score}/100
+                      </p>
+                      <p className="text-sm text-slate-500 mt-1">ציון כולל</p>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-amber-50">
-                      <span className="font-bold text-amber-700">{viewInspection.vehicle_score}/30</span>
-                      <p className="text-slate-600">רכב</p>
+                    
+                    {/* Score Breakdown */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="text-center p-3 rounded-lg bg-blue-50">
+                        <span className="font-bold text-blue-700">{viewInspection.combat_score}/10</span>
+                        <p className="text-slate-600">נוהל קרב</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-amber-50">
+                        <span className="font-bold text-amber-700">{viewInspection.vehicle_score}/30</span>
+                        <p className="text-slate-600">רכב</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-emerald-50">
+                        <span className="font-bold text-emerald-700">{viewInspection.procedures_score}/20</span>
+                        <p className="text-slate-600">נהלים</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-red-50">
+                        <span className="font-bold text-red-700">{viewInspection.safety_score}/10</span>
+                        <p className="text-slate-600">בטיחות</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-purple-50">
+                        <span className="font-bold text-purple-700">{viewInspection.routes_familiarity_score}/15</span>
+                        <p className="text-slate-600">נתבים</p>
+                      </div>
+                      <div className="text-center p-3 rounded-lg bg-indigo-50">
+                        <span className="font-bold text-indigo-700">{viewInspection.simulations_score}/15</span>
+                        <p className="text-slate-600">סימולציות</p>
+                      </div>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-emerald-50">
-                      <span className="font-bold text-emerald-700">{viewInspection.procedures_score}/20</span>
-                      <p className="text-slate-600">נהלים</p>
+                    
+                    {/* Details */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+                        <span className="text-sm text-slate-600">מפקד:</span>
+                        <span className="font-medium text-slate-800">{viewInspection.commander_name}</span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+                        <span className="text-sm text-slate-600">מבצע הביקורת:</span>
+                        <span className="font-medium text-slate-800">{viewInspection.inspector_name}</span>
+                      </div>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-red-50">
-                      <span className="font-bold text-red-700">{viewInspection.safety_score}/10</span>
-                      <p className="text-slate-600">בטיחות</p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-purple-50">
-                      <span className="font-bold text-purple-700">{viewInspection.routes_familiarity_score}/15</span>
-                      <p className="text-slate-600">נתבים</p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-indigo-50">
-                      <span className="font-bold text-indigo-700">{viewInspection.simulations_score}/15</span>
-                      <p className="text-slate-600">סימולציות</p>
-                    </div>
-                  </div>
+                    
+                    {/* Notes */}
+                    {viewInspection.general_notes && (
+                      <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <p className="text-xs font-medium text-amber-800 mb-1">הערות:</p>
+                        <p className="text-sm text-amber-900">{viewInspection.general_notes}</p>
+                      </div>
+                    )}
+                  </TabsContent>
                   
-                  {/* Details */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
-                      <span className="text-sm text-slate-600">מפקד:</span>
-                      <span className="font-medium text-slate-800">{viewInspection.commander_name}</span>
+                  <TabsContent value="combat" className="space-y-4 mt-4">
+                    <div className="p-3 bg-blue-50 rounded-xl text-center">
+                      <span className="font-bold text-blue-800">נוהל קרב - {viewInspection.combat_score}/10 נקודות</span>
                     </div>
-                    <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
-                      <span className="text-sm text-slate-600">מבצע הביקורת:</span>
-                      <span className="font-medium text-slate-800">{viewInspection.inspector_name}</span>
+                    {viewInspection.combat_debrief_by && (
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        <p className="text-xs text-slate-500">תחקיר בוצע ע"י:</p>
+                        <p className="font-medium">{viewInspection.combat_debrief_by}</p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <CheckItem label="השתתפות הנהג בנוהל קרב" checked={viewInspection.combat_driver_participated} />
+                      <CheckItem label="נוכחות הנהג בתחקיר" checked={viewInspection.combat_driver_in_debrief} />
                     </div>
-                  </div>
+                  </TabsContent>
                   
-                  {/* Notes */}
-                  {viewInspection.general_notes && (
-                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                      <p className="text-xs font-medium text-amber-800 mb-1">הערות:</p>
-                      <p className="text-sm text-amber-900">{viewInspection.general_notes}</p>
+                  <TabsContent value="vehicle" className="space-y-4 mt-4">
+                    <div className="p-3 bg-amber-50 rounded-xl text-center">
+                      <span className="font-bold text-amber-800">רכב - {viewInspection.vehicle_score}/30 נקודות</span>
                     </div>
-                  )}
-                </div>
+                    <div className="p-3 bg-slate-100 rounded-xl">
+                      <p className="font-bold text-slate-700 mb-2 text-sm">טל"ת</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <CheckItem label="שמן" checked={viewInspection.vehicle_tlt_oil} />
+                        <CheckItem label="מים" checked={viewInspection.vehicle_tlt_water} />
+                        <CheckItem label="אומים" checked={viewInspection.vehicle_tlt_nuts} />
+                        <CheckItem label="לחץ אוויר" checked={viewInspection.vehicle_tlt_pressure} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <CheckItem label="ידיעת נקודות ורדים" checked={viewInspection.vehicle_vardim_knowledge} />
+                      <CheckItem label="דף משימה" checked={viewInspection.vehicle_mission_sheet} />
+                      <CheckItem label="כרטסת עבודה" checked={viewInspection.vehicle_work_card} />
+                      <CheckItem label="רכב נקי" checked={viewInspection.vehicle_clean} />
+                      <CheckItem label="ציוד מקובע" checked={viewInspection.vehicle_equipment_secured} />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="procedures" className="space-y-4 mt-4">
+                    <div className="p-3 bg-emerald-50 rounded-xl text-center">
+                      <span className="font-bold text-emerald-800">נהלים - {viewInspection.procedures_score}/20 נקודות</span>
+                    </div>
+                    <div className="space-y-2">
+                      <CheckItem label="תרגיל ירידה" checked={viewInspection.procedures_descent_drill} />
+                      <CheckItem label="תרגיל התהפכות" checked={viewInspection.procedures_rollover_drill} />
+                      <CheckItem label="תרגיל שריפה" checked={viewInspection.procedures_fire_drill} />
+                      <CheckItem label="ציוד לחימה" checked={viewInspection.procedures_combat_equipment} />
+                      <CheckItem label="נשק אישי" checked={viewInspection.procedures_weapon_present} />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="safety" className="space-y-4 mt-4">
+                    <div className="p-3 bg-red-50 rounded-xl text-center">
+                      <span className="font-bold text-red-800">בטיחות - {viewInspection.safety_score}/10 נקודות</span>
+                    </div>
+                    <CheckItem label="ידיעת עשרת הדברות" checked={viewInspection.safety_ten_commandments} />
+                    <div className="p-3 bg-slate-100 rounded-xl">
+                      <p className="font-bold text-slate-700 mb-2 text-sm">כלי נהג</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <CheckItem label="מטף" checked={viewInspection.safety_driver_tools_extinguisher} />
+                        <CheckItem label="ג'ק" checked={viewInspection.safety_driver_tools_jack} />
+                        <CheckItem label="מפתח גלגל" checked={viewInspection.safety_driver_tools_wheel_key} />
+                        <CheckItem label="אפוד" checked={viewInspection.safety_driver_tools_vest} />
+                        <CheckItem label="משולש" checked={viewInspection.safety_driver_tools_triangle} />
+                        <CheckItem label="רישיון" checked={viewInspection.safety_driver_tools_license} />
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="routes" className="space-y-4 mt-4">
+                    <div className="p-3 bg-purple-50 rounded-xl text-center">
+                      <span className="font-bold text-purple-800">נתבים - {viewInspection.routes_familiarity_score}/15 נקודות</span>
+                    </div>
+                    {viewInspection.routes_notes && (
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        <p className="text-xs text-slate-500 mb-1">הערות:</p>
+                        <p className="text-sm">{viewInspection.routes_notes}</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="simulations" className="space-y-4 mt-4">
+                    <div className="p-3 bg-indigo-50 rounded-xl text-center">
+                      <span className="font-bold text-indigo-800">סימולציות - {viewInspection.simulations_score}/15 נקודות</span>
+                    </div>
+                    {viewInspection.simulations_questions && Object.keys(viewInspection.simulations_questions).length > 0 && (
+                      <div className="space-y-2">
+                        {Object.entries(viewInspection.simulations_questions).map(([idx, answered]) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-white border">
+                            {answered ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-400" />
+                            )}
+                            <span className="text-sm text-slate-600">שאלה {parseInt(idx) + 1}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
                 
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setViewInspection(null)}>סגור</Button>
