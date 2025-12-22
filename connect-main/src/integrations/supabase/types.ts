@@ -25,6 +25,7 @@ export type Database = {
           driver_name: string | null
           driver_type: string
           id: string
+          judgment_result: string | null
           location: string | null
           notes: string | null
           severity: string | null
@@ -32,6 +33,7 @@ export type Database = {
           status: string
           updated_at: string
           vehicle_number: string | null
+          was_judged: boolean | null
         }
         Insert: {
           accident_date: string
@@ -43,6 +45,7 @@ export type Database = {
           driver_name?: string | null
           driver_type: string
           id?: string
+          judgment_result?: string | null
           location?: string | null
           notes?: string | null
           severity?: string | null
@@ -50,6 +53,7 @@ export type Database = {
           status?: string
           updated_at?: string
           vehicle_number?: string | null
+          was_judged?: boolean | null
         }
         Update: {
           accident_date?: string
@@ -61,6 +65,7 @@ export type Database = {
           driver_name?: string | null
           driver_type?: string
           id?: string
+          judgment_result?: string | null
           location?: string | null
           notes?: string | null
           severity?: string | null
@@ -68,6 +73,7 @@ export type Database = {
           status?: string
           updated_at?: string
           vehicle_number?: string | null
+          was_judged?: boolean | null
         }
         Relationships: [
           {
@@ -75,6 +81,13 @@ export type Database = {
             columns: ["soldier_id"]
             isOneToOne: false
             referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accidents_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
             referencedColumns: ["id"]
           },
         ]
@@ -236,6 +249,13 @@ export type Database = {
             referencedRelation: "soldiers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "event_attendance_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
         ]
       }
       inspections: {
@@ -382,6 +402,13 @@ export type Database = {
             referencedRelation: "soldiers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inspections_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
         ]
       }
       procedure_signatures: {
@@ -511,6 +538,13 @@ export type Database = {
             columns: ["soldier_id"]
             isOneToOne: false
             referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "punishments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
             referencedColumns: ["id"]
           },
         ]
@@ -877,7 +911,30 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      soldiers_basic: {
+        Row: {
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          outpost: string | null
+          personal_number: string | null
+        }
+        Insert: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          outpost?: string | null
+          personal_number?: string | null
+        }
+        Update: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          outpost?: string | null
+          personal_number?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {

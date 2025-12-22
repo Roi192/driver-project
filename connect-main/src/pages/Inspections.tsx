@@ -269,9 +269,9 @@ export default function Inspections() {
     // Routes: 15 points (manual)
     const routesScore = formData.routes_familiarity_score;
 
-    // Simulations: 15 points
+    // Simulations: 15 points (2 random questions)
     const answeredQuestions = Object.values(formData.simulations_answers).filter(Boolean).length;
-    const simulationsScore = (answeredQuestions / 3) * 15; // 3 random questions
+    const simulationsScore = (answeredQuestions / 2) * 15; // 2 random questions
 
     return {
       combat: Math.round(combatScore),
@@ -513,10 +513,16 @@ export default function Inspections() {
     return avg >= 80;
   });
 
-  const [randomQuestions] = useState(() => {
-    const shuffled = [...SIMULATION_QUESTIONS].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 3);
-  });
+  // Generate random questions when dialog opens (not during component mount)
+  const [randomQuestions, setRandomQuestions] = useState<string[]>([]);
+  
+  // Update random questions when form dialog opens
+  useEffect(() => {
+    if (dialogOpen && !editingInspection) {
+      const shuffled = [...SIMULATION_QUESTIONS].sort(() => 0.5 - Math.random());
+      setRandomQuestions(shuffled.slice(0, 2));
+    }
+  }, [dialogOpen, editingInspection]);
 
   if (authLoading || loading) {
     return (
@@ -668,30 +674,32 @@ export default function Inspections() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.combat_score, 10)}`}>{inspection.combat_score}/10</span>
-                            <p className="text-slate-500">קרב</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.vehicle_score, 30)}`}>{inspection.vehicle_score}/30</span>
-                            <p className="text-slate-500">רכב</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.procedures_score, 20)}`}>{inspection.procedures_score}/20</span>
-                            <p className="text-slate-500">נהלים</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.safety_score, 10)}`}>{inspection.safety_score}/10</span>
-                            <p className="text-slate-500">בטיחות</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.routes_familiarity_score, 15)}`}>{inspection.routes_familiarity_score}/15</span>
-                            <p className="text-slate-500">נתבים</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-white">
-                            <span className={`font-bold ${getScoreColor(inspection.simulations_score, 15)}`}>{inspection.simulations_score}/15</span>
-                            <p className="text-slate-500">מקתגים</p>
+                        <div className="overflow-x-auto">
+                          <div className="grid grid-cols-6 gap-2 text-xs min-w-[400px]">
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.combat_score, 10)}`}>{inspection.combat_score}/10</span>
+                              <p className="text-slate-500">קרב</p>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.vehicle_score, 30)}`}>{inspection.vehicle_score}/30</span>
+                              <p className="text-slate-500">רכב</p>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.procedures_score, 20)}`}>{inspection.procedures_score}/20</span>
+                              <p className="text-slate-500">נהלים</p>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.safety_score, 10)}`}>{inspection.safety_score}/10</span>
+                              <p className="text-slate-500">בטיחות</p>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.routes_familiarity_score, 15)}`}>{inspection.routes_familiarity_score}/15</span>
+                              <p className="text-slate-500">נתבים</p>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-white">
+                              <span className={`font-bold ${getScoreColor(inspection.simulations_score, 15)}`}>{inspection.simulations_score}/15</span>
+                              <p className="text-slate-500">מקתגים</p>
+                            </div>
                           </div>
                         </div>
                         
@@ -1159,9 +1167,9 @@ export default function Inspections() {
                       <span className="font-bold text-blue-800">נוהל קרב - {viewInspection.combat_score}/10 נקודות</span>
                     </div>
                     {viewInspection.combat_debrief_by && (
-                      <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500">תחקיר בוצע ע"י:</p>
-                        <p className="font-medium">{viewInspection.combat_debrief_by}</p>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <p className="text-xs text-slate-500 mb-1">תחקיר בוצע ע"י:</p>
+                        <p className="font-medium text-slate-700">{viewInspection.combat_debrief_by}</p>
                       </div>
                     )}
                     <div className="space-y-2">
@@ -1227,10 +1235,17 @@ export default function Inspections() {
                     <div className="p-3 bg-purple-50 rounded-xl text-center">
                       <span className="font-bold text-purple-800">נתבים - {viewInspection.routes_familiarity_score}/15 נקודות</span>
                     </div>
-                    {viewInspection.routes_notes && (
-                      <div className="p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs text-slate-500 mb-1">הערות:</p>
-                        <p className="text-sm">{viewInspection.routes_notes}</p>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-sm text-slate-600 mb-2"><strong>ציון היכרות נתבים:</strong> {viewInspection.routes_familiarity_score}/15</p>
+                    </div>
+                    {viewInspection.routes_notes ? (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <p className="text-xs text-slate-600 mb-1">הערות:</p>
+                        <p className="text-sm text-slate-800">{viewInspection.routes_notes}</p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <p className="text-sm text-slate-500">אין הערות נתבים</p>
                       </div>
                     )}
                   </TabsContent>
@@ -1239,18 +1254,32 @@ export default function Inspections() {
                     <div className="p-3 bg-indigo-50 rounded-xl text-center">
                       <span className="font-bold text-indigo-800">סימולציות - {viewInspection.simulations_score}/15 נקודות</span>
                     </div>
-                    {viewInspection.simulations_questions && Object.keys(viewInspection.simulations_questions).length > 0 && (
+                    {viewInspection.simulations_questions && Object.keys(viewInspection.simulations_questions).length > 0 ? (
                       <div className="space-y-2">
-                        {Object.entries(viewInspection.simulations_questions).map(([idx, answered]) => (
-                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-white border">
-                            {answered ? (
-                              <CheckCircle className="w-4 h-4 text-emerald-500" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-red-400" />
-                            )}
-                            <span className="text-sm text-slate-600">שאלה {parseInt(idx) + 1}</span>
-                          </div>
-                        ))}
+                        <p className="text-sm text-slate-600 font-medium">תשובות החייל:</p>
+                        {Object.entries(viewInspection.simulations_questions).map(([idx, answered]) => {
+                          const questionIndex = parseInt(idx);
+                          const questionText = SIMULATION_QUESTIONS[questionIndex] || `שאלה ${questionIndex + 1}`;
+                          return (
+                            <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-white border border-slate-200">
+                              {answered ? (
+                                <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                              ) : (
+                                <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                              )}
+                              <div>
+                                <span className={`text-sm ${answered ? 'text-slate-700' : 'text-slate-500'}`}>{questionText}</span>
+                                <p className={`text-xs ${answered ? 'text-emerald-600' : 'text-red-500'}`}>
+                                  {answered ? 'תשובה נכונה' : 'תשובה שגויה'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <p className="text-sm text-slate-500">אין נתוני סימולציות</p>
                       </div>
                     )}
                   </TabsContent>

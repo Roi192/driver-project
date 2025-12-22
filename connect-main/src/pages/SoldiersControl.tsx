@@ -416,43 +416,43 @@ export default function SoldiersControl() {
                 <div>
                   <Label className="text-xs text-slate-500 mb-1 block">רשיון צבאי</Label>
                   <Select value={militaryLicenseFilter} onValueChange={setMilitaryLicenseFilter}>
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="valid">תקף</SelectItem>
-                      <SelectItem value="warning">עומד לפוג (60 יום)</SelectItem>
-                      <SelectItem value="expired">פג תוקף</SelectItem>
-                      <SelectItem value="unknown">לא הוזן</SelectItem>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="valid" className="text-slate-700">תקף</SelectItem>
+                      <SelectItem value="warning" className="text-slate-700">עומד לפוג (60 יום)</SelectItem>
+                      <SelectItem value="expired" className="text-slate-700">פג תוקף</SelectItem>
+                      <SelectItem value="unknown" className="text-slate-700">לא הוזן</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 mb-1 block">רשיון אזרחי</Label>
                   <Select value={civilianLicenseFilter} onValueChange={setCivilianLicenseFilter}>
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="valid">תקף</SelectItem>
-                      <SelectItem value="warning">עומד לפוג (60 יום)</SelectItem>
-                      <SelectItem value="expired">פג תוקף</SelectItem>
-                      <SelectItem value="unknown">לא הוזן</SelectItem>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="valid" className="text-slate-700">תקף</SelectItem>
+                      <SelectItem value="warning" className="text-slate-700">עומד לפוג (60 יום)</SelectItem>
+                      <SelectItem value="expired" className="text-slate-700">פג תוקף</SelectItem>
+                      <SelectItem value="unknown" className="text-slate-700">לא הוזן</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500 mb-1 block">נהיגה מונעת</Label>
                   <Select value={defensiveDrivingFilter} onValueChange={setDefensiveDrivingFilter}>
-                    <SelectTrigger className="rounded-xl">
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">הכל</SelectItem>
-                      <SelectItem value="passed">עבר</SelectItem>
-                      <SelectItem value="not_passed">לא עבר</SelectItem>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="passed" className="text-slate-700">עבר</SelectItem>
+                      <SelectItem value="not_passed" className="text-slate-700">לא עבר</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

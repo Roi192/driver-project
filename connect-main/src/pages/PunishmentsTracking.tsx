@@ -417,8 +417,8 @@ export default function PunishmentsTracking() {
               <CardTitle className="text-slate-800">רשימת עונשים</CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[50vh] md:h-[60vh]">
-                <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px] space-y-3">
                   {filteredPunishments.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
                       <Gavel className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -429,42 +429,41 @@ export default function PunishmentsTracking() {
                       const type = getPunishmentType(p);
                       return (
                         <div key={p.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <User className="w-4 h-4 text-slate-400" />
-                                <h4 className="font-bold text-slate-800">{p.soldiers?.full_name}</h4>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${type === "משפט" ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"}`}>
-                                  {type}
-                                </span>
-                                <span className="text-xs text-slate-500">
-                                  {format(parseISO(p.punishment_date), "dd/MM/yyyy")}
-                                </span>
-                              </div>
-                              <p className="text-sm text-slate-600 mb-1"><strong>העבירה:</strong> {p.offense}</p>
-                              <p className="text-sm text-slate-600 mb-1"><strong>העונש:</strong> {p.punishment}</p>
-                              <p className="text-sm text-slate-500"><strong>שופט:</strong> {p.judge}</p>
-                              {p.notes && (
-                                <p className="text-sm text-slate-500 mt-1"><strong>הערות:</strong> {p.notes}</p>
-                              )}
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                              <h4 className="font-bold text-slate-800">{p.soldiers?.full_name}</h4>
+                              <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${type === "משפט" ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"}`}>
+                                {type}
+                              </span>
+                              <span className="text-xs text-slate-500 whitespace-nowrap">
+                                {format(parseISO(p.punishment_date), "dd/MM/yyyy")}
+                              </span>
                             </div>
-                            
-                            <div className="flex gap-2">
+                            <p className="text-sm text-slate-600 mb-1"><strong>העבירה:</strong> {p.offense}</p>
+                            <p className="text-sm text-slate-600 mb-1"><strong>העונש:</strong> {p.punishment}</p>
+                            <p className="text-sm text-slate-500"><strong>שופט:</strong> {p.judge}</p>
+                            {p.notes && (
+                              <p className="text-sm text-slate-500 mt-1"><strong>הערות:</strong> {p.notes}</p>
+                            )}
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => openEditDialog(p)}
-                                className="rounded-xl"
+                                className="rounded-xl flex-1"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-4 h-4 ml-1" />
+                                עריכה
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => { setItemToDelete(p); setDeleteConfirmOpen(true); }}
-                                className="rounded-xl text-red-500"
+                                className="rounded-xl text-red-500 flex-1"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4 ml-1" />
+                                מחיקה
                               </Button>
                             </div>
                           </div>
@@ -473,7 +472,7 @@ export default function PunishmentsTracking() {
                     })
                   )}
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         </div>

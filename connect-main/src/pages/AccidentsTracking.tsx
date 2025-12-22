@@ -43,12 +43,6 @@ interface Soldier {
   personal_number: string;
 }
 
-interface AccidentChecklist {
-  debriefing: boolean;
-  driver_talk: boolean;
-  closed: boolean;
-}
-
 interface Accident {
   id: string;
   soldier_id: string | null;
@@ -62,14 +56,12 @@ interface Accident {
   notes: string | null;
   created_at: string;
   soldiers?: Soldier;
-  status: 'reported' | 'investigating' | 'closed';
-  checklist: AccidentChecklist;
-  closed_at: string | null;
+  was_judged: boolean;
+  judgment_result: string | null;
 }
 
 type DriverType = 'security' | 'combat';
 type Severity = 'minor' | 'moderate' | 'severe';
-type AccidentStatus = 'reported' | 'investigating' | 'closed';
 
 const driverTypeLabels: Record<DriverType, string> = {
   security: 'נהג בט"ש',
@@ -86,18 +78,6 @@ const severityColors: Record<Severity, string> = {
   minor: 'bg-yellow-100 text-yellow-800',
   moderate: 'bg-orange-100 text-orange-800',
   severe: 'bg-red-100 text-red-800'
-};
-
-const statusLabels: Record<AccidentStatus, string> = {
-  reported: 'דווח',
-  investigating: 'בתחקיר',
-  closed: 'נסגר'
-};
-
-const statusColors: Record<AccidentStatus, string> = {
-  reported: 'bg-amber-100 text-amber-800',
-  investigating: 'bg-blue-100 text-blue-800',
-  closed: 'bg-emerald-100 text-emerald-800'
 };
 
 const AccidentsTracking = () => {
@@ -132,7 +112,8 @@ const AccidentsTracking = () => {
     severity: 'minor' as Severity,
     location: '',
     notes: '',
-    status: 'reported' as AccidentStatus
+    was_judged: false,
+    judgment_result: ''
   });
 
   // Fetch soldiers
@@ -158,10 +139,10 @@ const AccidentsTracking = () => {
         .select('*, soldiers(id, full_name, personal_number)')
         .order('accident_date', { ascending: false });
       if (error) throw error;
-      // Parse checklist from JSON
       return (data || []).map(a => ({
         ...a,
-        checklist: (a.checklist as unknown as AccidentChecklist) || { debriefing: false, driver_talk: false, closed: false }
+        was_judged: a.was_judged || false,
+        judgment_result: a.judgment_result || null
       })) as Accident[];
     }
   });
@@ -179,8 +160,8 @@ const AccidentsTracking = () => {
         notes: data.notes || null,
         soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
         driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
-        status: data.status,
-        checklist: { debriefing: false, driver_talk: false, closed: false }
+        was_judged: data.was_judged,
+        judgment_result: data.judgment_result || null
       });
       if (error) throw error;
     },
@@ -208,7 +189,8 @@ const AccidentsTracking = () => {
           notes: data.notes || null,
           soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
           driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
-          status: data.status
+          was_judged: data.was_judged,
+          judgment_result: data.judgment_result || null
         })
         .eq('id', data.id);
       if (error) throw error;
@@ -220,26 +202,6 @@ const AccidentsTracking = () => {
       resetForm();
     },
     onError: () => toast.error('שגיאה בעדכון התאונה')
-  });
-
-  // Update checklist mutation
-  const updateChecklistMutation = useMutation({
-    mutationFn: async ({ id, checklist, status, closed_at }: { id: string; checklist: AccidentChecklist; status: AccidentStatus; closed_at: string | null }) => {
-      const { error } = await supabase
-        .from('accidents')
-        .update({ 
-          checklist: JSON.parse(JSON.stringify(checklist)), 
-          status, 
-          closed_at 
-        })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accidents'] });
-      toast.success('הצ\'קליסט עודכן');
-    },
-    onError: () => toast.error('שגיאה בעדכון הצ\'קליסט')
   });
 
   // Delete accident mutation
@@ -266,7 +228,8 @@ const AccidentsTracking = () => {
       severity: 'minor',
       location: '',
       notes: '',
-      status: 'reported'
+      was_judged: false,
+      judgment_result: ''
     });
   };
 
@@ -282,26 +245,9 @@ const AccidentsTracking = () => {
       severity: accident.severity,
       location: accident.location || '',
       notes: accident.notes || '',
-      status: accident.status || 'reported'
+      was_judged: accident.was_judged || false,
+      judgment_result: accident.judgment_result || ''
     });
-  };
-
-  const handleChecklistChange = (accident: Accident, field: keyof Accident['checklist'], value: boolean) => {
-    const newChecklist = { ...accident.checklist, [field]: value };
-    let newStatus: AccidentStatus = accident.status;
-    let closedAt: string | null = accident.closed_at;
-    
-    // Auto-update status based on checklist
-    if (newChecklist.closed) {
-      newStatus = 'closed';
-      closedAt = new Date().toISOString();
-    } else if (newChecklist.debriefing || newChecklist.driver_talk) {
-      newStatus = 'investigating';
-    } else {
-      newStatus = 'reported';
-    }
-    
-    updateChecklistMutation.mutate({ id: accident.id, checklist: newChecklist, status: newStatus, closed_at: closedAt });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -348,27 +294,13 @@ const AccidentsTracking = () => {
   const stats = useMemo(() => {
     const securityAccidents = filteredAccidents.filter(a => a.driver_type === 'security').length;
     const combatAccidents = filteredAccidents.filter(a => a.driver_type === 'combat').length;
-    const openAccidents = filteredAccidents.filter(a => a.status !== 'closed').length;
-    const closedAccidents = filteredAccidents.filter(a => a.status === 'closed');
-    
-    // Calculate average time to close
-    let avgTimeToClose = 0;
-    if (closedAccidents.length > 0) {
-      const totalDays = closedAccidents.reduce((sum, a) => {
-        if (a.closed_at) {
-          return sum + differenceInDays(parseISO(a.closed_at), parseISO(a.accident_date));
-        }
-        return sum;
-      }, 0);
-      avgTimeToClose = Math.round(totalDays / closedAccidents.length);
-    }
+    const judgedAccidents = filteredAccidents.filter(a => a.was_judged).length;
     
     return {
       security: securityAccidents,
       combat: combatAccidents,
       total: securityAccidents + combatAccidents,
-      open: openAccidents,
-      avgTimeToClose
+      judged: judgedAccidents
     };
   }, [filteredAccidents]);
 
@@ -536,6 +468,31 @@ const AccidentsTracking = () => {
           placeholder="הערות נוספות"
           rows={2}
         />
+      </div>
+
+      {/* Judgment Fields */}
+      <div className="p-4 border rounded-lg bg-amber-50 border-amber-200 space-y-3">
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="was_judged"
+            checked={formData.was_judged}
+            onChange={(e) => setFormData(p => ({ ...p, was_judged: e.target.checked }))}
+            className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+          />
+          <Label htmlFor="was_judged" className="text-amber-800 font-medium">האם החייל נשפט?</Label>
+        </div>
+        {formData.was_judged && (
+          <div className="space-y-2">
+            <Label className="text-amber-800">תוצאת השיפוט</Label>
+            <Input
+              value={formData.judgment_result}
+              onChange={(e) => setFormData(p => ({ ...p, judgment_result: e.target.value }))}
+              placeholder="מה קיבל החייל (לדוגמה: מאסר, קנס...)"
+              className="bg-white"
+            />
+          </div>
+        )}
       </div>
 
       <Button type="submit" className="w-full" disabled={addMutation.isPending || updateMutation.isPending}>
@@ -720,7 +677,7 @@ const AccidentsTracking = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredAccidents.map((accident) => (
-                      <TableRow key={accident.id} className={accident.status === 'closed' ? 'bg-emerald-50/50' : ''}>
+                      <TableRow key={accident.id}>
                         <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
                         <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
                         <TableCell>
@@ -933,51 +890,18 @@ const AccidentsTracking = () => {
                     </div>
                   )}
 
-                  {/* Status */}
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-slate-50 rounded-xl">
-                    <p className="text-sm font-bold text-slate-700 mb-2">סטטוס</p>
-                    <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${statusColors[selectedAccident.status]}`}>
-                      {statusLabels[selectedAccident.status]}
+                  {/* Judgment Info */}
+                  <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl">
+                    <p className="text-sm font-bold text-slate-700 mb-2">האם נשפט?</p>
+                    <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${selectedAccident.was_judged ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
+                      {selectedAccident.was_judged ? 'כן' : 'לא'}
                     </span>
-                  </div>
-
-                  {/* Checklist */}
-                  <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl">
-                    <p className="text-sm font-bold text-slate-700 mb-3">צ'קליסט פעולות</p>
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selectedAccident.checklist?.debriefing || false}
-                          onChange={(e) => handleChecklistChange(selectedAccident, 'debriefing', e.target.checked)}
-                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="font-medium">תחקיר בוצע</span>
-                        {selectedAccident.checklist?.debriefing && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
-                      </label>
-                      
-                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selectedAccident.checklist?.driver_talk || false}
-                          onChange={(e) => handleChecklistChange(selectedAccident, 'driver_talk', e.target.checked)}
-                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="font-medium">שיחה עם נהג</span>
-                        {selectedAccident.checklist?.driver_talk && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
-                      </label>
-                      
-                      <label className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={selectedAccident.checklist?.closed || false}
-                          onChange={(e) => handleChecklistChange(selectedAccident, 'closed', e.target.checked)}
-                          className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="font-medium">סגירת תאונה</span>
-                        {selectedAccident.checklist?.closed && <CheckCircle className="w-4 h-4 text-emerald-500 mr-auto" />}
-                      </label>
-                    </div>
+                    {selectedAccident.was_judged && selectedAccident.judgment_result && (
+                      <div className="mt-3">
+                        <p className="text-xs text-slate-500 mb-1">תוצאת השיפוט</p>
+                        <p className="text-sm font-medium text-slate-700">{selectedAccident.judgment_result}</p>
+                      </div>
+                    )}
                   </div>
 
                   {selectedAccident.notes && (

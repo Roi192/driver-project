@@ -466,11 +466,10 @@ export default function AttendanceTracking() {
     toast.success("הקובץ יוצא בהצלחה");
   };
 
-  // Filter soldiers - only show those with data in current filter
+  // Filter soldiers - show all soldiers that match search, not just those with data
   const filteredSoldiers = soldiers.filter(s => {
     const matchesSearch = s.full_name.includes(searchTerm) || s.personal_number.includes(searchTerm);
-    const stats = getSoldierStats(s.id);
-    return matchesSearch && stats.hasData;
+    return matchesSearch;
   });
 
   // Edit attendance

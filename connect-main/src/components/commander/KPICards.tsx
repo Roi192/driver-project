@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Users, 
@@ -8,15 +8,16 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  X,
-  ChevronLeft
+  ChevronLeft,
+  Gavel
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface KPI {
   id: string;
@@ -37,45 +38,30 @@ interface Soldier {
   is_active: boolean | null;
 }
 
-interface EventAttendance {
-  soldier_id: string;
-  status: string;
-}
-
-interface Inspection {
-  id: string;
-  total_score: number | null;
-  soldier_id: string;
-  inspection_date: string;
-}
-
-interface Accident {
-  id: string;
-  driver_name: string | null;
-  severity: string | null;
-  accident_date: string;
-  description: string | null;
-}
-
-// Detail data types
-interface KPIDetailData {
-  readyDrivers: Soldier[];
-  notReadyDrivers: Soldier[];
-  attendanceRecords: { soldier: Soldier; attended: number; total: number }[];
-  inspectionDetails: (Inspection & { soldierName?: string })[];
-  accidentDetails: Accident[];
+interface MonthlyTrendData {
+  month: string;
+  count: number;
+  avgScore?: number;
 }
 
 export function KPICards() {
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedKPI, setSelectedKPI] = useState<string | null>(null);
-  const [detailData, setDetailData] = useState<KPIDetailData>({
+  const [detailData, setDetailData] = useState<{
+    readyDrivers: Soldier[];
+    notReadyDrivers: Soldier[];
+    attendanceRecords: { soldier: Soldier; attended: number; total: number }[];
+    accidentTrend: MonthlyTrendData[];
+    punishmentTrend: MonthlyTrendData[];
+    inspectionTrend: MonthlyTrendData[];
+  }>({
     readyDrivers: [],
     notReadyDrivers: [],
     attendanceRecords: [],
-    inspectionDetails: [],
-    accidentDetails: []
+    accidentTrend: [],
+    punishmentTrend: [],
+    inspectionTrend: []
   });
 
   useEffect(() => {
@@ -87,8 +73,12 @@ export function KPICards() {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    // Get last 6 months for trends
+    const sixMonthsAgo = subMonths(today, 5);
+    const months = eachMonthOfInterval({ start: startOfMonth(sixMonthsAgo), end: endOfMonth(today) });
+
     try {
-      // 1. Driver readiness percentage
+      // 1. Driver readiness percentage - based on valid licenses only
       const { data: soldiers } = await supabase
         .from('soldiers')
         .select('id, full_name, military_license_expiry, civilian_license_expiry, is_active')
@@ -130,7 +120,7 @@ export function KPICards() {
       const attendanceByDriver: Record<string, { attended: number; total: number }> = {};
 
       if (attendance) {
-        attendance.forEach((record: EventAttendance) => {
+        attendance.forEach((record) => {
           if (!attendanceByDriver[record.soldier_id]) {
             attendanceByDriver[record.soldier_id] = { attended: 0, total: 0 };
           }
@@ -146,7 +136,6 @@ export function KPICards() {
         ? Math.round((attendedCount / totalAttendance) * 100) 
         : 0;
 
-      // Build attendance records with soldier names
       const attendanceRecords = Object.entries(attendanceByDriver).map(([soldierId, data]) => {
         const soldier = soldiers?.find(s => s.id === soldierId);
         return {
@@ -156,46 +145,107 @@ export function KPICards() {
         };
       }).sort((a, b) => (a.attended / a.total) - (b.attended / b.total));
 
-      // 3. Average inspection score
+      // 3. Average inspection score this month
       const { data: inspections } = await supabase
         .from('inspections')
         .select('id, total_score, soldier_id, inspection_date')
-        .gte('inspection_date', firstDayOfMonth.toISOString().split('T')[0])
-        .order('total_score', { ascending: true });
+        .order('inspection_date', { ascending: false });
 
       let avgScore = 0;
-      const inspectionDetails: (Inspection & { soldierName?: string })[] = [];
+      let monthlyInspections = 0;
       if (inspections && inspections.length > 0) {
-        const validScores = inspections.filter((i: Inspection) => i.total_score !== null);
-        if (validScores.length > 0) {
+        const thisMonthInspections = inspections.filter(i => 
+          parseISO(i.inspection_date) >= firstDayOfMonth
+        );
+        monthlyInspections = thisMonthInspections.length;
+        if (thisMonthInspections.length > 0) {
           avgScore = Math.round(
-            validScores.reduce((sum: number, i: Inspection) => sum + (i.total_score || 0), 0) / validScores.length
+            thisMonthInspections.reduce((sum, i) => sum + (i.total_score || 0), 0) / thisMonthInspections.length
           );
         }
-        inspections.forEach((insp: Inspection) => {
-          const soldier = soldiers?.find(s => s.id === insp.soldier_id);
-          inspectionDetails.push({
-            ...insp,
-            soldierName: soldier?.full_name || 'לא ידוע'
-          });
-        });
       }
 
-      // 4. Exceptional events count
+      // Build inspection trend data
+      const inspectionTrend: MonthlyTrendData[] = months.map(month => {
+        const monthStart = startOfMonth(month);
+        const monthEnd = endOfMonth(month);
+        const monthInspections = (inspections || []).filter(i => {
+          const date = parseISO(i.inspection_date);
+          return date >= monthStart && date <= monthEnd;
+        });
+        const avg = monthInspections.length > 0 
+          ? Math.round(monthInspections.reduce((sum, i) => sum + (i.total_score || 0), 0) / monthInspections.length)
+          : 0;
+        return {
+          month: format(month, 'MMM', { locale: he }),
+          count: monthInspections.length,
+          avgScore: avg
+        };
+      });
+
+      // 4. Accidents trend
       const { data: accidents } = await supabase
         .from('accidents')
-        .select('id, driver_name, severity, accident_date, description')
-        .gte('accident_date', firstDayOfMonth.toISOString().split('T')[0])
+        .select('id, accident_date')
         .order('accident_date', { ascending: false });
 
-      const exceptionalEvents = accidents?.length || 0;
+      const monthlyAccidents = (accidents || []).filter(a => 
+        parseISO(a.accident_date) >= firstDayOfMonth
+      ).length;
+
+      const accidentTrend: MonthlyTrendData[] = months.map(month => {
+        const monthStart = startOfMonth(month);
+        const monthEnd = endOfMonth(month);
+        const monthAccidents = (accidents || []).filter(a => {
+          const date = parseISO(a.accident_date);
+          return date >= monthStart && date <= monthEnd;
+        });
+        return {
+          month: format(month, 'MMM', { locale: he }),
+          count: monthAccidents.length
+        };
+      });
+
+      // Calculate accident trend (compare last 2 months)
+      const lastMonthAccidents = accidentTrend[accidentTrend.length - 1]?.count || 0;
+      const prevMonthAccidents = accidentTrend[accidentTrend.length - 2]?.count || 0;
+      const accidentTrendDir = lastMonthAccidents < prevMonthAccidents ? 'up' : lastMonthAccidents > prevMonthAccidents ? 'down' : 'neutral';
+
+      // 5. Punishments trend
+      const { data: punishments } = await supabase
+        .from('punishments')
+        .select('id, punishment_date')
+        .order('punishment_date', { ascending: false });
+
+      const monthlyPunishments = (punishments || []).filter(p => 
+        parseISO(p.punishment_date) >= firstDayOfMonth
+      ).length;
+
+      const punishmentTrend: MonthlyTrendData[] = months.map(month => {
+        const monthStart = startOfMonth(month);
+        const monthEnd = endOfMonth(month);
+        const monthPunishments = (punishments || []).filter(p => {
+          const date = parseISO(p.punishment_date);
+          return date >= monthStart && date <= monthEnd;
+        });
+        return {
+          month: format(month, 'MMM', { locale: he }),
+          count: monthPunishments.length
+        };
+      });
+
+      // Calculate punishment trend
+      const lastMonthPunishments = punishmentTrend[punishmentTrend.length - 1]?.count || 0;
+      const prevMonthPunishments = punishmentTrend[punishmentTrend.length - 2]?.count || 0;
+      const punishmentTrendDir = lastMonthPunishments < prevMonthPunishments ? 'up' : lastMonthPunishments > prevMonthPunishments ? 'down' : 'neutral';
 
       setDetailData({
         readyDrivers: readyDriversList,
         notReadyDrivers: notReadyDriversList,
         attendanceRecords,
-        inspectionDetails,
-        accidentDetails: accidents || []
+        accidentTrend,
+        punishmentTrend,
+        inspectionTrend
       });
 
       setKpis([
@@ -219,19 +269,35 @@ export function KPICards() {
         },
         {
           id: 'inspections',
-          label: 'ציון ביקורות',
+          label: 'ממוצע ביקורות',
           value: avgScore || '-',
           icon: ClipboardCheck,
           trend: avgScore >= 80 ? 'up' : avgScore >= 60 ? 'neutral' : 'down',
           color: avgScore >= 80 ? 'success' : avgScore >= 60 ? 'warning' : 'danger'
         },
         {
-          id: 'events',
-          label: 'אירועים חריגים',
-          value: exceptionalEvents,
+          id: 'accidents',
+          label: 'מגמת תאונות',
+          value: monthlyAccidents,
           icon: AlertTriangle,
-          trend: exceptionalEvents === 0 ? 'up' : exceptionalEvents <= 2 ? 'neutral' : 'down',
-          color: exceptionalEvents === 0 ? 'success' : exceptionalEvents <= 2 ? 'warning' : 'danger'
+          trend: accidentTrendDir,
+          color: accidentTrendDir === 'up' ? 'success' : accidentTrendDir === 'neutral' ? 'warning' : 'danger'
+        },
+        {
+          id: 'punishments',
+          label: 'מגמת עונשים',
+          value: monthlyPunishments,
+          icon: Gavel,
+          trend: punishmentTrendDir,
+          color: punishmentTrendDir === 'up' ? 'success' : punishmentTrendDir === 'neutral' ? 'warning' : 'danger'
+        },
+        {
+          id: 'inspection_count',
+          label: 'כמות ביקורות',
+          value: monthlyInspections,
+          icon: ClipboardCheck,
+          trend: monthlyInspections >= 10 ? 'up' : monthlyInspections >= 5 ? 'neutral' : 'down',
+          color: monthlyInspections >= 10 ? 'success' : monthlyInspections >= 5 ? 'warning' : 'danger'
         }
       ]);
 
@@ -354,54 +420,116 @@ export function KPICards() {
           </ScrollArea>
         );
       case 'inspections':
+      case 'inspection_count':
         return (
-          <ScrollArea className="h-80">
-            <div className="space-y-2">
-              {detailData.inspectionDetails.map(insp => (
-                <div key={insp.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <span className="font-medium text-slate-700">{insp.soldierName}</span>
-                    <p className="text-xs text-slate-500">{format(parseISO(insp.inspection_date), 'dd/MM/yyyy', { locale: he })}</p>
-                  </div>
-                  <Badge className={cn(
-                    "text-white",
-                    (insp.total_score || 0) >= 80 ? "bg-emerald-500" : (insp.total_score || 0) >= 60 ? "bg-amber-500" : "bg-red-500"
-                  )}>
-                    {insp.total_score || 0}
-                  </Badge>
-                </div>
-              ))}
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">מגמת ביקורות ב-6 חודשים אחרונים</p>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={detailData.inspectionTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ direction: 'rtl', fontSize: 12 }}
+                    formatter={(value: number, name: string) => [value, name === 'count' ? 'כמות' : 'ממוצע']}
+                  />
+                  <Bar dataKey="count" fill="#3b82f6" name="כמות" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </ScrollArea>
+            <div className="h-48">
+              <p className="text-sm text-slate-600 mb-2">ממוצע ציונים</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={detailData.inspectionTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} />
+                  <Tooltip 
+                    contentStyle={{ direction: 'rtl', fontSize: 12 }}
+                    formatter={(value: number) => [value, 'ממוצע']}
+                  />
+                  <Line type="monotone" dataKey="avgScore" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         );
-      case 'events':
+      case 'accidents':
         return (
-          <ScrollArea className="h-80">
-            {detailData.accidentDetails.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                <p>אין אירועים חריגים החודש</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {detailData.accidentDetails.map(acc => (
-                  <div key={acc.id} className="p-3 bg-slate-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-slate-700">{acc.driver_name || 'לא ידוע'}</span>
-                      <Badge className={cn(
-                        "text-white",
-                        acc.severity === 'severe' || acc.severity === 'major' ? "bg-red-500" : "bg-amber-500"
-                      )}>
-                        {acc.severity === 'severe' ? 'חמור' : acc.severity === 'major' ? 'משמעותי' : 'קל'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-slate-500">{format(parseISO(acc.accident_date), 'dd/MM/yyyy', { locale: he })}</p>
-                    {acc.description && <p className="text-sm text-slate-600 mt-1">{acc.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">מגמת תאונות ב-6 חודשים אחרונים</p>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={detailData.accidentTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ direction: 'rtl' }}
+                    formatter={(value: number) => [value, 'תאונות']}
+                  />
+                  <Line type="monotone" dataKey="count" stroke="#ef4444" strokeWidth={3} dot={{ r: 5, fill: '#ef4444' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-center p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-600">
+                {detailData.accidentTrend[detailData.accidentTrend.length - 1]?.count || 0} תאונות החודש
+                {detailData.accidentTrend[detailData.accidentTrend.length - 2] && (
+                  <span className={cn(
+                    "mr-2",
+                    (detailData.accidentTrend[detailData.accidentTrend.length - 1]?.count || 0) < 
+                    (detailData.accidentTrend[detailData.accidentTrend.length - 2]?.count || 0) 
+                      ? "text-emerald-600" : "text-red-600"
+                  )}>
+                    ({(detailData.accidentTrend[detailData.accidentTrend.length - 1]?.count || 0) - 
+                      (detailData.accidentTrend[detailData.accidentTrend.length - 2]?.count || 0) >= 0 ? '+' : ''}
+                    {(detailData.accidentTrend[detailData.accidentTrend.length - 1]?.count || 0) - 
+                      (detailData.accidentTrend[detailData.accidentTrend.length - 2]?.count || 0)} מהחודש הקודם)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        );
+      case 'punishments':
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">מגמת עונשים ב-6 חודשים אחרונים</p>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={detailData.punishmentTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ direction: 'rtl' }}
+                    formatter={(value: number) => [value, 'עונשים']}
+                  />
+                  <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={3} dot={{ r: 5, fill: '#f97316' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-center p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-600">
+                {detailData.punishmentTrend[detailData.punishmentTrend.length - 1]?.count || 0} עונשים החודש
+                {detailData.punishmentTrend[detailData.punishmentTrend.length - 2] && (
+                  <span className={cn(
+                    "mr-2",
+                    (detailData.punishmentTrend[detailData.punishmentTrend.length - 1]?.count || 0) < 
+                    (detailData.punishmentTrend[detailData.punishmentTrend.length - 2]?.count || 0) 
+                      ? "text-emerald-600" : "text-red-600"
+                  )}>
+                    ({(detailData.punishmentTrend[detailData.punishmentTrend.length - 1]?.count || 0) - 
+                      (detailData.punishmentTrend[detailData.punishmentTrend.length - 2]?.count || 0) >= 0 ? '+' : ''}
+                    {(detailData.punishmentTrend[detailData.punishmentTrend.length - 1]?.count || 0) - 
+                      (detailData.punishmentTrend[detailData.punishmentTrend.length - 2]?.count || 0)} מהחודש הקודם)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
         );
       default:
         return null;
@@ -412,8 +540,10 @@ export function KPICards() {
     switch (selectedKPI) {
       case 'readiness': return 'פירוט כשירות נהגים';
       case 'attendance': return 'פירוט נוכחות חודשית';
-      case 'inspections': return 'פירוט ביקורות החודש';
-      case 'events': return 'פירוט אירועים חריגים';
+      case 'inspections': return 'מגמת ממוצע ביקורות';
+      case 'accidents': return 'מגמת תאונות';
+      case 'punishments': return 'מגמת עונשים';
+      case 'inspection_count': return 'מגמת כמות ביקורות';
       default: return '';
     }
   };
@@ -421,7 +551,7 @@ export function KPICards() {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 gap-4">
-        {[1, 2, 3, 4].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <div key={i} className="h-28 bg-slate-200/50 rounded-2xl animate-pulse" />
         ))}
       </div>
