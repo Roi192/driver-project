@@ -7,15 +7,18 @@ import {
   ClipboardX, 
   Car,
   ChevronLeft,
-  Shield
+  Shield,
+  FileText,
+  Calendar,
+  Clock
 } from 'lucide-react';
-import { differenceInDays, parseISO, isAfter } from 'date-fns';
+import { differenceInDays, parseISO, isAfter, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface Alert {
   id: string;
-  type: 'license' | 'attendance' | 'inspection' | 'accident';
+  type: 'license' | 'attendance' | 'inspection' | 'accident' | 'procedure' | 'event' | 'defensive';
   severity: 'critical' | 'warning' | 'info';
   title: string;
   description: string;
@@ -29,6 +32,7 @@ interface Soldier {
   military_license_expiry: string | null;
   civilian_license_expiry: string | null;
   is_active: boolean | null;
+  defensive_driving_passed: boolean | null;
 }
 
 interface Accident {
@@ -49,6 +53,19 @@ interface EventAttendance {
   status: string;
 }
 
+interface WorkPlanEvent {
+  id: string;
+  title: string;
+  event_date: string;
+  status: string;
+}
+
+interface ShiftReport {
+  id: string;
+  is_complete: boolean;
+  report_date: string;
+}
+
 export function SmartAlerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,24 +83,34 @@ export function SmartAlerts() {
       // 1. Check license expiry
       const { data: soldiers } = await supabase
         .from('soldiers')
-        .select('id, full_name, military_license_expiry, civilian_license_expiry, is_active')
+        .select('id, full_name, military_license_expiry, civilian_license_expiry, is_active, defensive_driving_passed')
         .eq('is_active', true);
 
       if (soldiers) {
         const expiredLicenses: string[] = [];
         const expiringLicenses: string[] = [];
+        let noDefensiveDrivingCount = 0;
 
         soldiers.forEach((soldier: Soldier) => {
           const militaryExpiry = soldier.military_license_expiry ? parseISO(soldier.military_license_expiry) : null;
           const civilianExpiry = soldier.civilian_license_expiry ? parseISO(soldier.civilian_license_expiry) : null;
 
+          // Check defensive driving
+          if (!soldier.defensive_driving_passed) {
+            noDefensiveDrivingCount++;
+          }
+
           [militaryExpiry, civilianExpiry].forEach((expiry) => {
             if (expiry) {
               const daysUntil = differenceInDays(expiry, today);
               if (daysUntil < 0) {
-                expiredLicenses.push(soldier.full_name);
+                if (!expiredLicenses.includes(soldier.full_name)) {
+                  expiredLicenses.push(soldier.full_name);
+                }
               } else if (daysUntil <= 30) {
-                expiringLicenses.push(soldier.full_name);
+                if (!expiringLicenses.includes(soldier.full_name)) {
+                  expiringLicenses.push(soldier.full_name);
+                }
               }
             }
           });
@@ -109,6 +136,19 @@ export function SmartAlerts() {
             title: 'רישיונות עומדים לפוג',
             description: `${expiringLicenses.length} נהגים עם רישיון שיפוג ב-30 יום הקרובים`,
             count: expiringLicenses.length,
+            link: '/soldiers-control'
+          });
+        }
+
+        // Alert for soldiers without defensive driving
+        if (noDefensiveDrivingCount > 0) {
+          alertsList.push({
+            id: 'no-defensive-driving',
+            type: 'defensive',
+            severity: 'info',
+            title: 'חסר נהיגה מונעת',
+            description: `${noDefensiveDrivingCount} נהגים שלא עברו נהיגה מונעת`,
+            count: noDefensiveDrivingCount,
             link: '/soldiers-control'
           });
         }
@@ -193,6 +233,48 @@ export function SmartAlerts() {
         }
       }
 
+      // 5. Check upcoming events this week
+      const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
+      const { data: upcomingEvents } = await supabase
+        .from('work_plan_events')
+        .select('id, title, event_date, status')
+        .gte('event_date', today.toISOString().split('T')[0])
+        .lte('event_date', weekEnd.toISOString().split('T')[0])
+        .eq('status', 'pending');
+
+      if (upcomingEvents && upcomingEvents.length > 0) {
+        alertsList.push({
+          id: 'upcoming-events',
+          type: 'event',
+          severity: 'info',
+          title: 'אירועים השבוע',
+          description: `${upcomingEvents.length} אירועים מתוכננים השבוע`,
+          count: upcomingEvents.length,
+          link: '/annual-work-plan'
+        });
+      }
+
+      // 6. Check incomplete shift reports from yesterday
+      const yesterday = addDays(today, -1).toISOString().split('T')[0];
+      const { data: incompleteReports } = await supabase
+        .from('shift_reports')
+        .select('id, is_complete, report_date')
+        .eq('report_date', yesterday)
+        .eq('is_complete', false);
+
+      if (incompleteReports && incompleteReports.length > 0) {
+        alertsList.push({
+          id: 'incomplete-reports',
+          type: 'procedure',
+          severity: 'warning',
+          title: 'דוחות לא הושלמו',
+          description: `${incompleteReports.length} דוחות משמרת מאתמול לא הושלמו`,
+          count: incompleteReports.length,
+          link: '/admin'
+        });
+      }
+
     } catch (error) {
       console.error('Error fetching alerts:', error);
     }
@@ -207,6 +289,9 @@ export function SmartAlerts() {
       case 'attendance': return UserX;
       case 'inspection': return ClipboardX;
       case 'accident': return Car;
+      case 'procedure': return FileText;
+      case 'event': return Calendar;
+      case 'defensive': return Clock;
       default: return AlertTriangle;
     }
   };

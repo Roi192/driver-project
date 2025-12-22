@@ -46,7 +46,7 @@ interface Soldier {
   defensive_driving_passed: boolean | null;
 }
 
-// פונקציית כשירות אוטומטית
+// פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
 const getFitnessStatus = (soldier: Soldier) => {
   const today = new Date();
   const militaryExpiry = soldier.military_license_expiry ? parseISO(soldier.military_license_expiry) : null;
@@ -54,13 +54,10 @@ const getFitnessStatus = (soldier: Soldier) => {
   
   const militaryExpired = militaryExpiry && differenceInDays(militaryExpiry, today) < 0;
   const civilianExpired = civilianExpiry && differenceInDays(civilianExpiry, today) < 0;
-  const noDefensiveDriving = !soldier.defensive_driving_passed;
   
+  // נהג כשיר = שני הרשיונות בתוקף
   if (militaryExpired || civilianExpired) {
     return { status: "not_fit", label: "לא כשיר", color: "bg-red-500", icon: "❌" };
-  }
-  if (noDefensiveDriving) {
-    return { status: "partial", label: "חסר נהיגה מונעת", color: "bg-amber-500", icon: "⚠️" };
   }
   if (!militaryExpiry || !civilianExpiry) {
     return { status: "unknown", label: "חסר מידע", color: "bg-slate-400", icon: "❓" };
@@ -80,6 +77,11 @@ export default function SoldiersControl() {
   const [soldierToDelete, setSoldierToDelete] = useState<Soldier | null>(null);
   const [profileSoldier, setProfileSoldier] = useState<Soldier | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  
+  // Filters
+  const [militaryLicenseFilter, setMilitaryLicenseFilter] = useState<string>("all");
+  const [civilianLicenseFilter, setCivilianLicenseFilter] = useState<string>("all");
+  const [defensiveDrivingFilter, setDefensiveDrivingFilter] = useState<string>("all");
 
   const [formData, setFormData] = useState({
     personal_number: "",
@@ -243,10 +245,38 @@ export default function SoldiersControl() {
     toast.success("הקובץ יוצא בהצלחה");
   };
 
-  const filteredSoldiers = soldiers.filter(soldier =>
-    soldier.full_name.includes(searchTerm) ||
-    soldier.personal_number.includes(searchTerm)
-  );
+  // Apply all filters
+  const filteredSoldiers = soldiers.filter(soldier => {
+    // Text search
+    const matchesSearch = soldier.full_name.includes(searchTerm) || soldier.personal_number.includes(searchTerm);
+    if (!matchesSearch) return false;
+    
+    // Military license filter
+    if (militaryLicenseFilter !== "all") {
+      const status = getLicenseStatus(soldier.military_license_expiry).status;
+      if (militaryLicenseFilter === "expired" && status !== "expired") return false;
+      if (militaryLicenseFilter === "warning" && status !== "warning") return false;
+      if (militaryLicenseFilter === "valid" && status !== "valid") return false;
+      if (militaryLicenseFilter === "unknown" && status !== "unknown") return false;
+    }
+    
+    // Civilian license filter
+    if (civilianLicenseFilter !== "all") {
+      const status = getLicenseStatus(soldier.civilian_license_expiry).status;
+      if (civilianLicenseFilter === "expired" && status !== "expired") return false;
+      if (civilianLicenseFilter === "warning" && status !== "warning") return false;
+      if (civilianLicenseFilter === "valid" && status !== "valid") return false;
+      if (civilianLicenseFilter === "unknown" && status !== "unknown") return false;
+    }
+    
+    // Defensive driving filter
+    if (defensiveDrivingFilter !== "all") {
+      if (defensiveDrivingFilter === "passed" && !soldier.defensive_driving_passed) return false;
+      if (defensiveDrivingFilter === "not_passed" && soldier.defensive_driving_passed) return false;
+    }
+    
+    return true;
+  });
 
   const expiringLicenses = soldiers.filter(soldier => {
     const militaryStatus = getLicenseStatus(soldier.military_license_expiry);
@@ -377,6 +407,58 @@ export default function SoldiersControl() {
               className="pr-10 py-6 rounded-2xl border-2"
             />
           </div>
+          
+          {/* Filters */}
+          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur rounded-2xl">
+            <CardContent className="p-4">
+              <p className="text-sm font-bold text-slate-700 mb-3">סינון מתקדם</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">רשיון צבאי</Label>
+                  <Select value={militaryLicenseFilter} onValueChange={setMilitaryLicenseFilter}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="valid">תקף</SelectItem>
+                      <SelectItem value="warning">עומד לפוג (60 יום)</SelectItem>
+                      <SelectItem value="expired">פג תוקף</SelectItem>
+                      <SelectItem value="unknown">לא הוזן</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">רשיון אזרחי</Label>
+                  <Select value={civilianLicenseFilter} onValueChange={setCivilianLicenseFilter}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="valid">תקף</SelectItem>
+                      <SelectItem value="warning">עומד לפוג (60 יום)</SelectItem>
+                      <SelectItem value="expired">פג תוקף</SelectItem>
+                      <SelectItem value="unknown">לא הוזן</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">נהיגה מונעת</Label>
+                  <Select value={defensiveDrivingFilter} onValueChange={setDefensiveDrivingFilter}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">הכל</SelectItem>
+                      <SelectItem value="passed">עבר</SelectItem>
+                      <SelectItem value="not_passed">לא עבר</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Soldiers List */}
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
