@@ -10,15 +10,16 @@ import {
   Shield,
   FileText,
   Calendar,
-  Clock
+  Clock,
+  TrendingUp
 } from 'lucide-react';
-import { differenceInDays, parseISO, isAfter, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { differenceInDays, parseISO, isAfter, startOfWeek, endOfWeek, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface Alert {
   id: string;
-  type: 'license' | 'attendance' | 'inspection' | 'accident' | 'procedure' | 'event' | 'defensive';
+  type: 'license' | 'attendance' | 'inspection' | 'accident' | 'procedure' | 'event' | 'defensive' | 'accident_trend';
   severity: 'critical' | 'warning' | 'info';
   title: string;
   description: string;
@@ -39,6 +40,7 @@ interface Accident {
   id: string;
   driver_name: string | null;
   severity: string | null;
+  accident_date: string;
 }
 
 interface Inspection {
@@ -202,32 +204,51 @@ export function SmartAlerts() {
         });
       }
 
-      // 4. Check open accidents
+      // 4. Check accident trend - compare this month to last month
+      const thisMonthStart = startOfMonth(today);
+      const thisMonthEnd = endOfMonth(today);
+      const lastMonthStart = startOfMonth(subMonths(today, 1));
+      const lastMonthEnd = endOfMonth(subMonths(today, 1));
+
       const { data: accidents } = await supabase
         .from('accidents')
-        .select('id, driver_name, severity')
-        .or('notes.is.null,notes.neq.נסגר');
+        .select('id, driver_name, severity, accident_date');
 
       if (accidents && accidents.length > 0) {
-        const severeAccidents = accidents.filter((a: Accident) => a.severity === 'severe' || a.severity === 'major');
+        const thisMonthAccidents = accidents.filter((a: Accident) => {
+          const accidentDate = parseISO(a.accident_date);
+          return accidentDate >= thisMonthStart && accidentDate <= thisMonthEnd;
+        });
+
+        const lastMonthAccidents = accidents.filter((a: Accident) => {
+          const accidentDate = parseISO(a.accident_date);
+          return accidentDate >= lastMonthStart && accidentDate <= lastMonthEnd;
+        });
+
+        const difference = thisMonthAccidents.length - lastMonthAccidents.length;
+
+        if (difference > 0) {
+          alertsList.push({
+            id: 'accident-trend',
+            type: 'accident_trend',
+            severity: difference >= 3 ? 'critical' : 'warning',
+            title: 'עלייה בתאונות',
+            description: `${difference} תאונות יותר מחודש קודם (${thisMonthAccidents.length} החודש לעומת ${lastMonthAccidents.length} בחודש שעבר)`,
+            count: difference,
+            link: '/accidents-tracking'
+          });
+        }
+
+        // Still show severe accidents if any
+        const severeAccidents = thisMonthAccidents.filter((a: Accident) => a.severity === 'severe');
         if (severeAccidents.length > 0) {
           alertsList.push({
             id: 'severe-accidents',
             type: 'accident',
             severity: 'critical',
-            title: 'תאונות חמורות פתוחות',
-            description: `${severeAccidents.length} תאונות חמורות שטרם נסגרו`,
+            title: 'תאונות חמורות החודש',
+            description: `${severeAccidents.length} תאונות חמורות החודש`,
             count: severeAccidents.length,
-            link: '/accidents-tracking'
-          });
-        } else if (accidents.length > 0) {
-          alertsList.push({
-            id: 'open-accidents',
-            type: 'accident',
-            severity: 'info',
-            title: 'תאונות פתוחות',
-            description: `${accidents.length} תאונות שטרם נסגרו`,
-            count: accidents.length,
             link: '/accidents-tracking'
           });
         }
@@ -289,6 +310,7 @@ export function SmartAlerts() {
       case 'attendance': return UserX;
       case 'inspection': return ClipboardX;
       case 'accident': return Car;
+      case 'accident_trend': return TrendingUp;
       case 'procedure': return FileText;
       case 'event': return Calendar;
       case 'defensive': return Clock;

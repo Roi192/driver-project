@@ -134,6 +134,24 @@ export default function AdminDashboard() {
     }
   };
 
+  // Call cleanup function for old reports (runs once on admin load)
+  useEffect(() => {
+    const cleanupOldReports = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('cleanup-old-reports');
+        if (data?.deletedReports > 0) {
+          console.log(`Cleaned up ${data.deletedReports} old reports and ${data.deletedPhotos} photos`);
+        }
+      } catch (error) {
+        console.error('Error cleaning up old reports:', error);
+      }
+    };
+    
+    if (isAdmin) {
+      cleanupOldReports();
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (isAdmin) {
       fetchReports();

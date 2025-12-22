@@ -853,15 +853,15 @@ const AccidentsTracking = () => {
                   <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
                     <div>
                       <p className="text-xs text-slate-500">תאריך</p>
-                      <p className="font-bold">{format(parseISO(selectedAccident.accident_date), 'dd/MM/yyyy')}</p>
+                      <p className="font-bold text-slate-800">{format(parseISO(selectedAccident.accident_date), 'dd/MM/yyyy')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">נהג</p>
-                      <p className="font-bold">{getDriverName(selectedAccident)}</p>
+                      <p className="font-bold text-slate-800">{getDriverName(selectedAccident)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">סוג נהג</p>
-                      <p className="font-bold">{driverTypeLabels[selectedAccident.driver_type]}</p>
+                      <p className="font-bold text-slate-800">{driverTypeLabels[selectedAccident.driver_type]}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">חומרה</p>
@@ -872,13 +872,13 @@ const AccidentsTracking = () => {
                     {selectedAccident.vehicle_number && (
                       <div>
                         <p className="text-xs text-slate-500">מספר רכב</p>
-                        <p className="font-bold">{selectedAccident.vehicle_number}</p>
+                        <p className="font-bold text-slate-800">{selectedAccident.vehicle_number}</p>
                       </div>
                     )}
                     {selectedAccident.location && (
                       <div>
                         <p className="text-xs text-slate-500">מיקום</p>
-                        <p className="font-bold">{selectedAccident.location}</p>
+                        <p className="font-bold text-slate-800">{selectedAccident.location}</p>
                       </div>
                     )}
                   </div>
@@ -886,7 +886,7 @@ const AccidentsTracking = () => {
                   {selectedAccident.description && (
                     <div className="p-4 bg-slate-50 rounded-xl">
                       <p className="text-xs text-slate-500 mb-1">תיאור</p>
-                      <p className="text-sm">{selectedAccident.description}</p>
+                      <p className="text-sm text-slate-700">{selectedAccident.description}</p>
                     </div>
                   )}
 
@@ -907,7 +907,7 @@ const AccidentsTracking = () => {
                   {selectedAccident.notes && (
                     <div className="p-4 bg-slate-50 rounded-xl">
                       <p className="text-xs text-slate-500 mb-1">הערות</p>
-                      <p className="text-sm">{selectedAccident.notes}</p>
+                      <p className="text-sm text-slate-700">{selectedAccident.notes}</p>
                     </div>
                   )}
                 </div>

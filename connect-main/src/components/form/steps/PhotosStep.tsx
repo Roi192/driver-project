@@ -4,18 +4,66 @@ import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 
+// Image compression utility
+const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate new dimensions
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to compressed JPEG
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+};
+
 export function PhotosStep() {
   const { setValue, watch, register } = useFormContext();
   const photos = watch("photos") || {};
   
-  const handlePhotoCapture = (photoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = async (photoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setValue(`photos.${photoId}`, e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress the image before storing
+        const compressedDataUrl = await compressImage(file, 800, 0.6);
+        setValue(`photos.${photoId}`, compressedDataUrl);
+      } catch (error) {
+        console.error('Error compressing image:', error);
+        // Fallback to original if compression fails
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setValue(`photos.${photoId}`, e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
