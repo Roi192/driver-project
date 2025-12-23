@@ -785,6 +785,7 @@ export type Database = {
           military_license_expiry: string | null
           outpost: string | null
           personal_number: string
+          qualified_date: string | null
           release_date: string | null
           updated_at: string
         }
@@ -798,6 +799,7 @@ export type Database = {
           military_license_expiry?: string | null
           outpost?: string | null
           personal_number: string
+          qualified_date?: string | null
           release_date?: string | null
           updated_at?: string
         }
@@ -811,6 +813,7 @@ export type Database = {
           military_license_expiry?: string | null
           outpost?: string | null
           personal_number?: string
+          qualified_date?: string | null
           release_date?: string | null
           updated_at?: string
         }

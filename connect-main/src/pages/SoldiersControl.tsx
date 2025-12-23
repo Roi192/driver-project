@@ -26,7 +26,8 @@ import {
   FileSpreadsheet,
   Search,
   Eye,
-  Car
+  Car,
+  CheckCircle
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -44,6 +45,7 @@ interface Soldier {
   is_active: boolean;
   created_at: string;
   defensive_driving_passed: boolean | null;
+  qualified_date: string | null;
 }
 
 // פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
@@ -90,6 +92,7 @@ export default function SoldiersControl() {
     civilian_license_expiry: "",
     release_date: "",
     defensive_driving_passed: false,
+    qualified_date: format(new Date(), "yyyy-MM-dd"),
   });
 
   useEffect(() => {
@@ -147,6 +150,7 @@ export default function SoldiersControl() {
       civilian_license_expiry: formData.civilian_license_expiry || null,
       release_date: formData.release_date || null,
       defensive_driving_passed: formData.defensive_driving_passed,
+      qualified_date: formData.qualified_date || null,
     };
 
     if (editingSoldier) {
@@ -208,6 +212,7 @@ export default function SoldiersControl() {
       civilian_license_expiry: "",
       release_date: "",
       defensive_driving_passed: false,
+      qualified_date: format(new Date(), "yyyy-MM-dd"),
     });
     setEditingSoldier(null);
   };
@@ -221,6 +226,7 @@ export default function SoldiersControl() {
       civilian_license_expiry: soldier.civilian_license_expiry || "",
       release_date: soldier.release_date || "",
       defensive_driving_passed: soldier.defensive_driving_passed || false,
+      qualified_date: soldier.qualified_date || format(new Date(), "yyyy-MM-dd"),
     });
     setDialogOpen(true);
   };
@@ -230,6 +236,7 @@ export default function SoldiersControl() {
       "מספר אישי": soldier.personal_number,
       "שם מלא": soldier.full_name,
       "מוצב": soldier.outpost || "-",
+      "תאריך נהג מוכשר": soldier.qualified_date ? format(parseISO(soldier.qualified_date), "dd/MM/yyyy") : "-",
       "רשיון צבאי": soldier.military_license_expiry ? format(parseISO(soldier.military_license_expiry), "dd/MM/yyyy") : "-",
       "סטטוס רשיון צבאי": getLicenseStatus(soldier.military_license_expiry).label,
       "רשיון אזרחי": soldier.civilian_license_expiry ? format(parseISO(soldier.civilian_license_expiry), "dd/MM/yyyy") : "-",
@@ -526,6 +533,15 @@ export default function SoldiersControl() {
                                 </div>
                               </div>
                               
+                              {soldier.qualified_date && (
+                                <div className="flex items-center gap-1 mt-2">
+                                  <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                  <span className="text-xs text-emerald-600 font-medium">
+                                    מוכשר מ: {format(parseISO(soldier.qualified_date), "dd/MM/yyyy")}
+                                  </span>
+                                </div>
+                              )}
+                              
                               {soldier.release_date && (
                                 <div className="flex items-center gap-1 mt-2">
                                   <Calendar className="w-3 h-3 text-slate-400" />
@@ -633,6 +649,17 @@ export default function SoldiersControl() {
                   type="date"
                   value={formData.release_date}
                   onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                <Label className="text-emerald-700 font-bold">תאריך נהג מוכשר *</Label>
+                <p className="text-xs text-emerald-600 mb-2">מתי הנהג הוכשר לנהיגה ביחידה</p>
+                <Input
+                  type="date"
+                  value={formData.qualified_date}
+                  onChange={(e) => setFormData({ ...formData, qualified_date: e.target.value })}
+                  className="bg-white"
                 />
               </div>
 

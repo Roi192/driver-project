@@ -76,6 +76,7 @@ interface Soldier {
   full_name: string;
   personal_number: string;
   created_at: string;
+  qualified_date: string | null;
 }
 
 interface WorkPlanEvent {
@@ -202,11 +203,12 @@ export default function AttendanceTracking() {
     return Array.from(titles).sort();
   }, [events]);
 
-  // Check if soldier was qualified at a specific date
+  // Check if soldier was qualified at a specific date (using qualified_date field)
   const wasSoldierQualifiedAtDate = (soldier: Soldier, eventDate: string): boolean => {
-    const soldierCreatedDate = parseISO(soldier.created_at);
+    // Use qualified_date if available, otherwise fallback to created_at
+    const qualifiedDate = soldier.qualified_date ? parseISO(soldier.qualified_date) : parseISO(soldier.created_at);
     const eventDateParsed = parseISO(eventDate);
-    return soldierCreatedDate <= eventDateParsed;
+    return qualifiedDate <= eventDateParsed;
   };
 
   // Get soldier's status for an event

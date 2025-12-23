@@ -506,16 +506,16 @@ const AccidentsTracking = () => {
       <div className="p-4 md:p-6 space-y-6" dir="rtl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h1 className="text-2xl font-bold">מעקב תאונות</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="flex-shrink-0">
               <Filter className="ml-2 h-4 w-4" /> סינון
             </Button>
-            <Button variant="outline" onClick={exportToExcel}>
-              <FileSpreadsheet className="ml-2 h-4 w-4" /> ייצוא לאקסל
+            <Button variant="outline" onClick={exportToExcel} className="flex-shrink-0">
+              <FileSpreadsheet className="ml-2 h-4 w-4" /> ייצוא
             </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button><Plus className="ml-2 h-4 w-4" /> הוסף תאונה</Button>
+                <Button className="flex-shrink-0"><Plus className="ml-2 h-4 w-4" /> הוסף תאונה</Button>
               </DialogTrigger>
               <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
