@@ -10,6 +10,7 @@ export const OUTPOSTS = [
   "נווה יאיר",
   "רנתיס",
   "מכבים",
+  "חשמונאים",
 ] as const;
 
 export const SHIFT_TYPES = [

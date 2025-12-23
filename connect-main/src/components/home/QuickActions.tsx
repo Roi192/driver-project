@@ -15,8 +15,19 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
-const actions = [
+interface ActionItem {
+  to: string;
+  icon: typeof FileText;
+  label: string;
+  description: string;
+  iconGradient: string;
+  featured?: boolean;
+  hideForBattalion?: boolean;
+}
+
+const actions: ActionItem[] = [
   {
     to: "/shift-form",
     icon: FileText,
@@ -24,6 +35,7 @@ const actions = [
     description: "מלא את הטופס לפני תחילת המשמרת",
     iconGradient: "from-primary to-primary/70",
     featured: true,
+    hideForBattalion: true,
   },
   {
     to: "/drill-locations",
@@ -70,6 +82,14 @@ const actions = [
 ];
 
 export function QuickActions() {
+  const { userType } = useAuth();
+  const isBattalionUser = userType === 'battalion';
+
+  // Filter actions based on user type
+  const filteredActions = actions.filter(action => 
+    !action.hideForBattalion || !isBattalionUser
+  );
+
   return (
     <section className="relative px-4 py-20 overflow-hidden">
       {/* Premium Light Background */}
@@ -134,7 +154,7 @@ export function QuickActions() {
         
         {/* Action Cards Grid - Premium Light */}
         <div className="space-y-4">
-          {actions.map((action, i) => (
+          {filteredActions.map((action, i) => (
             <Link
               key={action.to}
               to={action.to}

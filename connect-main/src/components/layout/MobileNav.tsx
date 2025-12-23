@@ -31,22 +31,34 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import unitLogo from "@/assets/unit-logo.png";
 
-const navItems = [
-  { to: "/", icon: Home, label: "דף הבית" },
-  { to: "/shift-form", icon: FileText, label: "טופס לפני משמרת", featured: true },
-  { to: "/drill-locations", icon: MapPin, label: "נקודות תרגולות" },
-  { to: "/safety-files", icon: FolderOpen, label: "תיקי בטיחות" },
-  { to: "/safety-events", icon: AlertTriangle, label: "אירועי בטיחות" },
-  { to: "/training-videos", icon: Video, label: "סרטוני הדרכה" },
-  { to: "/procedures", icon: BookOpen, label: "נהלים" },
-  { to: "/my-reports", icon: ClipboardList, label: "הדיווחים שלי" },
-];
+// Base nav items - shift-form will be filtered based on user type
+const getNavItems = (userType: string | null) => {
+  const items = [
+    { to: "/", icon: Home, label: "דף הבית" },
+    { to: "/shift-form", icon: FileText, label: "טופס לפני משמרת", featured: true },
+    { to: "/drill-locations", icon: MapPin, label: "נקודות תרגולות" },
+    { to: "/safety-files", icon: FolderOpen, label: "תיקי בטיחות" },
+    { to: "/safety-events", icon: AlertTriangle, label: "אירועי בטיחות" },
+    { to: "/training-videos", icon: Video, label: "סרטוני הדרכה" },
+    { to: "/procedures", icon: BookOpen, label: "נהלים" },
+    { to: "/my-reports", icon: ClipboardList, label: "הדיווחים שלי" },
+  ];
+  
+  // Hide shift-form for battalion users
+  if (userType === 'battalion') {
+    return items.filter(item => item.to !== '/shift-form');
+  }
+  
+  return items;
+};
 
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [userName, setUserName] = useState<string>("");
-  const { signOut, isAdmin, user } = useAuth();
+  const { signOut, isAdmin, user, userType } = useAuth();
   const navigate = useNavigate();
+  
+  const navItems = getNavItems(userType);
 
   useEffect(() => {
     const fetchUserName = async () => {

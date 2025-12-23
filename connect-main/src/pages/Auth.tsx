@@ -6,10 +6,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, Car, Users } from 'lucide-react';
 import unitLogo from '@/assets/unit-logo.png';
 import bgVehicles from '@/assets/bg-vehicles.png';
+import { OUTPOSTS } from '@/lib/constants';
+
+const REGIONS = [
+  "ארץ בנימין",
+  "גבעת בנימין", 
+  "טלמונים",
+  "מכבים"
+] as const;
+
+const MILITARY_ROLES = [
+  "מג\"ד",
+  "סמג\"ד",
+  "מ\"פ",
+  "סמ\"פ",
+  "מ\"מ",
+  "מ\"כ",
+  "אחר"
+] as const;
+
+const PLATOONS = [
+  "גדודי",
+  ...OUTPOSTS
+] as const;
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +41,13 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [outpost, setOutpost] = useState('');
+  
+  // New fields for battalion users
+  const [userType, setUserType] = useState<'driver' | 'battalion' | null>(null);
+  const [region, setRegion] = useState('');
+  const [militaryRole, setMilitaryRole] = useState('');
+  const [platoon, setPlatoon] = useState('');
+  
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
 
@@ -54,6 +85,7 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!email || !password || !fullName) {
       toast({
         title: 'שגיאה',
@@ -72,8 +104,26 @@ export default function Auth() {
       return;
     }
 
+    if (userType === 'battalion' && (!region || !militaryRole || !platoon)) {
+      toast({
+        title: 'שגיאה',
+        description: 'נא למלא גזרה, תפקיד ופלוגה',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
-    const { error } = await signUp(email, password, fullName, outpost);
+    const { error } = await signUp({
+      email,
+      password,
+      fullName,
+      userType: userType || 'driver',
+      outpost: userType === 'driver' ? outpost : undefined,
+      region: userType === 'battalion' ? region : undefined,
+      militaryRole: userType === 'battalion' ? militaryRole : undefined,
+      platoon: userType === 'battalion' ? platoon : undefined,
+    });
     setIsLoading(false);
 
     if (error) {
@@ -96,6 +146,16 @@ export default function Auth() {
         description: 'ברוך הבא למערכת',
       });
     }
+  };
+
+  const resetSignupForm = () => {
+    setFullName('');
+    setEmail('');
+    setPassword('');
+    setOutpost('');
+    setRegion('');
+    setMilitaryRole('');
+    setPlatoon('');
   };
 
   return (
@@ -163,6 +223,7 @@ export default function Auth() {
               <TabsTrigger 
                 value="signup" 
                 className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300"
+                onClick={() => { resetSignupForm(); setUserType(null); }}
               >
                 הרשמה
               </TabsTrigger>
@@ -212,57 +273,175 @@ export default function Auth() {
             </TabsContent>
 
             <TabsContent value="signup" className="animate-fade-in">
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-slate-800 font-semibold">שם מלא *</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="ישראל ישראלי"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
-                  />
+              {/* User Type Selection */}
+              {!userType ? (
+                <div className="space-y-4">
+                  <p className="text-center text-slate-700 font-medium mb-4">בחר סוג משתמש:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-24 flex flex-col gap-2 border-2 hover:border-primary hover:bg-primary/5 transition-all"
+                      onClick={() => setUserType('driver')}
+                    >
+                      <Car className="w-8 h-8 text-primary" />
+                      <span className="font-bold text-slate-800">נהג בט"ש</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-24 flex flex-col gap-2 border-2 hover:border-primary hover:bg-primary/5 transition-all"
+                      onClick={() => setUserType('battalion')}
+                    >
+                      <Users className="w-8 h-8 text-primary" />
+                      <span className="font-bold text-slate-800">גדודי תע"ם</span>
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email" className="text-slate-800 font-semibold">אימייל *</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    dir="ltr"
-                    className="text-right bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-slate-800 font-semibold">סיסמה *</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="לפחות 6 תווים"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    dir="ltr"
-                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 cta-button text-base font-bold rounded-xl" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin ml-2" />
-                      נרשם...
-                    </>
-                  ) : (
-                    'הירשם למערכת'
+              ) : (
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  {/* Back button */}
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => { setUserType(null); resetSignupForm(); }}
+                    className="text-slate-600 hover:text-slate-800 mb-2"
+                  >
+                    ← חזור לבחירת סוג משתמש
+                  </Button>
+
+                  {/* User type indicator */}
+                  <div className={`p-3 rounded-xl text-center mb-4 ${userType === 'driver' ? 'bg-blue-50 border border-blue-200' : 'bg-purple-50 border border-purple-200'}`}>
+                    {userType === 'driver' ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Car className="w-5 h-5 text-blue-600" />
+                        <span className="font-bold text-blue-800">הרשמה כנהג בט"ש</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-2">
+                        <Users className="w-5 h-5 text-purple-600" />
+                        <span className="font-bold text-purple-800">הרשמה כגדודי תע"ם</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name" className="text-slate-800 font-semibold">שם מלא *</Label>
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="ישראל ישראלי"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    />
+                  </div>
+
+                  {/* Driver-specific fields */}
+                  {userType === 'driver' && (
+                    <div className="space-y-2">
+                      <Label className="text-slate-800 font-semibold">מוצב</Label>
+                      <Select value={outpost} onValueChange={setOutpost}>
+                        <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                          <SelectValue placeholder="בחר מוצב" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {OUTPOSTS.map(o => (
+                            <SelectItem key={o} value={o}>{o}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
-                </Button>
-              </form>
+
+                  {/* Battalion-specific fields */}
+                  {userType === 'battalion' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-slate-800 font-semibold">גזרה *</Label>
+                        <Select value={region} onValueChange={setRegion}>
+                          <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                            <SelectValue placeholder="בחר גזרה" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {REGIONS.map(r => (
+                              <SelectItem key={r} value={r}>{r}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-slate-800 font-semibold">תפקיד *</Label>
+                        <Select value={militaryRole} onValueChange={setMilitaryRole}>
+                          <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                            <SelectValue placeholder="בחר תפקיד" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MILITARY_ROLES.map(r => (
+                              <SelectItem key={r} value={r}>{r}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-slate-800 font-semibold">פלוגה *</Label>
+                        <Select value={platoon} onValueChange={setPlatoon}>
+                          <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                            <SelectValue placeholder="בחר פלוגה" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PLATOONS.map(p => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email" className="text-slate-800 font-semibold">אימייל *</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      dir="ltr"
+                      className="text-right bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password" className="text-slate-800 font-semibold">סיסמה *</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      placeholder="לפחות 6 תווים"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      dir="ltr"
+                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 cta-button text-base font-bold rounded-xl" 
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin ml-2" />
+                        נרשם...
+                      </>
+                    ) : (
+                      'הירשם למערכת'
+                    )}
+                  </Button>
+                </form>
+              )}
             </TabsContent>
           </Tabs>
 

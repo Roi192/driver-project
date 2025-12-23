@@ -349,32 +349,36 @@ export default function SoldiersControl() {
                   התראות רשיונות - 30/60 יום ({expiringLicenses.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {expiringLicenses.slice(0, 5).map(soldier => {
-                  const militaryStatus = getLicenseStatus(soldier.military_license_expiry);
-                  const civilianStatus = getLicenseStatus(soldier.civilian_license_expiry);
-                  const militaryDays = soldier.military_license_expiry ? differenceInDays(parseISO(soldier.military_license_expiry), new Date()) : null;
-                  const civilianDays = soldier.civilian_license_expiry ? differenceInDays(parseISO(soldier.civilian_license_expiry), new Date()) : null;
-                  return (
-                    <div key={soldier.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/80 border border-red-200">
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-800">{soldier.full_name}</p>
-                        <div className="flex gap-2 mt-1 flex-wrap">
-                          {(militaryStatus.status === "expired" || militaryStatus.status === "warning") && (
-                            <Badge className={`${militaryStatus.color} text-white text-xs`}>
-                              צבאי: {militaryDays !== null && militaryDays < 0 ? "פג תוקף" : `${militaryDays} ימים`}
-                            </Badge>
-                          )}
-                          {(civilianStatus.status === "expired" || civilianStatus.status === "warning") && (
-                            <Badge className={`${civilianStatus.color} text-white text-xs`}>
-                              אזרחי: {civilianDays !== null && civilianDays < 0 ? "פג תוקף" : `${civilianDays} ימים`}
-                            </Badge>
-                          )}
+              <CardContent>
+                <ScrollArea className="w-full">
+                  <div className="space-y-2 min-w-[300px]">
+                    {expiringLicenses.map(soldier => {
+                      const militaryStatus = getLicenseStatus(soldier.military_license_expiry);
+                      const civilianStatus = getLicenseStatus(soldier.civilian_license_expiry);
+                      const militaryDays = soldier.military_license_expiry ? differenceInDays(parseISO(soldier.military_license_expiry), new Date()) : null;
+                      const civilianDays = soldier.civilian_license_expiry ? differenceInDays(parseISO(soldier.civilian_license_expiry), new Date()) : null;
+                      return (
+                        <div key={soldier.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/80 border border-red-200">
+                          <div className="flex-1">
+                            <p className="font-bold text-slate-800">{soldier.full_name}</p>
+                            <div className="flex gap-2 mt-1 flex-wrap">
+                              {(militaryStatus.status === "expired" || militaryStatus.status === "warning") && (
+                                <Badge className={`${militaryStatus.color} text-white text-xs`}>
+                                  צבאי: {militaryDays !== null && militaryDays < 0 ? "פג תוקף" : `${militaryDays} ימים`}
+                                </Badge>
+                              )}
+                              {(civilianStatus.status === "expired" || civilianStatus.status === "warning") && (
+                                <Badge className={`${civilianStatus.color} text-white text-xs`}>
+                                  אזרחי: {civilianDays !== null && civilianDays < 0 ? "פג תוקף" : `${civilianDays} ימים`}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           )}

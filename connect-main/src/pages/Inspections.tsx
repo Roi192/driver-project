@@ -673,64 +673,60 @@ export default function Inspections() {
                         </div>
                         
                         <ScrollArea className="w-full" dir="rtl">
-                          <div className="grid grid-cols-6 gap-2 text-xs min-w-[400px] pb-2">
-                            <div className="text-center p-2 rounded-lg bg-white">
+                          <div className="flex gap-2 text-xs min-w-[500px] pb-2">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.combat_score, 10)}`}>{inspection.combat_score}/10</span>
                               <p className="text-slate-500">קרב</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-white">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.vehicle_score, 30)}`}>{inspection.vehicle_score}/30</span>
                               <p className="text-slate-500">רכב</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-white">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.procedures_score, 20)}`}>{inspection.procedures_score}/20</span>
                               <p className="text-slate-500">נהלים</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-white">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.safety_score, 10)}`}>{inspection.safety_score}/10</span>
                               <p className="text-slate-500">בטיחות</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-white">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.routes_familiarity_score, 15)}`}>{inspection.routes_familiarity_score}/15</span>
                               <p className="text-slate-500">נתבים</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-white">
+                            <div className="text-center p-2 rounded-lg bg-white flex-1">
                               <span className={`font-bold ${getScoreColor(inspection.simulations_score, 15)}`}>{inspection.simulations_score}/15</span>
                               <p className="text-slate-500">מקתגים</p>
                             </div>
+                            {/* Action buttons inline for mobile scroll */}
+                            <div className="flex items-center gap-1 pr-2 border-r border-slate-200">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 px-2 h-auto py-1"
+                                onClick={() => { setViewInspection(inspection); setViewTab("overview"); }}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-amber-500 hover:text-amber-600 hover:bg-amber-50 px-2 h-auto py-1"
+                                onClick={() => openEditDialog(inspection)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-auto py-1"
+                                onClick={() => { setInspectionToDelete(inspection.id); setDeleteDialogOpen(true); }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </ScrollArea>
-                        
-                        {/* View/Edit/Delete buttons - now mobile-friendly */}
-                        <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2 mt-3 pt-3 border-t border-slate-200">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 text-xs sm:text-sm px-2 sm:px-3"
-                            onClick={() => { setViewInspection(inspection); setViewTab("overview"); }}
-                          >
-                            <Eye className="w-4 h-4 sm:ml-1" />
-                            <span className="hidden sm:inline">צפייה</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-amber-500 hover:text-amber-600 hover:bg-amber-50 text-xs sm:text-sm px-2 sm:px-3"
-                            onClick={() => openEditDialog(inspection)}
-                          >
-                            <Edit className="w-4 h-4 sm:ml-1" />
-                            <span className="hidden sm:inline">עריכה</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs sm:text-sm px-2 sm:px-3"
-                            onClick={() => { setInspectionToDelete(inspection.id); setDeleteDialogOpen(true); }}
-                          >
-                            <Trash2 className="w-4 h-4 sm:ml-1" />
-                            <span className="hidden sm:inline">מחק</span>
-                          </Button>
-                        </div>
                       </div>
                     ))
                   )}
@@ -756,41 +752,44 @@ export default function Inspections() {
                 />
               ))}
             </div>
-            <p className="text-sm text-slate-500 text-center mb-4">{steps[currentStep]}</p>
+            <p className="text-sm text-slate-800 font-semibold text-center mb-4">{steps[currentStep]}</p>
 
             <ScrollArea className="h-[55vh]">
               {/* Step 0: General Details */}
               {currentStep === 0 && (
                 <div className="space-y-4">
-                  <div>
-                    <Label>תאריך</Label>
-                    <Input type="date" value={formData.inspection_date} onChange={e => setFormData({...formData, inspection_date: e.target.value})} />
+                  <div className="p-3 bg-slate-100 rounded-xl text-center border border-slate-200 mb-4">
+                    <span className="font-bold text-slate-800">פרטים כלליים</span>
                   </div>
                   <div>
-                    <Label>פלוגה</Label>
+                    <Label className="text-slate-800 font-semibold">תאריך</Label>
+                    <Input type="date" value={formData.inspection_date} onChange={e => setFormData({...formData, inspection_date: e.target.value})} className="bg-white border-slate-300 text-slate-800" />
+                  </div>
+                  <div>
+                    <Label className="text-slate-800 font-semibold">פלוגה</Label>
                     <Select value={formData.platoon} onValueChange={v => setFormData({...formData, platoon: v})}>
-                      <SelectTrigger><SelectValue placeholder="בחר" /></SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 text-slate-800"><SelectValue placeholder="בחר" /></SelectTrigger>
                       <SelectContent>
                         {OUTPOSTS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label>שם המפקד</Label>
-                    <Input value={formData.commander_name} onChange={e => setFormData({...formData, commander_name: e.target.value})} />
+                    <Label className="text-slate-800 font-semibold">שם המפקד</Label>
+                    <Input value={formData.commander_name} onChange={e => setFormData({...formData, commander_name: e.target.value})} className="bg-white border-slate-300 text-slate-800" />
                   </div>
                   <div>
-                    <Label>שם הנהג</Label>
+                    <Label className="text-slate-800 font-semibold">שם הנהג</Label>
                     <Select value={formData.soldier_id} onValueChange={v => setFormData({...formData, soldier_id: v})}>
-                      <SelectTrigger><SelectValue placeholder="בחר חייל" /></SelectTrigger>
+                      <SelectTrigger className="bg-white border-slate-300 text-slate-800"><SelectValue placeholder="בחר חייל" /></SelectTrigger>
                       <SelectContent>
                         {soldiers.map(s => <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label>שם מבצע הביקורת</Label>
-                    <Input value={formData.inspector_name} onChange={e => setFormData({...formData, inspector_name: e.target.value})} />
+                    <Label className="text-slate-800 font-semibold">שם מבצע הביקורת</Label>
+                    <Input value={formData.inspector_name} onChange={e => setFormData({...formData, inspector_name: e.target.value})} className="bg-white border-slate-300 text-slate-800" />
                   </div>
                 </div>
               )}
@@ -798,20 +797,20 @@ export default function Inspections() {
               {/* Step 1: Combat Procedure (10 pts) */}
               {currentStep === 1 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-blue-50 rounded-xl text-center">
-                    <span className="font-bold text-blue-800">נוהל קרב - 10 נקודות</span>
+                  <div className="p-3 bg-blue-100 rounded-xl text-center border border-blue-200">
+                    <span className="font-bold text-blue-900">נוהל קרב - 10 נקודות</span>
                   </div>
                   <div>
-                    <Label>ע"י מי בוצע התחקיר והתדריך</Label>
-                    <Input value={formData.combat_debrief_by} onChange={e => setFormData({...formData, combat_debrief_by: e.target.value})} />
+                    <Label className="text-slate-800 font-semibold">ע"י מי בוצע התחקיר והתדריך</Label>
+                    <Input value={formData.combat_debrief_by} onChange={e => setFormData({...formData, combat_debrief_by: e.target.value})} className="bg-white border-slate-300 text-slate-800" />
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl border">
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
                     <Checkbox checked={formData.combat_driver_participated} onCheckedChange={c => setFormData({...formData, combat_driver_participated: !!c})} />
-                    <span>האם הנהג השתתף בנוהל קרב</span>
+                    <span className="text-slate-800">האם הנהג השתתף בנוהל קרב</span>
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl border">
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
                     <Checkbox checked={formData.combat_driver_in_debrief} onCheckedChange={c => setFormData({...formData, combat_driver_in_debrief: !!c})} />
-                    <span>נוכחות הנהג בתחקיר</span>
+                    <span className="text-slate-800">נוכחות הנהג בתחקיר</span>
                   </div>
                 </div>
               )}
@@ -819,10 +818,10 @@ export default function Inspections() {
               {/* Step 2: Vehicle (30 pts) */}
               {currentStep === 2 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-amber-50 rounded-xl text-center">
-                    <span className="font-bold text-amber-800">רכב - 30 נקודות</span>
+                  <div className="p-3 bg-amber-100 rounded-xl text-center border border-amber-200">
+                    <span className="font-bold text-amber-900">רכב - 30 נקודות</span>
                   </div>
-                  <div className="p-3 bg-slate-100 rounded-xl">
+                  <div className="p-3 bg-slate-100 rounded-xl border border-slate-300">
                     <p className="font-bold text-slate-800 mb-2">טל"ת</p>
                     <div className="grid grid-cols-2 gap-2">
                       {[
@@ -831,9 +830,9 @@ export default function Inspections() {
                         { key: "vehicle_tlt_nuts", label: "אומים" },
                         { key: "vehicle_tlt_pressure", label: "לחץ אוויר" },
                       ].map(item => (
-                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
+                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-300">
                           <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                          <span className="text-sm text-slate-700">{item.label}</span>
+                          <span className="text-sm text-slate-800">{item.label}</span>
                         </div>
                       ))}
                     </div>
@@ -846,9 +845,9 @@ export default function Inspections() {
                       { key: "vehicle_clean", label: "רכב נקי" },
                       { key: "vehicle_equipment_secured", label: "ציוד מקובע" },
                     ].map(item => (
-                      <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+                      <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
                         <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                        <span className="text-slate-700">{item.label}</span>
+                        <span className="text-slate-800">{item.label}</span>
                       </div>
                     ))}
                   </div>
@@ -858,8 +857,8 @@ export default function Inspections() {
               {/* Step 3: Procedures (20 pts) */}
               {currentStep === 3 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-emerald-50 rounded-xl text-center">
-                    <span className="font-bold text-emerald-800">נהלים - 20 נקודות</span>
+                  <div className="p-3 bg-emerald-100 rounded-xl text-center border border-emerald-200">
+                    <span className="font-bold text-emerald-900">נהלים - 20 נקודות</span>
                   </div>
                   {[
                     { key: "procedures_descent_drill", label: "ביצוע תרגולת ירידה לשול" },
@@ -867,9 +866,9 @@ export default function Inspections() {
                     { key: "procedures_fire_drill", label: "ביצוע תרגולת שריפה" },
                     { key: "procedures_combat_equipment", label: "ציוד לחימה (ווסט קרמי, קסדה ונשק אישי)" },
                   ].map(item => (
-                    <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+                    <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
                       <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                      <span className="text-slate-700">{item.label}</span>
+                      <span className="text-slate-800">{item.label}</span>
                     </div>
                   ))}
                 </div>
@@ -878,14 +877,14 @@ export default function Inspections() {
               {/* Step 4: Safety (10 pts) */}
               {currentStep === 4 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-red-50 rounded-xl text-center">
-                    <span className="font-bold text-red-800">בטיחות - 10 נקודות</span>
+                  <div className="p-3 bg-red-100 rounded-xl text-center border border-red-200">
+                    <span className="font-bold text-red-900">בטיחות - 10 נקודות</span>
                   </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-300 bg-white">
                     <Checkbox checked={formData.safety_ten_commandments} onCheckedChange={c => setFormData({...formData, safety_ten_commandments: !!c})} />
-                    <span className="text-slate-700">הכרה של עשרת הדיברות לנהג</span>
+                    <span className="text-slate-800">הכרה של עשרת הדיברות לנהג</span>
                   </div>
-                  <div className="p-3 bg-slate-100 rounded-xl">
+                  <div className="p-3 bg-slate-100 rounded-xl border border-slate-300">
                     <p className="font-bold text-slate-800 mb-2">כלי נהג</p>
                     <div className="grid grid-cols-2 gap-2">
                       {[
@@ -896,9 +895,9 @@ export default function Inspections() {
                         { key: "safety_driver_tools_triangle", label: "משולש" },
                         { key: "safety_driver_tools_license", label: "רשיון רכב" },
                       ].map(item => (
-                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
+                        <div key={item.key} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-300">
                           <Checkbox checked={(formData as any)[item.key]} onCheckedChange={c => setFormData({...formData, [item.key]: !!c})} />
-                          <span className="text-sm text-slate-700">{item.label}</span>
+                          <span className="text-sm text-slate-800">{item.label}</span>
                         </div>
                       ))}
                     </div>
@@ -909,8 +908,8 @@ export default function Inspections() {
               {/* Step 5: Routes (15 pts) */}
               {currentStep === 5 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-purple-50 rounded-xl text-center">
-                    <span className="font-bold text-purple-800">נתבים - 15 נקודות</span>
+                  <div className="p-3 bg-purple-100 rounded-xl text-center border border-purple-200">
+                    <span className="font-bold text-purple-900">נתבים - 15 נקודות</span>
                   </div>
                   
                   {/* Vulnerability helper */}
@@ -926,25 +925,30 @@ export default function Inspections() {
                   )}
                   
                   <div>
-                    <Label className="text-slate-700">תשובת החייל</Label>
+                    <Label className="text-slate-800 font-semibold">תשובת החייל</Label>
                     <Textarea 
                       placeholder="הזן את תשובת החייל על נתיבים והיכרותו עם הגזרה..."
                       value={formData.routes_notes} 
                       onChange={e => setFormData({...formData, routes_notes: e.target.value})} 
-                      className="bg-white border-slate-200"
+                      className="bg-white border-slate-300 text-slate-800 placeholder:text-slate-400"
                     />
                   </div>
                   <div>
-                    <Label className="text-slate-700">ציון (0-15 נקודות)</Label>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      max="15" 
-                      value={formData.routes_familiarity_score} 
-                      onChange={e => setFormData({...formData, routes_familiarity_score: parseInt(e.target.value) || 0})} 
-                      className="bg-white border-slate-200"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">המפקד מזין ציון בין 0 ל-15</p>
+                    <Label className="text-slate-800 font-semibold">ציון (0-15 נקודות)</Label>
+                    <Select 
+                      value={formData.routes_familiarity_score.toString()} 
+                      onValueChange={v => setFormData({...formData, routes_familiarity_score: parseInt(v)})}
+                    >
+                      <SelectTrigger className="bg-white border-slate-300 text-slate-800">
+                        <SelectValue placeholder="בחר ציון" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 16 }, (_, i) => (
+                          <SelectItem key={i} value={i.toString()}>{i} נקודות</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-600 mt-1">המפקד בוחר ציון בין 0 ל-15</p>
                   </div>
                 </div>
               )}
@@ -952,15 +956,15 @@ export default function Inspections() {
               {/* Step 6: Simulations (15 pts) */}
               {currentStep === 6 && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-indigo-50 rounded-xl text-center">
-                    <span className="font-bold text-indigo-800">מקתגים - 15 נקודות</span>
+                  <div className="p-3 bg-indigo-100 rounded-xl text-center border border-indigo-200">
+                    <span className="font-bold text-indigo-900">מקתגים - 15 נקודות</span>
                   </div>
-                  <p className="text-sm text-slate-600">שאל את הנהג וסמן אם ענה נכון:</p>
+                  <p className="text-sm text-slate-700 font-medium">שאל את הנהג וסמן אם ענה נכון:</p>
                   {randomQuestions.map((question, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                      <p className="text-sm font-medium text-slate-700">{question}</p>
+                    <div key={idx} className="p-4 rounded-xl border border-slate-300 bg-white space-y-3">
+                      <p className="text-sm font-bold text-slate-800">{question}</p>
                       <div>
-                        <Label className="text-xs text-slate-500">תשובת החייל:</Label>
+                        <Label className="text-sm text-slate-700 font-semibold">תשובת החייל:</Label>
                         <Textarea 
                           placeholder="הזן את תשובת החייל..."
                           value={formData.simulations_answers[`answer_${idx}`] || ""}
@@ -968,11 +972,11 @@ export default function Inspections() {
                             ...formData,
                             simulations_answers: {...formData.simulations_answers, [`answer_${idx}`]: e.target.value}
                           })}
-                          className="mt-1 bg-slate-50 border-slate-200 text-sm"
+                          className="mt-1 bg-white border-slate-300 text-slate-800 placeholder:text-slate-400 text-sm"
                           rows={2}
                         />
                       </div>
-                      <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
                         <Checkbox 
                           checked={formData.simulations_answers[idx] || false} 
                           onCheckedChange={c => setFormData({
@@ -980,13 +984,13 @@ export default function Inspections() {
                             simulations_answers: {...formData.simulations_answers, [idx]: !!c}
                           })} 
                         />
-                        <span className="text-sm text-emerald-600 font-medium">הנהג ענה נכון</span>
+                        <span className="text-sm text-emerald-700 font-bold">הנהג ענה נכון</span>
                       </div>
                     </div>
                   ))}
                   <div>
-                    <Label className="text-slate-700">הערות כלליות</Label>
-                    <Textarea value={formData.general_notes} onChange={e => setFormData({...formData, general_notes: e.target.value})} className="bg-white border-slate-200" />
+                    <Label className="text-slate-800 font-semibold">הערות כלליות</Label>
+                    <Textarea value={formData.general_notes} onChange={e => setFormData({...formData, general_notes: e.target.value})} className="bg-white border-slate-300 text-slate-800 placeholder:text-slate-400" />
                   </div>
                 </div>
               )}

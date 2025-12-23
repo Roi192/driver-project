@@ -4,13 +4,25 @@ import { supabase } from '@/integrations/supabase/client';
 
 type AppRole = 'driver' | 'admin';
 
+interface SignUpData {
+  email: string;
+  password: string;
+  fullName: string;
+  userType: 'driver' | 'battalion';
+  outpost?: string;
+  region?: string;
+  militaryRole?: string;
+  platoon?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
+  userType: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, outpost: string) => Promise<{ error: Error | null }>;
+  signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
@@ -22,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [userType, setUserType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,9 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchUserRole(session.user.id);
+            fetchUserType(session.user.id);
           }, 0);
         } else {
           setRole(null);
+          setUserType(null);
         }
       }
     );
@@ -49,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (session?.user) {
         fetchUserRole(session.user.id);
+        fetchUserType(session.user.id);
       }
       setLoading(false);
     });
@@ -68,6 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchUserType = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_type')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setUserType(data.user_type);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -76,17 +104,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, fullName: string, outpost: string) => {
+  const signUp = async (data: SignUpData) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: data.email,
+      password: data.password,
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          full_name: fullName,
-          outpost: outpost,
+          full_name: data.fullName,
+          user_type: data.userType,
+          outpost: data.outpost || null,
+          region: data.region || null,
+          military_role: data.militaryRole || null,
+          platoon: data.platoon || null,
         },
       },
     });
@@ -110,12 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setRole(null);
+    setUserType(null);
   };
 
   const value = {
     user,
     session,
     role,
+    userType,
     loading,
     signIn,
     signUp,
