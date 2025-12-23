@@ -553,6 +553,8 @@ export default function AttendanceTracking() {
       const soldier = soldiers.find(s => s.id === soldierId);
       if (!soldier) return null;
       const { status, reason, completed, completedAt } = getSoldierEventStatus(soldier, event);
+      // Filter out soldiers who are "not_in_rotation" - they shouldn't appear in event attendance list
+      if (status === "not_in_rotation") return null;
       return { soldier, status, reason, completed, completedAt };
     }).filter(Boolean);
   };
@@ -1018,8 +1020,8 @@ export default function AttendanceTracking() {
                       <Card className="border-0 shadow-sm bg-slate-50">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center justify-between">
-                            <span>{selectedEventForAttendance.title}</span>
-                            <Badge variant="outline" className="text-xs">
+                            <span className="text-slate-800">{selectedEventForAttendance.title}</span>
+                            <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300">
                               {format(parseISO(selectedEventForAttendance.event_date), "dd/MM/yyyy")}
                             </Badge>
                           </CardTitle>
