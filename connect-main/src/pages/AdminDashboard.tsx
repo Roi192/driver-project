@@ -296,8 +296,13 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Stats Cards Grid */}
-          <div className="grid grid-cols-2 gap-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          {/* Shift Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <ShiftStatsCard reports={reports} />
+          </div>
+
+          {/* Other Stats Cards Grid */}
+          <div className="grid grid-cols-2 gap-4 animate-slide-up" style={{ animationDelay: '0.15s' }}>
             {/* Total Reports Card - Premium */}
             <Card className="group relative overflow-hidden border-0 bg-white/90 backdrop-blur-2xl shadow-[0_6px_30px_rgba(0,0,0,0.06)] hover:shadow-[0_12px_50px_rgba(0,0,0,0.12)] transition-all duration-500 rounded-3xl hover:scale-[1.02]">
               {/* Gradient overlay */}
@@ -325,7 +330,6 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
 
-            <ShiftStatsCard reports={reports} />
             <VehicleReportsCard reports={reports} />
             <OutpostStatsCard reports={reports} />
             
