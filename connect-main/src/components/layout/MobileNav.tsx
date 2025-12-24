@@ -92,10 +92,10 @@ export function MobileNav() {
   return (
     <>
       {/* Header - Premium Dark Style */}
-      <header className="fixed top-0 right-0 left-0 z-50 h-16 bg-gradient-to-l from-slate-900 via-slate-800 to-slate-900 backdrop-blur-2xl border-b border-gold/30 shadow-2xl">
-        {/* Animated shine effect */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+      <header className="fixed top-0 right-0 left-0 z-50 h-16 bg-gradient-to-l from-slate-900 via-slate-800 to-slate-900 border-b border-gold/30 shadow-2xl will-change-transform transform-gpu">
+        {/* Static shine effect - removed animation to prevent flickering */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold/5 to-transparent" />
         </div>
         
         <div className="flex items-center justify-between h-full px-4 relative z-10">
@@ -124,9 +124,9 @@ export function MobileNav() {
               <span className="font-bold text-sm text-white block drop-shadow-lg">{displayName}</span>
               <span className="text-xs bg-gradient-to-r from-gold via-gold-light to-gold bg-clip-text text-transparent font-bold">פלנ"ג בנימין</span>
             </div>
-            <div className="relative">
-              {/* Glowing ring */}
-              <div className="absolute -inset-1 bg-gradient-to-br from-gold via-primary to-gold rounded-2xl blur-md opacity-60 animate-pulse" />
+            <div className="relative flex-shrink-0">
+              {/* Static glow ring - removed animation */}
+              <div className="absolute -inset-1 bg-gradient-to-br from-gold via-primary to-gold rounded-2xl blur-md opacity-40" />
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-teal to-primary flex items-center justify-center relative shadow-emblem border-2 border-gold/50">
                 <span className="text-lg font-black text-white drop-shadow-lg">{firstLetter}</span>
               </div>
@@ -138,7 +138,7 @@ export function MobileNav() {
       {/* Mobile Menu Overlay */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-background/80 backdrop-blur-xl transition-all duration-500",
+          "fixed inset-0 z-40 bg-background/80 backdrop-blur-md transition-opacity duration-300 will-change-opacity",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={() => setIsOpen(false)}
@@ -147,26 +147,26 @@ export function MobileNav() {
       {/* Mobile Menu - Dark Premium Style */}
       <nav
         className={cn(
-          "fixed top-16 right-0 bottom-0 z-40 w-[85%] max-w-sm bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 backdrop-blur-2xl border-l-2 border-gold/40 transition-all duration-500 ease-out overflow-y-auto shadow-2xl",
+          "fixed top-16 right-0 bottom-0 z-40 w-[85%] max-w-sm bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-l-2 border-gold/40 transition-transform duration-300 ease-out overflow-y-auto shadow-2xl will-change-transform transform-gpu",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
-        {/* Decorative Background with animated elements */}
+        {/* Decorative Background - static */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(var(--gold)/0.15),transparent_50%)] pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,hsl(var(--primary)/0.15),transparent_50%)] pointer-events-none" />
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-gold/10 to-transparent pointer-events-none" />
         
-        {/* Animated particles */}
-        <div className="absolute top-20 right-10 w-2 h-2 rounded-full bg-gold/40 animate-pulse" />
-        <div className="absolute top-40 left-8 w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse" style={{ animationDelay: '0.5s' }} />
-        <div className="absolute top-60 right-20 w-1 h-1 rounded-full bg-gold/30 animate-pulse" style={{ animationDelay: '1s' }} />
+        {/* Static particles - removed animation */}
+        <div className="absolute top-20 right-10 w-2 h-2 rounded-full bg-gold/40" />
+        <div className="absolute top-40 left-8 w-1.5 h-1.5 rounded-full bg-primary/40" />
+        <div className="absolute top-60 right-20 w-1 h-1 rounded-full bg-gold/30" />
         
         {/* User Info Header - Glowing Premium Style */}
         <div className="p-5 border-b border-gold/30 bg-gradient-to-l from-gold/10 via-transparent to-primary/10 relative">
           <div className="flex items-center gap-4">
-            {/* User Avatar with glow */}
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-br from-gold via-primary to-gold rounded-2xl blur-lg opacity-60 animate-pulse" />
+            {/* User Avatar - static glow */}
+            <div className="relative flex-shrink-0">
+              <div className="absolute -inset-1 bg-gradient-to-br from-gold via-primary to-gold rounded-2xl blur-lg opacity-40" />
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary via-teal to-primary flex items-center justify-center relative shadow-emblem border-2 border-gold/50">
                 <span className="text-xl font-black text-white drop-shadow-lg">{firstLetter}</span>
               </div>
@@ -189,10 +189,10 @@ export function MobileNav() {
 
         {/* Unit Logo Section - Enhanced */}
         <div className="p-4 flex justify-center">
-          <div className="relative">
-            {/* Multi-layer glow effect */}
-            <div className="absolute -inset-4 bg-gradient-to-br from-gold via-primary to-gold rounded-full blur-2xl opacity-40 animate-pulse" />
-            <div className="absolute -inset-2 bg-gradient-to-br from-primary to-gold rounded-full blur-xl opacity-30" />
+          <div className="relative flex-shrink-0">
+            {/* Static glow effect */}
+            <div className="absolute -inset-4 bg-gradient-to-br from-gold via-primary to-gold rounded-full blur-2xl opacity-30" />
+            <div className="absolute -inset-2 bg-gradient-to-br from-primary to-gold rounded-full blur-xl opacity-20" />
             <img 
               src={unitLogo} 
               alt="סמל הפלוגה" 
