@@ -23,7 +23,10 @@ import PunishmentsTracking from "./pages/PunishmentsTracking";
 import Inspections from "./pages/Inspections";
 import HolidaysManagement from "./pages/HolidaysManagement";
 import AccidentsTracking from "./pages/AccidentsTracking";
+import KnowTheArea from "./pages/KnowTheArea";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
 const queryClient = new QueryClient();
 
@@ -33,8 +36,10 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <InstallPrompt />
         <BrowserRouter>
           <Routes>
+            <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />
             <Route
               path="/"
@@ -169,6 +174,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AccidentsTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/know-the-area"
+              element={
+                <ProtectedRoute>
+                  <KnowTheArea />
                 </ProtectedRoute>
               }
             />

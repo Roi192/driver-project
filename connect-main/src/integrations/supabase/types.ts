@@ -158,6 +158,45 @@ export type Database = {
         }
         Relationships: []
       }
+      dangerous_routes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          danger_type: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          route_points: Json
+          severity: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          danger_type?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          route_points?: Json
+          severity?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          danger_type?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          route_points?: Json
+          severity?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       drill_locations: {
         Row: {
           created_at: string
@@ -411,6 +450,48 @@ export type Database = {
           },
         ]
       }
+      map_points_of_interest: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          latitude: number
+          longitude: number
+          name: string
+          point_type: string
+          severity: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          latitude: number
+          longitude: number
+          name: string
+          point_type?: string
+          severity?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          latitude?: number
+          longitude?: number
+          name?: string
+          point_type?: string
+          severity?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       procedure_signatures: {
         Row: {
           created_at: string
@@ -607,7 +688,9 @@ export type Database = {
           description: string | null
           event_date: string | null
           id: string
+          latitude: number | null
           lessons_learned: string | null
+          longitude: number | null
           title: string
           updated_at: string
         }
@@ -617,7 +700,9 @@ export type Database = {
           description?: string | null
           event_date?: string | null
           id?: string
+          latitude?: number | null
           lessons_learned?: string | null
+          longitude?: number | null
           title: string
           updated_at?: string
         }
@@ -627,7 +712,9 @@ export type Database = {
           description?: string | null
           event_date?: string | null
           id?: string
+          latitude?: number | null
           lessons_learned?: string | null
+          longitude?: number | null
           title?: string
           updated_at?: string
         }
@@ -662,6 +749,42 @@ export type Database = {
           image_url?: string | null
           outpost?: string
           title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sector_boundaries: {
+        Row: {
+          boundary_points: Json
+          color: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          boundary_points?: Json
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          boundary_points?: Json
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
           updated_at?: string
         }
         Relationships: []
