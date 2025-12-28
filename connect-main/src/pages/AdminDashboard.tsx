@@ -82,7 +82,7 @@ interface ShiftReport {
 }
 
 const shiftTypeMap: Record<string, string> = {
-  morning: 'בקר',
+  morning: 'בוקר',
   afternoon: 'צהריים',
   evening: 'ערב',
 };
@@ -282,7 +282,7 @@ export default function AdminDashboard() {
                   {/* Badge */}
                   <div className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 shadow-lg backdrop-blur-sm animate-glow">
                     <Crown className="w-6 h-6 text-accent animate-bounce-soft" />
-                    <span className="text-primary font-black text-xl">דשבורד מנהל</span>
+                    <span className="text-primary font-black text-xl">דשבור מנהל</span>
                     <Sparkles className="w-5 h-5 text-accent animate-pulse" />
                   </div>
                 </div>
