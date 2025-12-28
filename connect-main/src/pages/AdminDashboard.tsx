@@ -82,7 +82,7 @@ interface ShiftReport {
 }
 
 const shiftTypeMap: Record<string, string> = {
-  morning: 'בוקר',
+  morning: 'בקר',
   afternoon: 'צהריים',
   evening: 'ערב',
 };
