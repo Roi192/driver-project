@@ -306,6 +306,7 @@ const KnowTheArea = () => {
   const [showRoutes, setShowRoutes] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [showBoundaries, setShowBoundaries] = useState(true);
+  const [expandedSection, setExpandedSection] = useState<"outposts" | "routes" | "events" | null>(null);
   
   // Map click context menu
   const [showMapClickMenu, setShowMapClickMenu] = useState(false);
@@ -843,36 +844,174 @@ const KnowTheArea = () => {
       </header>
 
       <main className="pb-8">
-        {/* Stats Cards */}
+      {/* Stats Cards */}
         <div className="p-4">
           <div className="grid grid-cols-3 gap-3">
             {/* Outposts Card */}
-            <div className="premium-card p-4 text-center">
+            <button 
+              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-amber-500/50 transition-all"
+              onClick={() => setExpandedSection(expandedSection === 'outposts' ? null : 'outposts')}
+            >
               <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
                 <Building2 className="w-6 h-6 text-white" />
               </div>
               <div className="text-2xl font-bold text-foreground">{filteredOutposts.length}</div>
               <div className="text-xs text-muted-foreground font-medium">מוצבים</div>
-            </div>
+            </button>
 
             {/* Routes Card */}
-            <div className="premium-card p-4 text-center">
+            <button 
+              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-red-500/50 transition-all"
+              onClick={() => setExpandedSection(expandedSection === 'routes' ? null : 'routes')}
+            >
               <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg">
                 <Route className="w-6 h-6 text-white" />
               </div>
               <div className="text-2xl font-bold text-foreground">{filteredRoutes.length}</div>
               <div className="text-xs text-muted-foreground font-medium">צירים אדומים</div>
-            </div>
+            </button>
 
             {/* Events Card */}
-            <div className="premium-card p-4 text-center">
+            <button 
+              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-orange-500/50 transition-all"
+              onClick={() => setExpandedSection(expandedSection === 'events' ? null : 'events')}
+            >
               <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
                 <AlertTriangle className="w-6 h-6 text-white" />
               </div>
               <div className="text-2xl font-bold text-foreground">{eventsWithLocation.length}</div>
               <div className="text-xs text-muted-foreground font-medium">אירועי בטיחות</div>
-            </div>
+            </button>
           </div>
+
+          {/* Expanded Sections */}
+          {expandedSection === 'outposts' && (
+            <div className="mt-4 glass-card p-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-foreground flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-amber-500" />
+                  רשימת מוצבים
+                </h3>
+                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {filteredOutposts.map((point) => (
+                  <button
+                    key={point.id}
+                    onClick={() => {
+                      handleFocusOnItem(point.latitude, point.longitude);
+                      setExpandedSection(null);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-amber-500/20 hover:border-amber-500/30 transition-colors border border-transparent"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                        <Star className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-foreground text-sm">{point.name}</p>
+                        {point.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{point.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Navigation className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                ))}
+                {filteredOutposts.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">אין מוצבים להצגה</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {expandedSection === 'routes' && (
+            <div className="mt-4 glass-card p-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-foreground flex items-center gap-2">
+                  <Route className="w-5 h-5 text-red-500" />
+                  רשימת צירים אדומים
+                </h3>
+                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {filteredRoutes.map((route) => (
+                  <button
+                    key={route.id}
+                    onClick={() => {
+                      handleFocusOnRoute(route);
+                      setExpandedSection(null);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-red-500/20 hover:border-red-500/30 transition-colors border border-transparent"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                        <Route className="w-4 h-4 text-red-500" />
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-foreground text-sm">{route.name}</p>
+                        {route.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{route.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Navigation className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                ))}
+                {filteredRoutes.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">אין צירים להצגה</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {expandedSection === 'events' && (
+            <div className="mt-4 glass-card p-4 animate-slide-up">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-500" />
+                  רשימת אירועי בטיחות
+                </h3>
+                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {eventsWithLocation.map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => {
+                      handleFocusOnItem(event.latitude!, event.longitude!);
+                      setExpandedSection(null);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-orange-500/20 hover:border-orange-500/30 transition-colors border border-transparent"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-orange-500" />
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-foreground text-sm">{event.title}</p>
+                        {event.event_date && (
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(event.event_date).toLocaleDateString("he-IL")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Navigation className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                ))}
+                {eventsWithLocation.length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">אין אירועים עם מיקום להצגה</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search & Filters */}

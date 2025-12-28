@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
-import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
@@ -23,6 +23,8 @@ interface SafetyContent {
   video_url: string | null;
   file_url: string | null;
   event_date: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const categories = [
@@ -84,6 +86,8 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
       { name: "image_url", label: "תמונה", type: "image" },
       { name: "file_url", label: "קובץ PDF", type: "media", mediaTypes: ["pdf", "file"] },
       { name: "video_url", label: "סרטון (קובץ / YouTube)", type: "media", mediaTypes: ["video", "youtube"] },
+      { name: "latitude", label: "קו רוחב (אופציונלי)", type: "text", placeholder: "31.9" },
+      { name: "longitude", label: "קו אורך (אופציונלי)", type: "text", placeholder: "35.2" },
     ];
   }
 
@@ -133,6 +137,9 @@ export default function SafetyEvents() {
     if (!selectedCategory) return;
     setIsSubmitting(true);
 
+    const latitude = data.latitude ? parseFloat(data.latitude) : null;
+    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+
     const insertData = {
       title: data.title as string,
       category: selectedCategory,
@@ -141,6 +148,8 @@ export default function SafetyEvents() {
       image_url: data.image_url || null,
       video_url: data.video_url || null,
       file_url: data.file_url || null,
+      latitude,
+      longitude,
     };
 
     const { error } = await supabase.from("safety_content").insert([insertData]);
@@ -150,6 +159,19 @@ export default function SafetyEvents() {
       console.error(error);
     } else {
       toast.success("התוכן נוסף בהצלחה");
+      
+      // If it's a sector event with location, also add to safety_events table
+      if (selectedCategory === "sector_events" && latitude && longitude) {
+        await supabase.from("safety_events").insert([{
+          title: data.title,
+          description: data.description || null,
+          category: "other",
+          event_date: data.event_date || null,
+          latitude,
+          longitude,
+        }]);
+      }
+      
       setAddDialogOpen(false);
       fetchItems(selectedCategory);
     }
@@ -160,6 +182,9 @@ export default function SafetyEvents() {
     if (!selectedItem) return;
     setIsSubmitting(true);
 
+    const latitude = data.latitude ? parseFloat(data.latitude) : null;
+    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+
     const updateData = {
       title: data.title as string,
       description: data.description || null,
@@ -167,6 +192,8 @@ export default function SafetyEvents() {
       image_url: data.image_url || null,
       video_url: data.video_url || null,
       file_url: data.file_url || null,
+      latitude,
+      longitude,
     };
 
     const { error } = await supabase
@@ -488,7 +515,14 @@ export default function SafetyEvents() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold mb-1 truncate text-slate-800 group-hover:text-primary transition-colors">{item.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold mb-1 truncate text-slate-800 group-hover:text-primary transition-colors">{item.title}</h3>
+                    {item.latitude && item.longitude && (
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center" title="כולל מיקום">
+                        <MapPin className="w-3 h-3 text-green-600" />
+                      </div>
+                    )}
+                  </div>
                   {item.event_date && (
                     <p className="text-sm text-primary font-medium mb-2">
                       {formatDate(item.event_date)}

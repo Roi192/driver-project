@@ -651,6 +651,8 @@ export type Database = {
           file_url: string | null
           id: string
           image_url: string | null
+          latitude: number | null
+          longitude: number | null
           title: string
           updated_at: string
           video_url: string | null
@@ -663,6 +665,8 @@ export type Database = {
           file_url?: string | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           title: string
           updated_at?: string
           video_url?: string | null
@@ -675,6 +679,8 @@ export type Database = {
           file_url?: string | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           title?: string
           updated_at?: string
           video_url?: string | null
