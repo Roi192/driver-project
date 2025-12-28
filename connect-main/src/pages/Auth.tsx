@@ -95,10 +95,23 @@ export default function Auth() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
         title: 'שגיאה',
-        description: 'הסיסמה חייבת להכיל לפחות 6 תווים',
+        description: 'הסיסמה חייבת להכיל לפחות 8 תווים',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (!(hasUpperCase && hasLowerCase && hasNumber)) {
+      toast({
+        title: 'שגיאה',
+        description: 'הסיסמה חייבת להכיל אותיות גדולות, אותיות קטנות ומספרים',
         variant: 'destructive',
       });
       return;

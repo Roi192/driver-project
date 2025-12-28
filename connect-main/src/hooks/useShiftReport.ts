@@ -82,11 +82,17 @@ export function useShiftReport() {
         return null;
       }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("shift-photos").getPublicUrl(fileName);
+      // Create a signed URL valid for 1 year (31536000 seconds) for private bucket access
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from("shift-photos")
+        .createSignedUrl(fileName, 31536000);
 
-      return publicUrl;
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.error("Signed URL error:", signedUrlError);
+        return null;
+      }
+
+      return signedUrlData.signedUrl;
     } catch (error) {
       console.error("Photo upload failed:", error);
       return null;

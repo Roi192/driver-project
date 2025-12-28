@@ -15,17 +15,9 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: [
-        "favicon.ico",
-        "apple-touch-icon.png",
-        "pwa-192x192.png",
-        "pwa-512x512.png",
-      ],
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: false, // We use our own manifest.json
       workbox: {
-        // 👇 הוספנו את השורה הזו – מעלה את המגבלה מ־2MB ל־5MB
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
