@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
-import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
