@@ -49,6 +49,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // Create custom icons
+// Outpost icon - small house/building style
 const createOutpostIcon = () => {
   return L.divIcon({
     className: "outpost-marker",
@@ -57,51 +58,72 @@ const createOutpostIcon = () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        border-radius: 50%;
-        border: 3px solid #fef3c7;
-        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.5);
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border-radius: 6px;
+        border: 2px solid white;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1">
+          <path d="M3 21h18v-9l-9-7-9 7v9z"/>
+          <path d="M9 21v-6h6v6"/>
         </svg>
       </div>
     `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
   });
 };
 
+// Event icon - car crash/accident style
 const createEventIcon = () => {
   return L.divIcon({
     className: "event-marker",
     html: `
       <div style="
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        border-radius: 50%;
-        border: 4px solid #fecaca;
-        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6), 0 0 0 4px rgba(220, 38, 38, 0.2);
-        animation: eventPulse 2s infinite;
+        width: 32px;
+        height: 32px;
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-        </svg>
+        <div style="
+          position: absolute;
+          width: 32px;
+          height: 32px;
+          background: rgba(239, 68, 68, 0.3);
+          border-radius: 50%;
+          animation: eventPulse 2s infinite;
+        "></div>
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+        ">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
       </div>
     `,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -20],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
   });
 };
 
+// Heatmap event icon - styled crash/accident marker
 const createHeatmapEventIcon = () => {
   return L.divIcon({
     className: "heatmap-event-marker",
@@ -111,13 +133,13 @@ const createHeatmapEventIcon = () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 44px;
-        height: 44px;
+        width: 36px;
+        height: 36px;
       ">
         <div style="
           position: absolute;
-          width: 44px;
-          height: 44px;
+          width: 36px;
+          height: 36px;
           background: radial-gradient(circle, rgba(239, 68, 68, 0.4) 0%, transparent 70%);
           border-radius: 50%;
           animation: heatPulse 1.5s infinite;
@@ -126,22 +148,24 @@ const createHeatmapEventIcon = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 36px;
-          height: 36px;
-          background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
+          width: 28px;
+          height: 28px;
+          background: linear-gradient(135deg, #fbbf24 0%, #ef4444 50%, #dc2626 100%);
           border-radius: 50%;
-          border: 3px solid rgba(255, 255, 255, 0.9);
-          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.7), inset 0 -2px 4px rgba(0,0,0,0.2);
+          border: 2px solid white;
+          box-shadow: 0 2px 12px rgba(239, 68, 68, 0.6);
         ">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
         </div>
       </div>
     `,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22],
-    popupAnchor: [0, -22],
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
   });
 };
 
@@ -259,7 +283,7 @@ const FlyToLocation = ({ position, zoom }: { position: [number, number] | null; 
   return null;
 };
 
-// Heat layer component
+// Heat layer component - 50m red center, 100m yellow/green outer
 const HeatLayer = ({ points }: { points: Array<[number, number, number]> }) => {
   const map = useMap();
   const heatLayerRef = useRef<any>(null);
@@ -272,18 +296,18 @@ const HeatLayer = ({ points }: { points: Array<[number, number, number]> }) => {
     if (points.length > 0) {
       // @ts-ignore
       heatLayerRef.current = L.heatLayer(points, {
-        radius: 70,
-        blur: 20,
+        radius: 25,
+        blur: 15,
         maxZoom: 18,
-        max: 0.8,
-        minOpacity: 0.7,
+        max: 1.0,
+        minOpacity: 0.6,
         gradient: {
-          0.0: 'rgba(34, 197, 94, 0.8)',
-          0.2: 'rgba(132, 204, 22, 0.85)',
-          0.4: 'rgba(234, 179, 8, 0.9)',
-          0.6: 'rgba(249, 115, 22, 0.95)',
-          0.8: 'rgba(239, 68, 68, 1)',
-          1.0: 'rgba(153, 27, 27, 1)'
+          0.0: 'rgba(34, 197, 94, 0.7)',
+          0.3: 'rgba(132, 204, 22, 0.8)',
+          0.5: 'rgba(234, 179, 8, 0.9)',
+          0.7: 'rgba(249, 115, 22, 0.95)',
+          0.85: 'rgba(239, 68, 68, 1)',
+          1.0: 'rgba(185, 28, 28, 1)'
         }
       }).addTo(map);
     }

@@ -62,6 +62,7 @@ const UsersManagement = () => {
   
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -74,6 +75,7 @@ const UsersManagement = () => {
     region: "",
     military_role: "",
     platoon: "",
+    role: "driver" as "driver" | "admin",
   });
   const [saving, setSaving] = useState(false);
 
@@ -101,6 +103,16 @@ const UsersManagement = () => {
 
       setProfiles(profilesRes.data || []);
       setUserRoles(rolesRes.data || []);
+
+      // Fetch emails via edge function
+      try {
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('get-user-emails');
+        if (!emailError && emailData?.emailMap) {
+          setUserEmails(emailData.emailMap);
+        }
+      } catch (e) {
+        console.log('Could not fetch emails');
+      }
     } catch (error: any) {
       console.error("Error fetching users:", error);
       toast.error("שגיאה בטעינת המשתמשים");
@@ -123,6 +135,7 @@ const UsersManagement = () => {
       region: profile.region || "",
       military_role: profile.military_role || "",
       platoon: profile.platoon || "",
+      role: getUserRole(profile.user_id),
     });
   };
 
@@ -132,7 +145,8 @@ const UsersManagement = () => {
     try {
       setSaving(true);
       
-      const { error } = await supabase
+      // Update profiles table
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({
           full_name: editFormData.full_name,
@@ -144,7 +158,21 @@ const UsersManagement = () => {
         })
         .eq("id", editingUser.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Update role and auth display name via edge function
+      const { data: updateData, error: updateError } = await supabase.functions.invoke('update-user-admin', {
+        body: {
+          targetUserId: editingUser.user_id,
+          displayName: editFormData.full_name,
+          newRole: editFormData.role,
+        }
+      });
+
+      if (updateError) {
+        console.error('Edge function error:', updateError);
+        toast.error("שגיאה בעדכון הרשאות המשתמש");
+      }
 
       toast.success("פרטי המשתמש עודכנו בהצלחה");
       setEditingUser(null);
@@ -160,7 +188,8 @@ const UsersManagement = () => {
   const filteredProfiles = profiles.filter(p =>
     p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.outpost?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (p.platoon?.toLowerCase().includes(searchQuery.toLowerCase()))
+    (p.platoon?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (userEmails[p.user_id]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   if (roleLoading || loading) {
@@ -224,7 +253,7 @@ const UsersManagement = () => {
         <div className="relative mb-4">
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
-            placeholder="חיפוש לפי שם, מוצב או מחלקה..."
+            placeholder="חיפוש לפי שם, מוצב, מחלקה או מייל..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pr-10 h-12 rounded-xl bg-muted/50 border-0"
@@ -236,6 +265,7 @@ const UsersManagement = () => {
           {filteredProfiles.map((profile) => {
             const role = getUserRole(profile.user_id);
             const isAdminUser = role === "admin";
+            const email = userEmails[profile.user_id];
             
             return (
               <div
@@ -257,6 +287,12 @@ const UsersManagement = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground">{profile.full_name}</h3>
+                      {email && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Mail className="w-3 h-3" />
+                          {email}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant={isAdminUser ? "default" : "secondary"} className={
                           isAdminUser ? "bg-amber-500/90" : ""
@@ -330,6 +366,14 @@ const UsersManagement = () => {
             </DialogHeader>
             
             <div className="space-y-4 py-4">
+              {/* Email display (read-only) */}
+              {editingUser && userEmails[editingUser.user_id] && (
+                <div className="p-3 rounded-xl bg-muted/50 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{userEmails[editingUser.user_id]}</span>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>שם מלא *</Label>
                 <Input
@@ -338,6 +382,26 @@ const UsersManagement = () => {
                   placeholder="שם מלא"
                   className="h-12 rounded-xl"
                 />
+              </div>
+
+              {/* Role Selection */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-amber-500" />
+                  הרשאות
+                </Label>
+                <Select
+                  value={editFormData.role}
+                  onValueChange={(value: "driver" | "admin") => setEditFormData(prev => ({ ...prev, role: value }))}
+                >
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue placeholder="בחר הרשאה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="driver">נהג (משתמש רגיל)</SelectItem>
+                    <SelectItem value="admin">מנהל (גישה מלאה)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
