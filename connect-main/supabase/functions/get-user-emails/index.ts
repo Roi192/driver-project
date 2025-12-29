@@ -1,7 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
 
 const corsHeaders = {
-  // אפשר לשים "*" אבל עדיף הדומיין שלך
+  // אפשר גם "*", אבל עדיף לשים את הדומיין שלך
   "Access-Control-Allow-Origin": "https://driver-project.vercel.app",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // טיפול ב-preflight (OPTIONS)
+  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       status: 200,
@@ -32,11 +32,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    // לקוח אדמין (service_role)
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
+    // מביא את כל המשתמשים מה־Auth
     const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+
     if (error) {
       console.error("listUsers error:", error);
       return new Response(
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    // map: user_id -> email
     const emailMap: Record<string, string> = {};
     for (const user of data.users) {
       if (user.email) {
