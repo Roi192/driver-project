@@ -382,7 +382,7 @@ export default function BomReport() {
           {/* Tasks List */}
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
             <CardContent className="p-4">
-              <ScrollArea className="max-h-[500px]">
+              <ScrollArea className="h-[calc(100vh-420px)] min-h-[300px]">
                 <div className="space-y-3">
                   {getFilteredTasks().length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
@@ -459,14 +459,14 @@ export default function BomReport() {
 
         {/* Add/Edit Task Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-card" dir="rtl">
             <DialogHeader>
-              <DialogTitle>{editingTask ? "עריכת משימה" : "הוספת משימה חדשה"}</DialogTitle>
+              <DialogTitle className="text-foreground">{editingTask ? "עריכת משימה" : "הוספת משימה חדשה"}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
               <div>
-                <Label>כותרת המשימה *</Label>
+                <Label className="text-foreground">כותרת המשימה *</Label>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -475,7 +475,7 @@ export default function BomReport() {
               </div>
 
               <div>
-                <Label>פירוט</Label>
+                <Label className="text-foreground">פירוט</Label>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -484,7 +484,7 @@ export default function BomReport() {
               </div>
 
               <div>
-                <Label>אחראי לביצוע *</Label>
+                <Label className="text-foreground">אחראי לביצוע *</Label>
                 <Input
                   value={formData.assigned_to}
                   onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
@@ -493,7 +493,7 @@ export default function BomReport() {
               </div>
 
               <div>
-                <Label>תג"ב (תאריך גמר ביצוע) *</Label>
+                <Label className="text-foreground">תג"ב (תאריך גמר ביצוע) *</Label>
                 <Input
                   type="date"
                   value={formData.due_date}
@@ -502,15 +502,15 @@ export default function BomReport() {
               </div>
 
               <div>
-                <Label>סטטוס</Label>
+                <Label className="text-foreground">סטטוס</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(v) => setFormData({ ...formData, status: v as any })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-background text-foreground border-border">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover border-border z-[10000]">
                     <SelectItem value="pending">לא בוצע</SelectItem>
                     <SelectItem value="in_progress">בתהליך</SelectItem>
                     <SelectItem value="completed">בוצע</SelectItem>
@@ -519,7 +519,7 @@ export default function BomReport() {
               </div>
 
               <div>
-                <Label>הערות</Label>
+                <Label className="text-foreground">הערות</Label>
                 <Textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -541,7 +541,7 @@ export default function BomReport() {
 
         {/* Task Detail Dialog */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="max-w-md" dir="rtl">
+          <DialogContent className="max-w-md bg-card" dir="rtl">
             {selectedTask && (
               <>
                 <DialogHeader>

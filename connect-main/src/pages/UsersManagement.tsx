@@ -357,9 +357,9 @@ const UsersManagement = () => {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-          <DialogContent className="max-w-md bg-card" dir="rtl">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-card" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
                 <Pencil className="w-5 h-5 text-primary" />
                 עריכת משתמש
               </DialogTitle>
@@ -375,7 +375,7 @@ const UsersManagement = () => {
               )}
 
               <div className="space-y-2">
-                <Label>שם מלא *</Label>
+                <Label className="text-foreground">שם מלא *</Label>
                 <Input
                   value={editFormData.full_name}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, full_name: e.target.value }))}
@@ -386,7 +386,7 @@ const UsersManagement = () => {
 
               {/* Role Selection */}
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
+                <Label className="flex items-center gap-2 text-foreground">
                   <Shield className="w-4 h-4 text-amber-500" />
                   הרשאות
                 </Label>
@@ -394,10 +394,10 @@ const UsersManagement = () => {
                   value={editFormData.role}
                   onValueChange={(value: "driver" | "admin") => setEditFormData(prev => ({ ...prev, role: value }))}
                 >
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border">
                     <SelectValue placeholder="בחר הרשאה" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover border-border z-[10000]">
                     <SelectItem value="driver">נהג (משתמש רגיל)</SelectItem>
                     <SelectItem value="admin">מנהל (גישה מלאה)</SelectItem>
                   </SelectContent>
@@ -405,7 +405,7 @@ const UsersManagement = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>מוצב</Label>
+                <Label className="text-foreground">מוצב</Label>
                 <Input
                   value={editFormData.outpost}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, outpost: e.target.value }))}
@@ -415,15 +415,15 @@ const UsersManagement = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>סוג משתמש</Label>
+                <Label className="text-foreground">סוג משתמש</Label>
                 <Select
                   value={editFormData.user_type}
                   onValueChange={(value) => setEditFormData(prev => ({ ...prev, user_type: value }))}
                 >
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border">
                     <SelectValue placeholder="בחר סוג" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover border-border z-[10000]">
                     <SelectItem value="driver">נהג</SelectItem>
                     <SelectItem value="commander">מפקד</SelectItem>
                     <SelectItem value="officer">קצין בטיחות</SelectItem>
@@ -432,7 +432,7 @@ const UsersManagement = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>מחלקה</Label>
+                <Label className="text-foreground">מחלקה</Label>
                 <Input
                   value={editFormData.platoon}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, platoon: e.target.value }))}
@@ -442,7 +442,7 @@ const UsersManagement = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>תפקיד צבאי</Label>
+                <Label className="text-foreground">תפקיד צבאי</Label>
                 <Input
                   value={editFormData.military_role}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, military_role: e.target.value }))}
@@ -452,7 +452,7 @@ const UsersManagement = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>אזור</Label>
+                <Label className="text-foreground">אזור</Label>
                 <Input
                   value={editFormData.region}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, region: e.target.value }))}
