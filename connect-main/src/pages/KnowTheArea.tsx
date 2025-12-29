@@ -83,23 +83,65 @@ const createEventIcon = () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
         border-radius: 50%;
-        border: 3px solid #fed7aa;
-        box-shadow: 0 4px 12px rgba(249, 115, 22, 0.5);
+        border: 4px solid #fecaca;
+        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6), 0 0 0 4px rgba(220, 38, 38, 0.2);
+        animation: eventPulse 2s infinite;
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-          <line x1="12" x2="12" y1="9" y2="13"/>
-          <line x1="12" x2="12.01" y1="17" y2="17"/>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
         </svg>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20],
+  });
+};
+
+const createHeatmapEventIcon = () => {
+  return L.divIcon({
+    className: "heatmap-event-marker",
+    html: `
+      <div style="
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+      ">
+        <div style="
+          position: absolute;
+          width: 44px;
+          height: 44px;
+          background: radial-gradient(circle, rgba(239, 68, 68, 0.4) 0%, transparent 70%);
+          border-radius: 50%;
+          animation: heatPulse 1.5s infinite;
+        "></div>
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%);
+          border-radius: 50%;
+          border: 3px solid rgba(255, 255, 255, 0.9);
+          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.7), inset 0 -2px 4px rgba(0,0,0,0.2);
+        ">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+    popupAnchor: [0, -22],
   });
 };
 
@@ -230,18 +272,18 @@ const HeatLayer = ({ points }: { points: Array<[number, number, number]> }) => {
     if (points.length > 0) {
       // @ts-ignore
       heatLayerRef.current = L.heatLayer(points, {
-        radius: 50,
-        blur: 25,
+        radius: 70,
+        blur: 20,
         maxZoom: 18,
-        max: 1.0,
-        minOpacity: 0.5,
+        max: 0.8,
+        minOpacity: 0.7,
         gradient: {
-          0.0: '#22c55e',
-          0.3: '#84cc16',
-          0.5: '#eab308',
-          0.7: '#f97316',
-          0.85: '#ef4444',
-          1.0: '#dc2626'
+          0.0: 'rgba(34, 197, 94, 0.8)',
+          0.2: 'rgba(132, 204, 22, 0.85)',
+          0.4: 'rgba(234, 179, 8, 0.9)',
+          0.6: 'rgba(249, 115, 22, 0.95)',
+          0.8: 'rgba(239, 68, 68, 1)',
+          1.0: 'rgba(153, 27, 27, 1)'
         }
       }).addTo(map);
     }
@@ -1311,13 +1353,44 @@ const KnowTheArea = () => {
                 </Marker>
               ))}
               
-              {/* Safety Events with coordinates */}
+              {/* Safety Events with coordinates - Map Mode */}
               {showEvents && viewMode === "map" && eventsWithLocation.map((event) => (
                 <Marker key={event.id} position={[event.latitude!, event.longitude!]} icon={createEventIcon()}>
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
                       <h3 className="font-bold text-lg mb-2">{event.title}</h3>
                       <Badge className="bg-orange-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
+                      {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
+                      {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
+                      {isAdmin && (
+                        <div className="flex gap-2 mt-3">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
+                            <Pencil className="w-4 h-4 ml-1" />עריכה
+                          </Button>
+                          <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
+                            <Trash2 className="w-4 h-4 ml-1" />מחק
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+              
+              {/* Safety Events with coordinates - Heatmap Mode - Styled Icons */}
+              {showEvents && viewMode === "heatmap" && eventsWithLocation.map((event) => (
+                <Marker key={event.id} position={[event.latitude!, event.longitude!]} icon={createHeatmapEventIcon()}>
+                  <Popup>
+                    <div className="text-right p-3 min-w-[220px]" dir="rtl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="1">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                          </svg>
+                        </div>
+                        <h3 className="font-bold text-lg">{event.title}</h3>
+                      </div>
+                      <Badge className="bg-red-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
                       {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
                       {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
                       {isAdmin && (

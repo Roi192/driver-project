@@ -27,7 +27,7 @@ import KnowTheArea from "./pages/KnowTheArea";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
-import {AdminUsersPage} from "@/pages/AdminUsers";
+
 
 const queryClient = new QueryClient();
 
