@@ -1,15 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*", // או הדומיין שלך אם תרצה להחמיר
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",  // 👈 חדש
+};
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+if (req.method === "OPTIONS") {
+  return new Response("ok", {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -63,9 +69,9 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ emailMap }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+  JSON.stringify({ emailMap }),
+  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+)
 
   } catch (error: any) {
     console.error('Error:', error.message)
