@@ -1,5 +1,4 @@
 export const OUTPOSTS = [
-  "חשמונאים",
   "כוכב יעקב",
   "רמה",
   "ענתות",
@@ -11,6 +10,7 @@ export const OUTPOSTS = [
   "נווה יאיר",
   "רנתיס",
   "מכבים",
+  "חשמונאים",
 ] as const;
 
 export const SHIFT_TYPES = [
