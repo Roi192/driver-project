@@ -25,9 +25,9 @@ import HolidaysManagement from "./pages/HolidaysManagement";
 import AccidentsTracking from "./pages/AccidentsTracking";
 import KnowTheArea from "./pages/KnowTheArea";
 import Install from "./pages/Install";
+import UsersManagement from "./pages/UsersManagement";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
-
 
 const queryClient = new QueryClient();
 
@@ -183,6 +183,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <KnowTheArea />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users-management"
+              element={
+                <ProtectedRoute>
+                  <UsersManagement />
                 </ProtectedRoute>
               }
             />
