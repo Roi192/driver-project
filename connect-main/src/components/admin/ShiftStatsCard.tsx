@@ -151,17 +151,17 @@ export function ShiftStatsCard({ reports }: ShiftStatsCardProps) {
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      {getMissingOutposts(selectedShift).map((outpost, i) => (
+                    {getMissingOutposts(selectedShift).map((outpost, i) => (
                         <div
                           key={outpost}
-                          className="flex items-center gap-4 p-4 rounded-2xl bg-destructive/5 border border-destructive/20 animate-slide-up"
+                          className="flex items-center gap-4 p-4 rounded-2xl bg-destructive border border-destructive/40 animate-slide-up"
                           style={{ animationDelay: `${i * 50}ms` }}
                         >
-                          <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
-                            <MapPin className="w-5 h-5 text-destructive" />
+                          <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                            <MapPin className="w-5 h-5 text-white" />
                           </div>
-                          <span className="font-bold text-slate-800">{outpost}</span>
-                          <Badge variant="destructive" className="mr-auto rounded-xl font-bold">
+                          <span className="font-bold text-white">{outpost}</span>
+                          <Badge className="mr-auto rounded-xl font-bold bg-white/20 text-white border-white/30">
                             לא דיווח
                           </Badge>
                         </div>

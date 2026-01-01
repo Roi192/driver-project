@@ -29,6 +29,7 @@ import {
   Search,
   Star,
   MapPinned,
+  MapPin,
   Building2,
   Layers,
   Navigation,
@@ -265,10 +266,103 @@ interface SectorBoundary {
   is_active: boolean;
 }
 
+interface SafetyFile {
+  id: string;
+  title: string;
+  content: string | null;
+  image_url: string | null;
+  category: "vardim" | "vulnerability" | "parsa";
+  outpost: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 interface ClickPosition {
   lat: number;
   lng: number;
 }
+
+// Safety file icons
+const createVardimIcon = () => {
+  return L.divIcon({
+    className: "vardim-marker",
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 8px rgba(168, 85, 247, 0.5);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="10" r="3"/>
+          <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
+  });
+};
+
+const createVulnerabilityIcon = () => {
+  return L.divIcon({
+    className: "vulnerability-marker",
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        border-radius: 6px;
+        border: 2px solid white;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.5);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
+  });
+};
+
+const createParsaIcon = () => {
+  return L.divIcon({
+    className: "parsa-marker",
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
+  });
+};
 
 // Component to fly to a specific location
 const FlyToLocation = ({ position, zoom }: { position: [number, number] | null; zoom?: number }) => {
@@ -359,6 +453,7 @@ const KnowTheArea = () => {
   const [safetyEvents, setSafetyEvents] = useState<SafetyEvent[]>([]);
   const [dangerousRoutes, setDangerousRoutes] = useState<DangerousRoute[]>([]);
   const [sectorBoundaries, setSectorBoundaries] = useState<SectorBoundary[]>([]);
+  const [safetyFiles, setSafetyFiles] = useState<SafetyFile[]>([]);
   const [loading, setLoading] = useState(true);
   
   // User location
@@ -372,7 +467,10 @@ const KnowTheArea = () => {
   const [showRoutes, setShowRoutes] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [showBoundaries, setShowBoundaries] = useState(true);
-  const [expandedSection, setExpandedSection] = useState<"outposts" | "routes" | "events" | null>(null);
+  const [showVardim, setShowVardim] = useState(true);
+  const [showVulnerability, setShowVulnerability] = useState(true);
+  const [showParsa, setShowParsa] = useState(true);
+  const [expandedSection, setExpandedSection] = useState<"outposts" | "routes" | "events" | "safetyFiles" | null>(null);
   
   // Map click context menu
   const [showMapClickMenu, setShowMapClickMenu] = useState(false);
@@ -450,11 +548,12 @@ const KnowTheArea = () => {
     try {
       setLoading(true);
       
-      const [pointsRes, eventsRes, routesRes, boundariesRes] = await Promise.all([
+      const [pointsRes, eventsRes, routesRes, boundariesRes, safetyFilesRes] = await Promise.all([
         supabase.from("map_points_of_interest").select("*").eq("is_active", true),
         supabase.from("safety_events").select("*").order("event_date", { ascending: false }).limit(100),
         supabase.from("dangerous_routes").select("*").eq("is_active", true),
         supabase.from("sector_boundaries").select("*").eq("is_active", true),
+        supabase.from("safety_files").select("*").not("latitude", "is", null),
       ]);
       
       if (pointsRes.data) setMapPoints(pointsRes.data);
@@ -473,6 +572,7 @@ const KnowTheArea = () => {
         }));
         setSectorBoundaries(boundaries);
       }
+      if (safetyFilesRes.data) setSafetyFiles(safetyFilesRes.data as SafetyFile[]);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("שגיאה בטעינת הנתונים");
@@ -505,6 +605,25 @@ const KnowTheArea = () => {
   const eventsWithLocation = useMemo(() => {
     return filteredEvents.filter(e => e.latitude && e.longitude);
   }, [filteredEvents]);
+
+  // Filtered safety files by category
+  const filteredVardim = useMemo(() => {
+    return safetyFiles
+      .filter(f => f.category === "vardim" && f.latitude && f.longitude)
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [safetyFiles, searchQuery]);
+
+  const filteredVulnerability = useMemo(() => {
+    return safetyFiles
+      .filter(f => f.category === "vulnerability" && f.latitude && f.longitude)
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [safetyFiles, searchQuery]);
+
+  const filteredParsa = useMemo(() => {
+    return safetyFiles
+      .filter(f => f.category === "parsa" && f.latitude && f.longitude)
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [safetyFiles, searchQuery]);
 
   // Calculate center
   const outposts = mapPoints.filter(p => p.point_type === "outpost");
@@ -949,6 +1068,48 @@ const KnowTheArea = () => {
               <div className="text-xs text-muted-foreground font-medium">אירועי בטיחות</div>
             </button>
           </div>
+
+          {/* Safety Files Filter Toggles */}
+          {(filteredVardim.length > 0 || filteredVulnerability.length > 0 || filteredParsa.length > 0) && (
+            <div className="mt-4 glass-card p-4">
+              <p className="text-sm font-bold text-foreground mb-3">נקודות מתיק בטיחות:</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowVardim(!showVardim)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    showVardim 
+                      ? "bg-purple-500/20 text-purple-700 border border-purple-500/30" 
+                      : "bg-muted text-muted-foreground border border-transparent"
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  נקודות ורדים ({filteredVardim.length})
+                </button>
+                <button
+                  onClick={() => setShowVulnerability(!showVulnerability)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    showVulnerability 
+                      ? "bg-amber-500/20 text-amber-700 border border-amber-500/30" 
+                      : "bg-muted text-muted-foreground border border-transparent"
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  נקודות תורפה ({filteredVulnerability.length})
+                </button>
+                <button
+                  onClick={() => setShowParsa(!showParsa)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    showParsa 
+                      ? "bg-emerald-500/20 text-emerald-700 border border-emerald-500/30" 
+                      : "bg-muted text-muted-foreground border border-transparent"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  נקודות פרסה ({filteredParsa.length})
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Expanded Sections */}
           {expandedSection === 'outposts' && (
@@ -1427,6 +1588,48 @@ const KnowTheArea = () => {
                           </Button>
                         </div>
                       )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {/* Safety Files - Vardim Points */}
+              {showVardim && filteredVardim.map((file) => (
+                <Marker key={`vardim-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createVardimIcon()}>
+                  <Popup>
+                    <div className="text-right p-3 min-w-[200px]" dir="rtl">
+                      <h3 className="font-bold text-lg mb-2">{file.title}</h3>
+                      <Badge className="bg-purple-500 text-white mb-2">נקודת ורדים</Badge>
+                      <p className="text-xs text-gray-500 mb-1">{file.outpost}</p>
+                      {file.content && <p className="text-sm text-gray-600 mt-2">{file.content}</p>}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {/* Safety Files - Vulnerability Points */}
+              {showVulnerability && filteredVulnerability.map((file) => (
+                <Marker key={`vuln-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createVulnerabilityIcon()}>
+                  <Popup>
+                    <div className="text-right p-3 min-w-[200px]" dir="rtl">
+                      <h3 className="font-bold text-lg mb-2">{file.title}</h3>
+                      <Badge className="bg-amber-500 text-white mb-2">נקודת תורפה</Badge>
+                      <p className="text-xs text-gray-500 mb-1">{file.outpost}</p>
+                      {file.content && <p className="text-sm text-gray-600 mt-2">{file.content}</p>}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+              {/* Safety Files - Parsa Points */}
+              {showParsa && filteredParsa.map((file) => (
+                <Marker key={`parsa-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createParsaIcon()}>
+                  <Popup>
+                    <div className="text-right p-3 min-w-[200px]" dir="rtl">
+                      <h3 className="font-bold text-lg mb-2">{file.title}</h3>
+                      <Badge className="bg-emerald-500 text-white mb-2">נקודת פרסה</Badge>
+                      <p className="text-xs text-gray-500 mb-1">{file.outpost}</p>
+                      {file.content && <p className="text-sm text-gray-600 mt-2">{file.content}</p>}
                     </div>
                   </Popup>
                 </Marker>

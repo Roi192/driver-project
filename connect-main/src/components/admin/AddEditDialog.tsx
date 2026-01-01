@@ -17,19 +17,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, MapPin, Crosshair } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { VideoUpload } from "./VideoUpload";
 import { MediaUpload } from "./MediaUpload";
+import { toast } from "sonner";
 
 export interface FieldConfig {
   name: string;
   label: string;
-  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media";
+  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media" | "location";
   placeholder?: string;
   required?: boolean;
   options?: { value: string; label: string }[];
   mediaTypes?: ("video" | "youtube" | "pdf" | "file")[];
+  // For location type - names of lat/lng fields to update
+  latField?: string;
+  lngField?: string;
 }
 
 interface AddEditDialogProps {
@@ -52,7 +56,7 @@ export function AddEditDialog({
   isLoading,
 }: AddEditDialogProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
-
+  const [gettingLocation, setGettingLocation] = useState(false);
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -72,6 +76,32 @@ export function AddEditDialog({
 
   const handleChange = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const getCurrentLocation = (latField: string, lngField: string) => {
+    setGettingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setFormData((prev) => ({
+            ...prev,
+            [latField]: position.coords.latitude.toFixed(6),
+            [lngField]: position.coords.longitude.toFixed(6),
+          }));
+          toast.success("המיקום נקלט בהצלחה!");
+          setGettingLocation(false);
+        },
+        (error) => {
+          console.error("Location error:", error);
+          toast.error("לא ניתן לקבל מיקום. אנא בדוק את הרשאות המיקום.");
+          setGettingLocation(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      toast.error("הדפדפן אינו תומך במיקום");
+      setGettingLocation(false);
+    }
   };
 
   return (
@@ -137,6 +167,21 @@ export function AddEditDialog({
                   onChange={(url) => handleChange(field.name, url)}
                   allowedTypes={field.mediaTypes || ["video", "youtube"]}
                 />
+              ) : field.type === "location" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={gettingLocation}
+                  onClick={() => getCurrentLocation(field.latField || "latitude", field.lngField || "longitude")}
+                  className="w-full h-12 rounded-xl border-2 border-dashed border-primary/50 hover:border-primary hover:bg-primary/10 gap-2 font-bold"
+                >
+                  {gettingLocation ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Crosshair className="w-5 h-5" />
+                  )}
+                  {gettingLocation ? "מקבל מיקום..." : "הוסף מיקום בזמן אמת"}
+                </Button>
               ) : (
                 <Input
                   id={field.name}

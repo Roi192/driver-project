@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -83,13 +82,18 @@ interface EventAttendance {
 }
 
 // סיבות היעדרות
-type AbsenceReason = "קורס" | "גימלים" | "נעדר" | "נפקד";
+type AbsenceReason = "קורס" | "גימלים" | "גימלים ממושכים" | "נעדר" | "נפקד" | "כלא";
+
+// סיבות שלא משפיעות על אחוז הנוכחות (החייל לא היה יכול להגיע)
+const NON_COUNTABLE_ABSENCE_REASONS: AbsenceReason[] = ["קורס", "גימלים ממושכים", "נפקד", "כלא"];
 
 const absenceReasonOptions: { value: AbsenceReason; label: string }[] = [
   { value: "קורס", label: "קורס" },
   { value: "גימלים", label: "גימלים" },
+  { value: "גימלים ממושכים", label: "גימלים ממושכים" },
   { value: "נעדר", label: "נעדר (ללא סיבה מוצדקת)" },
   { value: "נפקד", label: "נפקד" },
+  { value: "כלא", label: "כלא" },
 ];
 
 // 4 סטטוסים לנוכחות
@@ -447,9 +451,33 @@ export default function AnnualWorkPlan() {
   const getEventAttendanceStats = (eventId: string) => {
     const eventAttendance = attendance.filter(a => a.event_id === eventId);
     const attended = eventAttendance.filter(a => a.status === "attended").length;
-    const absent = eventAttendance.filter(a => a.status === "absent").length;
+    
+    // נעדרים שמשפיעים על אחוז הנוכחות (רק גימלים ונעדר ללא סיבה)
+    const countableAbsent = eventAttendance.filter(a => 
+      a.status === "absent" && 
+      !NON_COUNTABLE_ABSENCE_REASONS.includes(a.absence_reason as AbsenceReason)
+    ).length;
+    
+    // נעדרים שלא משפיעים על אחוז הנוכחות (קורס, גימלים ממושכים, נפקד, כלא)
+    const nonCountableAbsent = eventAttendance.filter(a => 
+      a.status === "absent" && 
+      NON_COUNTABLE_ABSENCE_REASONS.includes(a.absence_reason as AbsenceReason)
+    ).length;
+    
     const notInRotation = eventAttendance.filter(a => a.status === "not_in_rotation").length;
-    return { attended, absent, notInRotation, total: eventAttendance.length };
+    
+    // אחוז נוכחות - רק מחושב מאלו שהיו יכולים להגיע
+    const totalCountable = attended + countableAbsent;
+    const attendancePercent = totalCountable > 0 ? Math.round((attended / totalCountable) * 100) : 0;
+    
+    return { 
+      attended, 
+      absent: countableAbsent, 
+      nonCountableAbsent,
+      notInRotation, 
+      total: eventAttendance.length,
+      attendancePercent 
+    };
   };
 
   // Select all expected or toggle

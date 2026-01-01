@@ -8,8 +8,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
-import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
@@ -86,8 +86,9 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
       { name: "image_url", label: "תמונה", type: "image" },
       { name: "file_url", label: "קובץ PDF", type: "media", mediaTypes: ["pdf", "file"] },
       { name: "video_url", label: "סרטון (קובץ / YouTube)", type: "media", mediaTypes: ["video", "youtube"] },
-      { name: "latitude", label: "קו רוחב (אופציונלי)", type: "text", placeholder: "31.9" },
-      { name: "longitude", label: "קו אורך (אופציונלי)", type: "text", placeholder: "35.2" },
+      { name: "get_location", label: "מיקום", type: "location", latField: "latitude", lngField: "longitude" },
+      { name: "latitude", label: "קו רוחב", type: "text", placeholder: "31.9" },
+      { name: "longitude", label: "קו אורך", type: "text", placeholder: "35.2" },
     ];
   }
 
@@ -585,6 +586,26 @@ export default function SafetyEvents() {
               </p>
             )}
           </div>
+
+          {/* Location */}
+          {selectedItem.latitude && selectedItem.longitude && (
+            <a
+              href={`https://www.google.com/maps?q=${selectedItem.latitude},${selectedItem.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-card p-4 flex items-center gap-4 hover:border-primary/50 transition-all duration-300 group"
+            >
+              <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                <MapPin className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-800">הצג מיקום במפה</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedItem.latitude.toFixed(6)}, {selectedItem.longitude.toFixed(6)}
+                </p>
+              </div>
+            </a>
+          )}
 
           {/* PDF Link */}
           {selectedItem.file_url && (

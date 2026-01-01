@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
 import { OUTPOSTS } from "@/lib/constants";
-import { FolderOpen, ArrowRight, MapPin, AlertTriangle, Shield, Navigation, Plus, Pencil, Trash2, Loader2, Sparkles } from "lucide-react";
+import { FolderOpen, ArrowRight, MapPin, AlertTriangle, Shield, Navigation, Plus, Pencil, Trash2, Loader2, Sparkles, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { useNavigate } from "react-router-dom";
 
 type View = "outposts" | "categories" | "points" | "pointDetail";
 type SafetyCategory = "vardim" | "vulnerability" | "parsa";
@@ -20,6 +21,8 @@ interface SafetyFile {
   image_url: string | null;
   category: SafetyCategory;
   outpost: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const categories = [
@@ -32,10 +35,14 @@ const getFields = (): FieldConfig[] => [
   { name: "title", label: "שם הנקודה", type: "text", required: true, placeholder: "הזן שם..." },
   { name: "content", label: "תיאור", type: "textarea", placeholder: "תיאור מפורט של הנקודה..." },
   { name: "image_url", label: "תמונה", type: "image" },
+  { name: "get_location", label: "מיקום", type: "location", latField: "latitude", lngField: "longitude" },
+  { name: "latitude", label: "קו רוחב", type: "text", placeholder: "31.9" },
+  { name: "longitude", label: "קו אורך", type: "text", placeholder: "35.2" },
 ];
 
 export default function SafetyFiles() {
   const { isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [view, setView] = useState<View>("outposts");
   const [selectedOutpost, setSelectedOutpost] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<SafetyCategory | null>(null);
@@ -69,12 +76,17 @@ export default function SafetyFiles() {
     if (!selectedOutpost || !selectedCategory) return;
     setIsSubmitting(true);
 
+    const latitude = data.latitude ? parseFloat(data.latitude) : null;
+    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+
     const insertData = {
       title: data.title as string,
       content: data.content || null,
       image_url: data.image_url || null,
       outpost: selectedOutpost,
       category: selectedCategory,
+      latitude,
+      longitude,
     };
 
     const { error } = await supabase.from("safety_files").insert([insertData]);
@@ -94,10 +106,15 @@ export default function SafetyFiles() {
     if (!selectedPoint) return;
     setIsSubmitting(true);
 
+    const latitude = data.latitude ? parseFloat(data.latitude) : null;
+    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+
     const updateData = {
       title: data.title as string,
       content: data.content || null,
       image_url: data.image_url || null,
+      latitude,
+      longitude,
     };
 
     const { error } = await supabase
@@ -350,6 +367,8 @@ export default function SafetyFiles() {
 
     // Point Detail View
     if (view === "pointDetail" && selectedPoint) {
+      const hasLocation = selectedPoint.latitude && selectedPoint.longitude;
+      
       return (
         <div className="space-y-6 animate-fade-in">
           <div className="glass-card overflow-hidden">
@@ -361,17 +380,36 @@ export default function SafetyFiles() {
               />
             )}
             <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <div className="military-badge">
                   <MapPin className="w-4 h-4" />
                   {selectedOutpost}
                 </div>
+                {hasLocation && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={() => navigate(`/know-the-area?lat=${selectedPoint.latitude}&lng=${selectedPoint.longitude}`)}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    הצג במפה
+                  </Button>
+                )}
               </div>
               <h2 className="text-xl font-bold mb-3 text-slate-800">{selectedPoint.title}</h2>
               {selectedPoint.content && (
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {selectedPoint.content}
                 </p>
+              )}
+              {hasLocation && (
+                <div className="mt-4 p-3 bg-primary/10 rounded-xl flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  <span className="text-sm text-primary font-medium">
+                    {selectedPoint.latitude?.toFixed(6)}, {selectedPoint.longitude?.toFixed(6)}
+                  </span>
+                </div>
               )}
             </div>
           </div>
