@@ -25,7 +25,8 @@ import {
   FileSearch,
   Car,
   Map,
-  UserCog
+  UserCog,
+  ListChecks
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,8 @@ const getNavItems = (userType: string | null) => {
   const items = [
     { to: "/", icon: Home, label: "דף הבית" },
     { to: "/shift-form", icon: FileText, label: "טופס לפני משמרת", featured: true },
+    { to: "/trip-form", icon: Home, label: "טופס טיולים לפני יציאה" },
+    { to: "/cleaning-parades", icon: Sparkles, label: "מסדרי ניקיון" },
     { to: "/drill-locations", icon: MapPin, label: "נקודות תרגולות" },
     { to: "/safety-files", icon: FolderOpen, label: "תיקי בטיחות" },
     { to: "/safety-events", icon: AlertTriangle, label: "אירועי בטיחות" },
@@ -46,9 +49,9 @@ const getNavItems = (userType: string | null) => {
     { to: "/my-reports", icon: ClipboardList, label: "הדיווחים שלי" },
   ];
   
-  // Hide shift-form for battalion users
+  // Hide shift-form, trip-form and cleaning-parades for battalion users
   if (userType === 'battalion') {
-    return items.filter(item => item.to !== '/shift-form');
+    return items.filter(item => item.to !== '/shift-form' && item.to !== '/trip-form' && item.to !== '/cleaning-parades');
   }
   
   return items;
@@ -392,6 +395,40 @@ export function MobileNav() {
                 </div>
                 <span className="font-bold text-base relative z-10 flex-1">ניהול משתמשים</span>
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-pink-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/cleaning-parades-management"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">ניהול מסדרי ניקיון</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/cleaning-parade-highlights-management"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                )}
+                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <ListChecks className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">עריכת דגשים למסדר ניקיון</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
             </>
           )}
