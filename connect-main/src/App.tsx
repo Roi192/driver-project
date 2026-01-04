@@ -26,6 +26,11 @@ import AccidentsTracking from "./pages/AccidentsTracking";
 import KnowTheArea from "./pages/KnowTheArea";
 import Install from "./pages/Install";
 import UsersManagement from "./pages/UsersManagement";
+import CleaningParades from "./pages/CleaningParades";
+import CleaningParadesManagement from "./pages/CleaningParadesManagement";
+import CleaningParadeHighlightsManagement from "./pages/CleaningParadeHighlightsManagement";
+import FitnessReport from "./pages/FitnessReport";
+import TripForm from "./pages/TripForm";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -191,6 +196,46 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UsersManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cleaning-parades"
+              element={
+                <ProtectedRoute>
+                  <CleaningParades />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cleaning-parades-management"
+              element={
+                <ProtectedRoute>
+                  <CleaningParadesManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cleaning-parade-highlights-management"
+              element={
+                <ProtectedRoute>
+                  <CleaningParadeHighlightsManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fitness-report"
+              element={
+                <ProtectedRoute>
+                  <FitnessReport />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trip-form"
+              element={
+                <ProtectedRoute>
+                  <TripForm />
                 </ProtectedRoute>
               }
             />

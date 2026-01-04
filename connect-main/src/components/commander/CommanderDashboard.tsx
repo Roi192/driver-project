@@ -8,6 +8,8 @@ import { SmartAlerts } from "./SmartAlerts";
 import { KPICards } from "./KPICards";
 import { NextUpSection } from "./NextUpSection";
 import { CommanderQuickActions } from "./CommanderQuickActions";
+import { CleaningParadeCards } from "./CleaningParadeCards";
+import { TripFormsCard } from "./TripFormsCard";
 
 export function CommanderDashboard() {
   const { user, signOut } = useAuth();
@@ -104,6 +106,16 @@ export function CommanderDashboard() {
         {/* KPI Cards */}
         <section className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
           <KPICards />
+        </section>
+
+        {/* Cleaning Parade Cards */}
+        <section className="animate-slide-up" style={{ animationDelay: '0.25s' }}>
+          <CleaningParadeCards />
+        </section>
+
+        {/* Trip Forms Card */}
+        <section className="animate-slide-up" style={{ animationDelay: '0.28s' }}>
+          <TripFormsCard />
         </section>
 
         {/* Next Up Section */}

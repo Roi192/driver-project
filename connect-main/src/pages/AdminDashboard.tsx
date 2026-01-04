@@ -19,6 +19,8 @@ import { ExportButton } from '@/components/admin/ExportButton';
 import { IncompleteReportsCard } from '@/components/admin/IncompleteReportsCard';
 import { ProcedureSignaturesCard } from '@/components/admin/ProcedureSignaturesCard';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import { CleaningParadeCards } from '@/components/commander/CleaningParadeCards';
+import { TripFormsCard } from '@/components/commander/TripFormsCard';
 
 import unitLogo from '@/assets/unit-logo.png';
 import { toast } from 'sonner';
@@ -339,6 +341,15 @@ export default function AdminDashboard() {
             <ProcedureSignaturesCard />
           </div>
 
+          {/* Cleaning Parade Cards */}
+          <div className="animate-slide-up" style={{ animationDelay: '0.15s' }}>
+            <CleaningParadeCards />
+          </div>
+
+          {/* Trip Forms Card */}
+          <div className="animate-slide-up" style={{ animationDelay: '0.17s' }}>
+            <TripFormsCard />
+          </div>
           {/* Weekly Reports Chart */}
           <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
             <WeeklyReportsChart reports={reports} />

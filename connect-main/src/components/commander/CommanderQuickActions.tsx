@@ -6,7 +6,8 @@ import {
   FileText,
   ChevronLeft,
   Sparkles,
-  Shield
+  Shield,
+  Activity
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,22 @@ const actions = [
     description: "עונשים ואירועים משמעתיים",
     gradient: "from-slate-600 to-slate-800",
     bgGlow: "bg-slate-400/20"
+  },
+  {
+    to: "/fitness-report",
+    icon: Activity,
+    label: "דוח כשירות",
+    description: "כשירות מרוכזת נהגים",
+    gradient: "from-teal-500 to-cyan-600",
+    bgGlow: "bg-teal-400/20"
+  },
+  {
+    to: "/cleaning-parades-management",
+    icon: Sparkles,
+    label: "מסדרי ניקיון",
+    description: "ניהול תמונות דוגמא",
+    gradient: "from-purple-500 to-pink-500",
+    bgGlow: "bg-purple-400/20"
   }
 ];
 

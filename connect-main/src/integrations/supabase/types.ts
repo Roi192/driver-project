@@ -158,6 +158,102 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaning_parade_examples: {
+        Row: {
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          image_url: string
+          outpost: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          display_order?: number
+          id?: string
+          image_url: string
+          outpost: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          outpost?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cleaning_parade_highlights: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cleaning_parades: {
+        Row: {
+          created_at: string
+          day_of_week: string
+          id: string
+          outpost: string
+          parade_date: string
+          parade_time: string
+          photos: string[] | null
+          responsible_driver: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: string
+          id?: string
+          outpost: string
+          parade_date?: string
+          parade_time?: string
+          photos?: string[] | null
+          responsible_driver: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          outpost?: string
+          parade_date?: string
+          parade_time?: string
+          photos?: string[] | null
+          responsible_driver?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dangerous_routes: {
         Row: {
           created_at: string
@@ -984,6 +1080,57 @@ export type Database = {
           title?: string
           updated_at?: string
           video_url?: string | null
+        }
+        Relationships: []
+      }
+      trip_forms: {
+        Row: {
+          created_at: string
+          exit_briefing_by_officer: boolean
+          form_date: string
+          id: string
+          notes: string | null
+          officer_name: string | null
+          personal_equipment_checked: boolean
+          signature: string
+          soldier_name: string
+          uniform_class_a: boolean
+          updated_at: string
+          user_id: string
+          vehicle_returned: boolean
+          weapon_reset: boolean
+        }
+        Insert: {
+          created_at?: string
+          exit_briefing_by_officer?: boolean
+          form_date?: string
+          id?: string
+          notes?: string | null
+          officer_name?: string | null
+          personal_equipment_checked?: boolean
+          signature: string
+          soldier_name: string
+          uniform_class_a?: boolean
+          updated_at?: string
+          user_id: string
+          vehicle_returned?: boolean
+          weapon_reset?: boolean
+        }
+        Update: {
+          created_at?: string
+          exit_briefing_by_officer?: boolean
+          form_date?: string
+          id?: string
+          notes?: string | null
+          officer_name?: string | null
+          personal_equipment_checked?: boolean
+          signature?: string
+          soldier_name?: string
+          uniform_class_a?: boolean
+          updated_at?: string
+          user_id?: string
+          vehicle_returned?: boolean
+          weapon_reset?: boolean
         }
         Relationships: []
       }
