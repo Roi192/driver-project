@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Camera, Upload, CheckCircle, AlertCircle, Sparkles, ImageIcon, Info, ListChecks } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { OUTPOSTS } from "@/lib/constants";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
@@ -196,18 +197,12 @@ export default function CleaningParades() {
       <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/80 to-cream/20">
         <div className="relative px-4 py-6 space-y-6 pb-24">
           {/* Header */}
-          <header className="relative overflow-hidden rounded-3xl bg-white/90 backdrop-blur-2xl border border-slate-200/60 p-5 shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-3xl" />
-            <div className="relative flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-black text-xl text-slate-800">מסדרי ניקיון</h1>
-                <p className="text-sm text-slate-500">דיווח על ביצוע מסדר ניקיון</p>
-              </div>
-            </div>
-          </header>
+          <PageHeader
+            icon={Sparkles}
+            title="מסדרי ניקיון"
+            subtitle="דיווח על ביצוע מסדר ניקיון"
+            badge="מסדרי ניקיון"
+          />
 
           {/* Current Date/Time Display */}
           <Card className="border-slate-200/60 shadow-lg">

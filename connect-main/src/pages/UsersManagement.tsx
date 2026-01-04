@@ -32,11 +32,11 @@ import {
   Mail,
   Calendar,
   Loader2,
-  ArrowRight,
   Building2,
   UserCog,
   MapPin,
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface UserProfile {
   id: string;
@@ -210,21 +210,12 @@ const UsersManagement = () => {
     <AppLayout>
       <div className="p-4 pb-24 max-w-4xl mx-auto" dir="rtl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
-          >
-            <ArrowRight className="w-5 h-5" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-black text-foreground">ניהול משתמשים</h1>
-            <p className="text-sm text-muted-foreground">צפייה ועריכת משתמשים רשומים</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-            <Users className="w-6 h-6 text-primary" />
-          </div>
-        </div>
+        <PageHeader
+          icon={Users}
+          title="ניהול משתמשים"
+          subtitle="צפייה ועריכת משתמשים רשומים"
+          badge="ניהול משתמשים"
+        />
 
         {/* Stats Card */}
         <div className="glass-card p-4 mb-6">

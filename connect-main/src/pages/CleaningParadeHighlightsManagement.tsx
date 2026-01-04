@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
-import { Plus, ListChecks, Trash2, Edit2, GripVertical, ArrowLeft } from "lucide-react";
+import { Plus, ListChecks, Trash2, Edit2, GripVertical } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface Highlight {
   id: string;
@@ -163,26 +164,13 @@ export default function CleaningParadeHighlightsManagement() {
       <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/80 to-cream/20">
         <div className="relative px-4 py-6 space-y-6 pb-24">
           {/* Header */}
-          <header className="relative overflow-hidden rounded-3xl bg-white/90 backdrop-blur-2xl border border-slate-200/60 p-5 shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-3xl" />
-            <div className="relative flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="w-10 h-10 rounded-xl"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-                <ListChecks className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-black text-xl text-slate-800">ניהול דגשים למסדר ניקיון</h1>
-                <p className="text-sm text-slate-500">עריכה והוספת דגשים</p>
-              </div>
-            </div>
-          </header>
+          <PageHeader
+            icon={ListChecks}
+            title="עריכת דגשים למסדרי ניקיון"
+            subtitle="ניהול הדגשים שמוצגים בדף מסדרי הניקיון"
+            badge="דגשים למסדר"
+          />
+          
 
           {/* Add Button */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
 import { OUTPOSTS, DRILLS } from "@/lib/constants";
-import { MapPin, ArrowRight, Target, Car, Flame, Navigation, Info, Plus, Pencil, Trash2, Loader2, Settings, Sparkles } from "lucide-react";
+import { MapPin, ArrowRight, Target, Car, Flame, Navigation, Info, Plus, Pencil, Trash2, Loader2, Settings } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -260,24 +261,12 @@ export default function DrillLocations() {
   const renderHeader = () => {
     if (view === "outposts") {
       return (
-        <div className="text-center mb-8 animate-slide-up">
-          {/* Floating decorative elements */}
-          <div className="absolute top-20 left-10 w-20 h-20 bg-primary/10 rounded-full blur-2xl animate-float" />
-          <div className="absolute top-32 right-10 w-16 h-16 bg-accent/15 rounded-full blur-xl animate-float" style={{ animationDelay: '1s' }} />
-          
-          <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_30px_hsl(var(--primary)/0.2)] animate-glow">
-            <MapPin className="w-5 h-5 text-primary animate-bounce-soft" />
-            <span className="text-sm font-black text-primary">נקודות תרגולות</span>
-            <Target className="w-4 h-4 text-accent" />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-3 animate-shimmer bg-[length:200%_auto]">
-            נקודות תרגולות
-          </h1>
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-            בחר מוצב לצפייה בנקודות התרגולות
-          </p>
-        </div>
+        <PageHeader
+          icon={Target}
+          title="נקודות תרגולות"
+          subtitle="בחר מוצב לצפייה בנקודות התרגולות"
+          badge="נקודות תרגולות"
+        />
       );
     }
 

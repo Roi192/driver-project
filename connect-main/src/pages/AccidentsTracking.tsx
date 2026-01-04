@@ -30,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter, Eye, CheckCircle } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -504,8 +505,14 @@ const AccidentsTracking = () => {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-6" dir="rtl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <h1 className="text-2xl font-bold">מעקב תאונות</h1>
+        <PageHeader
+          icon={Car}
+          title="מעקב תאונות"
+          subtitle="ניהול ומעקב תאונות נהגים"
+          badge="מעקב תאונות"
+        />
+        
+        <div className="flex flex-wrap gap-2 w-full justify-end">
           <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="flex-shrink-0">
               <Filter className="ml-2 h-4 w-4" /> סינון

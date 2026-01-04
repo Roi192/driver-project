@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
-import { ArrowRight, Flag, MapPin, Users, Calendar, Plus, Pencil, Trash2, Loader2, Play, FileText, Image, AlertTriangle, Sparkles, Clock } from "lucide-react";
+import { ArrowRight, Flag, MapPin, Users, Calendar, Plus, Pencil, Trash2, Loader2, Play, FileText, Image, AlertTriangle, Clock } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -277,24 +278,12 @@ export default function SafetyEvents() {
   const renderHeader = () => {
     if (view === "categories") {
       return (
-        <div className="relative text-center mb-8 animate-slide-up">
-          {/* Decorative glowing orbs */}
-          <div className="absolute top-12 left-6 w-28 h-28 bg-gradient-to-br from-primary/15 to-accent/10 rounded-full blur-3xl animate-float" />
-          <div className="absolute top-20 right-8 w-20 h-20 bg-accent/20 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }} />
-          
-          <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
-            <Flag className="w-5 h-5 text-primary animate-wiggle" />
-            <span className="text-sm font-black text-primary">אירועי בטיחות</span>
-            <AlertTriangle className="w-4 h-4 text-accent animate-pulse" />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-3">
-            אירועי בטיחות ותחקירים
-          </h1>
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-            צפה בתחקירים ואירועים מהשטח
-          </p>
-        </div>
+        <PageHeader
+          icon={Flag}
+          title="אירועי בטיחות ותחקירים"
+          subtitle="צפה בתחקירים ואירועים מהשטח"
+          badge="אירועי בטיחות"
+        />
       );
     }
 

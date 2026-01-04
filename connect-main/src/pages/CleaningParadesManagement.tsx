@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { Plus, Trash2, Image, Sparkles, Settings, Eye, ChevronLeft, Upload, GripVertical } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { OUTPOSTS } from "@/lib/constants";
 import { useNavigate } from "react-router-dom";
 
@@ -179,18 +180,12 @@ export default function CleaningParadesManagement() {
       <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/80 to-cream/20">
         <div className="relative px-4 py-6 space-y-6 pb-24">
           {/* Header */}
-          <header className="relative overflow-hidden rounded-3xl bg-white/90 backdrop-blur-2xl border border-slate-200/60 p-5 shadow-lg">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-3xl" />
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-                  <Settings className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="font-black text-xl text-slate-800">ניהול מסדרי ניקיון</h1>
-                  <p className="text-sm text-slate-500">הוספת ועריכת תמונות דוגמא למוצבים</p>
-                </div>
-              </div>
+          <PageHeader
+            icon={Settings}
+            title="ניהול מסדרי ניקיון"
+            subtitle="הוספת ועריכת תמונות דוגמא למוצבים"
+            badge="ניהול מסדרי ניקיון"
+          />
 
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
@@ -274,8 +269,6 @@ export default function CleaningParadesManagement() {
                   </div>
                 </DialogContent>
               </Dialog>
-            </div>
-          </header>
 
           {/* Filter by outpost */}
           <Card className="border-slate-200/60 shadow-lg">

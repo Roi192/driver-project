@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ClipboardList, Calendar, MapPin, Car, Clock, Loader2, FileCheck, Sparkles } from "lucide-react";
+import { ClipboardList, Calendar, MapPin, Car, Clock, Loader2, FileCheck } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -63,17 +64,12 @@ export default function MyReports() {
     <AppLayout>
       <div className="px-4 py-6 max-w-lg mx-auto">
         {/* Header */}
-        <div className="text-center mb-8 animate-slide-up">
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 mb-5">
-            <FileCheck className="w-5 h-5 text-primary" />
-            <span className="text-sm font-black text-primary">הדיווחים שלי</span>
-            <Sparkles className="w-4 h-4 text-accent" />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-3">
-            הדיווחים שלי
-          </h1>
-          <p className="text-muted-foreground">היסטוריית הדיווחים שלך</p>
-        </div>
+        <PageHeader
+          icon={FileCheck}
+          title="הדיווחים שלי"
+          subtitle="היסטוריית הדיווחים שלך"
+          badge="הדיווחים שלי"
+        />
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">

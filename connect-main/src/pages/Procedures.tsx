@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { FileText, Check, BookOpen, Sparkles, CheckCircle2, Loader2, ArrowRight, Shield, Award, Calendar, PenLine } from "lucide-react";
+import { FileText, Check, BookOpen, CheckCircle2, Loader2, ArrowRight, Shield, Award, Calendar, PenLine } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -375,35 +376,12 @@ export default function Procedures() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="px-4 py-6 max-w-lg mx-auto">
           {/* Header */}
-          <div className="relative text-center mb-8 animate-slide-up">
-            <div className="absolute top-8 left-10 w-28 h-28 bg-gradient-to-br from-primary/12 to-accent/8 rounded-full blur-3xl animate-float" />
-            <div className="absolute top-14 right-8 w-20 h-20 bg-accent/15 rounded-full blur-2xl animate-float" style={{ animationDelay: '2s' }} />
-            
-            {/* Unit Logo */}
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse" />
-                <img 
-                  src={unitLogo} 
-                  alt="סמל הפלוגה" 
-                  className="relative w-24 h-24 object-contain drop-shadow-lg"
-                />
-              </div>
-            </div>
-            
-            <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
-              <BookOpen className="w-5 h-5 text-primary animate-bounce-soft" />
-              <span className="text-sm font-black text-primary">נהלים</span>
-              <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-            </div>
-            <h1 className="text-3xl font-black bg-gradient-to-r from-slate-800 via-primary to-slate-800 bg-clip-text text-transparent mb-3">
-              נהלים לחתימה
-            </h1>
-            <p className="text-slate-600 flex items-center justify-center gap-2">
-              <FileText className="w-4 h-4 text-accent" />
-              בחר נוהל לקריאה וחתימה
-            </p>
-          </div>
+          <PageHeader
+            icon={BookOpen}
+            title="נהלים לחתימה"
+            subtitle="בחר נוהל לקריאה וחתימה"
+            badge="נהלים"
+          />
 
           {/* Procedures Cards */}
           <div className="space-y-4">

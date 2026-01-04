@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
 import { OUTPOSTS } from "@/lib/constants";
-import { FolderOpen, ArrowRight, MapPin, AlertTriangle, Shield, Navigation, Plus, Pencil, Trash2, Loader2, Sparkles, ExternalLink } from "lucide-react";
+import { FolderOpen, ArrowRight, MapPin, AlertTriangle, Shield, Navigation, Plus, Pencil, Trash2, Loader2, ExternalLink } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -194,24 +195,12 @@ export default function SafetyFiles() {
   const renderHeader = () => {
     if (view === "outposts") {
       return (
-        <div className="relative text-center mb-8 animate-slide-up">
-          {/* Premium floating elements */}
-          <div className="absolute top-16 left-8 w-24 h-24 bg-primary/10 rounded-full blur-3xl animate-float" />
-          <div className="absolute top-24 right-12 w-20 h-20 bg-accent/15 rounded-full blur-2xl animate-float" style={{ animationDelay: '1.5s' }} />
-          
-          <div className="relative inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-primary/20 via-card/50 to-accent/20 border border-primary/40 mb-5 shadow-[0_0_40px_hsl(var(--primary)/0.25)] animate-glow">
-            <FolderOpen className="w-5 h-5 text-primary animate-bounce-soft" />
-            <span className="text-sm font-black text-primary">תיקי בטיחות</span>
-            <Shield className="w-4 h-4 text-accent" />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent mb-3">
-            תיקי בטיחות מוצבים
-          </h1>
-          <p className="text-muted-foreground flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent animate-pulse" />
-            בחר מוצב לצפייה בתיק הבטיחות
-          </p>
-        </div>
+        <PageHeader
+          icon={FolderOpen}
+          title="תיקי בטיחות מוצבים"
+          subtitle="בחר מוצב לצפייה בתיק הבטיחות"
+          badge="תיקי בטיחות"
+        />
       );
     }
 
