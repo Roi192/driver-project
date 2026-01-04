@@ -46,6 +46,7 @@ interface Soldier {
   created_at: string;
   defensive_driving_passed: boolean | null;
   qualified_date: string | null;
+  correct_driving_in_service_date: string | null;
 }
 
 // פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
@@ -65,6 +66,24 @@ const getFitnessStatus = (soldier: Soldier) => {
     return { status: "unknown", label: "חסר מידע", color: "bg-slate-400", icon: "❓" };
   }
   return { status: "fit", label: "כשיר", color: "bg-emerald-500", icon: "✓" };
+};
+
+// פונקציה לבדיקת תוקף נהיגה נכונה בשירות (נדרש אחת לשנה)
+const getCorrectDrivingStatus = (soldier: Soldier) => {
+  if (!soldier.correct_driving_in_service_date) {
+    return { status: "unknown", label: "לא הוזן", color: "bg-slate-400", isValid: false };
+  }
+  
+  const today = new Date();
+  const trainingDate = parseISO(soldier.correct_driving_in_service_date);
+  const daysSinceTraining = differenceInDays(today, trainingDate);
+  
+  if (daysSinceTraining > 365) {
+    return { status: "expired", label: "פג תוקף", color: "bg-red-500", isValid: false };
+  } else if (daysSinceTraining > 300) {
+    return { status: "warning", label: `${365 - daysSinceTraining} ימים`, color: "bg-amber-500", isValid: true };
+  }
+  return { status: "valid", label: "תקף", color: "bg-emerald-500", isValid: true };
 };
 
 export default function SoldiersControl() {
@@ -93,6 +112,7 @@ export default function SoldiersControl() {
     release_date: "",
     defensive_driving_passed: false,
     qualified_date: format(new Date(), "yyyy-MM-dd"),
+    correct_driving_in_service_date: "",
   });
 
   useEffect(() => {
@@ -151,6 +171,7 @@ export default function SoldiersControl() {
       release_date: formData.release_date || null,
       defensive_driving_passed: formData.defensive_driving_passed,
       qualified_date: formData.qualified_date || null,
+      correct_driving_in_service_date: formData.correct_driving_in_service_date || null,
     };
 
     if (editingSoldier) {
@@ -213,6 +234,7 @@ export default function SoldiersControl() {
       release_date: "",
       defensive_driving_passed: false,
       qualified_date: format(new Date(), "yyyy-MM-dd"),
+      correct_driving_in_service_date: "",
     });
     setEditingSoldier(null);
   };
@@ -227,6 +249,7 @@ export default function SoldiersControl() {
       release_date: soldier.release_date || "",
       defensive_driving_passed: soldier.defensive_driving_passed || false,
       qualified_date: soldier.qualified_date || format(new Date(), "yyyy-MM-dd"),
+      correct_driving_in_service_date: soldier.correct_driving_in_service_date || "",
     });
     setDialogOpen(true);
   };
@@ -243,6 +266,8 @@ export default function SoldiersControl() {
       "סטטוס רשיון אזרחי": getLicenseStatus(soldier.civilian_license_expiry).label,
       "תאריך שחרור": soldier.release_date ? format(parseISO(soldier.release_date), "dd/MM/yyyy") : "-",
       "נהיגה מונעת": soldier.defensive_driving_passed ? "עבר" : "לא עבר",
+      "נהיגה נכונה בשירות": soldier.correct_driving_in_service_date ? format(parseISO(soldier.correct_driving_in_service_date), "dd/MM/yyyy") : "-",
+      "סטטוס נהיגה נכונה": getCorrectDrivingStatus(soldier).label,
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -559,6 +584,17 @@ export default function SoldiersControl() {
                                   </Badge>
                                 </div>
                               )}
+                              
+                              {/* Correct Driving in Service Status */}
+                              <div className="flex items-center gap-1 mt-2">
+                                <Car className="w-3 h-3 text-slate-400" />
+                                <span className="text-xs text-slate-500">נהיגה נכונה בשירות:</span>
+                                <Badge className={`${getCorrectDrivingStatus(soldier).color} text-white text-xs`}>
+                                  {soldier.correct_driving_in_service_date 
+                                    ? format(parseISO(soldier.correct_driving_in_service_date), "dd/MM/yy")
+                                    : "לא הוזן"}
+                                </Badge>
+                              </div>
                             </div>
                             
                             <div className="flex gap-2">
@@ -675,6 +711,17 @@ export default function SoldiersControl() {
                   <span className="font-bold text-blue-700">עבר נהיגה מונעת</span>
                   <p className="text-xs text-blue-600">סמן אם החייל עבר הכשרת נהיגה מונעת</p>
                 </Label>
+              </div>
+
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
+                <Label className="text-purple-700 font-bold">נהיגה נכונה בשירות</Label>
+                <p className="text-xs text-purple-600 mb-2">נדרש אחת לשנה לשמירה על כשירות</p>
+                <Input
+                  type="date"
+                  value={formData.correct_driving_in_service_date}
+                  onChange={(e) => setFormData({ ...formData, correct_driving_in_service_date: e.target.value })}
+                  className="bg-white"
+                />
               </div>
             </div>
 

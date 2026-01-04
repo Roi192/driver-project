@@ -1322,6 +1322,42 @@ const KnowTheArea = () => {
                 {showEvents ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                 אירועים
               </button>
+              <button
+                onClick={() => setShowVardim(!showVardim)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
+                  showVardim
+                    ? "bg-purple-500/20 border-purple-500/50 text-purple-700"
+                    : "bg-muted/50 border-border text-muted-foreground"
+                )}
+              >
+                {showVardim ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                ורדים
+              </button>
+              <button
+                onClick={() => setShowParsa(!showParsa)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
+                  showParsa
+                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-700"
+                    : "bg-muted/50 border-border text-muted-foreground"
+                )}
+              >
+                {showParsa ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                פרסה
+              </button>
+              <button
+                onClick={() => setShowVulnerability(!showVulnerability)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
+                  showVulnerability
+                    ? "bg-amber-500/20 border-amber-500/50 text-amber-700"
+                    : "bg-muted/50 border-border text-muted-foreground"
+                )}
+              >
+                {showVulnerability ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                תורפה
+              </button>
             </div>
           </div>
         </div>
@@ -1397,6 +1433,9 @@ const KnowTheArea = () => {
               zoom={userLocation ? 13 : 11}
               className="h-full w-full"
               ref={mapRef}
+              maxBounds={[[29.5, 34.2], [33.3, 35.9]]}
+              maxBoundsViscosity={1.0}
+              minZoom={8}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

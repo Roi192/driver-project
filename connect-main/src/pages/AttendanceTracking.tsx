@@ -49,13 +49,18 @@ import {
 type AttendanceStatus = "attended" | "absent" | "not_in_rotation" | "not_updated" | "not_qualified";
 
 // סיבות היעדרות
-type AbsenceReason = "קורס" | "גימלים" | "נעדר" | "נפקד";
+type AbsenceReason = "קורס" | "גימלים" | "גימלים ממושכים" | "נעדר" | "נפקד" | "כלא";
+
+// סיבות שלא נספרות באחוז נוכחות (החייל לא יכל להגיע)
+const NON_COUNTABLE_ABSENCE_REASONS: AbsenceReason[] = ["קורס", "גימלים ממושכים", "נפקד", "כלא"];
 
 const absenceReasonOptions: { value: AbsenceReason; label: string }[] = [
   { value: "קורס", label: "קורס" },
   { value: "גימלים", label: "גימלים" },
+  { value: "גימלים ממושכים", label: "גימלים ממושכים" },
   { value: "נעדר", label: "נעדר (ללא סיבה מוצדקת)" },
   { value: "נפקד", label: "נפקד" },
+  { value: "כלא", label: "כלא" },
 ];
 
 const attendanceStatusLabels: Record<AttendanceStatus, string> = {
@@ -336,12 +341,18 @@ export default function AttendanceTracking() {
     }
     
     filteredEvents.forEach(event => {
-      const { status, completed } = getSoldierEventStatus(soldier, event);
+      const { status, completed, reason } = getSoldierEventStatus(soldier, event);
       const isExpected = (event.expected_soldiers || []).includes(soldierId);
       
       if (isExpected || status === "attended" || status === "absent") {
         if (completed || status === "attended") attended++;
-        else if (status === "absent") absent++;
+        else if (status === "absent") {
+          // Check if reason is non-countable - if so, don't count towards absent
+          const isNonCountable = reason && NON_COUNTABLE_ABSENCE_REASONS.includes(reason as AbsenceReason);
+          if (!isNonCountable) {
+            absent++;
+          }
+        }
         else if (status === "not_qualified") notQualified++;
       } else if (status === "not_in_rotation") {
         notInRotation++;
@@ -1128,7 +1139,7 @@ export default function AttendanceTracking() {
                 <div>
                   <Label className="text-sm">סטטוס</Label>
                   <Select value={editStatus} onValueChange={(v) => setEditStatus(v as AttendanceStatus)}>
-                    <SelectTrigger className="mt-1 bg-white">
+                    <SelectTrigger className="mt-1 bg-white text-slate-800">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border border-slate-200 shadow-lg z-50">
@@ -1145,8 +1156,8 @@ export default function AttendanceTracking() {
                     <div>
                       <Label className="text-sm">סיבת היעדרות</Label>
                       <Select value={editReason} onValueChange={(v) => setEditReason(v as AbsenceReason)}>
-                        <SelectTrigger className="mt-1 bg-white">
-                          <SelectValue placeholder="בחר סיבה..." />
+                        <SelectTrigger className="mt-1 bg-white text-slate-800">
+                          <SelectValue placeholder="בחר סיבה..." className="text-slate-800" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200 shadow-lg z-50">
                           {absenceReasonOptions.map((option) => (
