@@ -136,8 +136,18 @@ export default function Inspections() {
   // Safety files for vulnerability helper
   const [vulnerabilityFiles, setVulnerabilityFiles] = useState<{title: string; content: string | null}[]>([]);
 
+  // Live datetime for new inspections
+  const [liveDateTime, setLiveDateTime] = useState(new Date());
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLiveDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [formData, setFormData] = useState({
-    inspection_date: format(new Date(), "yyyy-MM-dd"),
+    inspection_date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
     platoon: "",
     commander_name: "",
     soldier_id: "",
@@ -247,14 +257,13 @@ export default function Inspections() {
     ];
     vehicleScore = vehicleItems.filter(Boolean).length * 3.33;
 
-    // Procedures: 20 points (5 items)
+    // Procedures: 20 points (4 items - 5 points each)
     let proceduresScore = 0;
     const procedureItems = [
       formData.procedures_descent_drill, formData.procedures_rollover_drill,
-      formData.procedures_fire_drill, formData.procedures_combat_equipment,
-      formData.procedures_weapon_present
+      formData.procedures_fire_drill, formData.procedures_combat_equipment
     ];
-    proceduresScore = procedureItems.filter(Boolean).length * 4;
+    proceduresScore = procedureItems.filter(Boolean).length * 5;
 
     // Safety: 10 points (7 items)
     let safetyScore = 0;
@@ -295,7 +304,7 @@ export default function Inspections() {
     const scores = calculateScores();
 
     const data = {
-      inspection_date: formData.inspection_date,
+      inspection_date: editingInspection ? formData.inspection_date : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
       platoon: formData.platoon,
       commander_name: formData.commander_name,
       soldier_id: formData.soldier_id,
@@ -369,7 +378,7 @@ export default function Inspections() {
 
   const resetForm = () => {
     setFormData({
-      inspection_date: format(new Date(), "yyyy-MM-dd"),
+      inspection_date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
       platoon: "",
       commander_name: "",
       soldier_id: "",
@@ -770,8 +779,15 @@ export default function Inspections() {
                     <span className="font-bold text-slate-800">פרטים כלליים</span>
                   </div>
                   <div>
-                    <Label className="text-slate-800 font-semibold">תאריך</Label>
-                    <Input type="date" value={formData.inspection_date} onChange={e => setFormData({...formData, inspection_date: e.target.value})} className="bg-white border-slate-300 text-slate-900" />
+                    <Label className="text-slate-800 font-semibold">תאריך ושעה</Label>
+                    <div className="p-3 bg-slate-100 border border-slate-300 rounded-lg text-center">
+                      <span className="text-lg font-bold text-slate-900">
+                        {editingInspection 
+                          ? format(parseISO(formData.inspection_date), "dd/MM/yyyy HH:mm:ss", { locale: he })
+                          : format(liveDateTime, "dd/MM/yyyy HH:mm:ss", { locale: he })
+                        }
+                      </span>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-slate-800 font-semibold">פלוגה</Label>
@@ -1117,7 +1133,7 @@ export default function Inspections() {
                     <div>
                       <p className="text-base">{viewInspection.soldiers?.full_name}</p>
                       <p className="text-xs font-normal text-slate-500">
-                        {format(parseISO(viewInspection.inspection_date), "dd/MM/yyyy")} | {viewInspection.platoon}
+                        {format(parseISO(viewInspection.inspection_date), "dd/MM/yyyy HH:mm:ss", { locale: he })} | {viewInspection.platoon}
                       </p>
                     </div>
                   </DialogTitle>
