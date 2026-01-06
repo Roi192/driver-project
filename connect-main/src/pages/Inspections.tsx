@@ -269,9 +269,11 @@ export default function Inspections() {
     // Routes: 15 points (manual)
     const routesScore = formData.routes_familiarity_score;
 
-    // Simulations: 15 points (2 random questions)
-    const answeredQuestions = Object.values(formData.simulations_answers).filter(Boolean).length;
-    const simulationsScore = (answeredQuestions / 2) * 15; // 2 random questions
+    // Simulations: 15 points (2 random questions) - 7.5 points each
+    const correctAnswers = Object.entries(formData.simulations_answers)
+      .filter(([key, value]) => !key.startsWith('answer_') && !key.startsWith('question_') && value === true)
+      .length;
+    const simulationsScore = correctAnswers * 7.5; // 7.5 points per correct answer, max 15
 
     return {
       combat: Math.round(combatScore),
@@ -279,8 +281,8 @@ export default function Inspections() {
       procedures: Math.round(proceduresScore),
       safety: Math.round(safetyScore),
       routes: Math.round(routesScore),
-      simulations: Math.round(simulationsScore),
-      total: Math.round(combatScore + vehicleScore + proceduresScore + safetyScore + routesScore + simulationsScore)
+      simulations: Math.round(Math.min(simulationsScore, 15)), // Cap at 15
+      total: Math.round(combatScore + vehicleScore + proceduresScore + safetyScore + routesScore + Math.min(simulationsScore, 15))
     };
   };
 
@@ -328,7 +330,13 @@ export default function Inspections() {
       safety_score: scores.safety,
       routes_familiarity_score: scores.routes,
       routes_notes: formData.routes_notes,
-      simulations_questions: formData.simulations_answers,
+      // Store both questions and answers together
+      simulations_questions: {
+        ...formData.simulations_answers,
+        // Store the actual question texts
+        question_0: randomQuestions[0] || '',
+        question_1: randomQuestions[1] || '',
+      },
       simulations_score: scores.simulations,
       total_score: scores.total,
       general_notes: formData.general_notes,
@@ -1279,37 +1287,41 @@ export default function Inspections() {
                     </div>
                     {viewInspection.simulations_questions && Object.keys(viewInspection.simulations_questions).length > 0 ? (
                       <div className="space-y-3">
-                        <p className="text-sm text-slate-600 font-medium">תשובות החייל:</p>
-                        {Object.entries(viewInspection.simulations_questions)
-                          .filter(([idx]) => !idx.startsWith('answer_'))
-                          .map(([idx, answered]) => {
-                            const questionIndex = parseInt(idx);
-                            const questionText = SIMULATION_QUESTIONS[questionIndex] || `שאלה ${questionIndex + 1}`;
-                            const soldierAnswer = (viewInspection.simulations_questions as Record<string, any>)?.[`answer_${idx}`];
-                            return (
-                              <div key={idx} className="p-3 rounded-lg bg-white border border-slate-200 space-y-2">
-                                <div className="flex items-start gap-2">
-                                  {answered ? (
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                  ) : (
-                                    <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                                  )}
-                                  <div className="flex-1">
-                                    <span className="text-sm font-medium text-slate-700">{questionText}</span>
-                                    <p className={`text-xs ${answered ? 'text-emerald-600' : 'text-red-500'}`}>
-                                      {answered ? 'תשובה נכונה' : 'תשובה שגויה'}
-                                    </p>
-                                  </div>
-                                </div>
-                                {soldierAnswer && (
-                                  <div className="mr-7 p-2 bg-slate-50 rounded-lg border border-slate-100">
-                                    <p className="text-xs text-slate-500 mb-1">תשובת החייל:</p>
-                                    <p className="text-sm text-slate-700">{soldierAnswer}</p>
-                                  </div>
+                        <p className="text-sm text-slate-600 font-medium">שאלות ותשובות החייל:</p>
+                        {[0, 1].map((idx) => {
+                          const simData = viewInspection.simulations_questions as Record<string, any>;
+                          // Get the stored question text, or fallback to SIMULATION_QUESTIONS if it's an old record
+                          const questionText = simData[`question_${idx}`] || SIMULATION_QUESTIONS[idx] || `שאלה ${idx + 1}`;
+                          const answered = simData[idx] === true;
+                          const soldierAnswer = simData[`answer_${idx}`];
+                          
+                          // Skip if no question was stored and no answer exists
+                          if (!simData[`question_${idx}`] && simData[idx] === undefined) return null;
+                          
+                          return (
+                            <div key={idx} className="p-3 rounded-lg bg-white border border-slate-200 space-y-2">
+                              <div className="flex items-start gap-2">
+                                {answered ? (
+                                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                  <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                                 )}
+                                <div className="flex-1">
+                                  <span className="text-sm font-medium text-slate-700">{questionText}</span>
+                                  <p className={`text-xs ${answered ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {answered ? 'תשובה נכונה' : 'תשובה שגויה'}
+                                  </p>
+                                </div>
                               </div>
-                            );
-                          })}
+                              {soldierAnswer && (
+                                <div className="mr-7 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                  <p className="text-xs text-slate-500 mb-1">תשובת החייל:</p>
+                                  <p className="text-sm text-slate-700">{soldierAnswer}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
