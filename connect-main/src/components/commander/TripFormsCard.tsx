@@ -23,26 +23,46 @@ interface TripForm {
 }
 
 export function TripFormsCard() {
-  const [todayForms, setTodayForms] = useState<TripForm[]>([]);
+  const [periodForms, setPeriodForms] = useState<TripForm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState<TripForm | null>(null);
   const [showAllDialog, setShowAllDialog] = useState(false);
 
+  const getMostRecentThursday = (date: Date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+
+    // JS: 0=Sunday ... 4=Thursday
+    const day = d.getDay();
+    const diffDays = (day - 4 + 7) % 7;
+    d.setDate(d.getDate() - diffDays);
+
+    // כדי שב"יום חמישי" עדיין נראה את טפסי השבוע שחלף, אנחנו מתחילים מהחמישי הקודם (לא של היום)
+    if (day === 4) {
+      d.setDate(d.getDate() - 7);
+    }
+
+    return d;
+  };
+
   useEffect(() => {
-    fetchTodayForms();
+    fetchPeriodForms();
   }, []);
 
-  const fetchTodayForms = async () => {
+  const fetchPeriodForms = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const periodStart = getMostRecentThursday(now);
+      const periodStartStr = format(periodStart, 'yyyy-MM-dd');
+
       const { data, error } = await supabase
         .from('trip_forms')
         .select('*')
-        .eq('form_date', today)
+        .gte('form_date', periodStartStr)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTodayForms((data as TripForm[]) || []);
+      setPeriodForms((data as TripForm[]) || []);
     } catch (error) {
       console.error('Error fetching trip forms:', error);
     } finally {
@@ -50,7 +70,16 @@ export function TripFormsCard() {
     }
   };
 
-  const formCount = todayForms.length;
+  const now = new Date();
+  const periodStart = getMostRecentThursday(now);
+  const rangeStartLabel = format(periodStart, 'dd/MM/yyyy', { locale: he });
+  const rangeEndLabel = format(now, 'dd/MM/yyyy', { locale: he });
+  const rangeLabel =
+    rangeStartLabel === rangeEndLabel
+      ? rangeStartLabel
+      : `${rangeStartLabel}–${rangeEndLabel}`;
+
+  const formCount = periodForms.length;
 
   return (
     <>
@@ -66,7 +95,7 @@ export function TripFormsCard() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
                 <Home className="w-5 h-5 text-white" />
               </div>
-              <span>טפסי טיולים להיום</span>
+              <span>טפסי טיולים מאז חמישי</span>
             </div>
             <ChevronLeft className="w-5 h-5 text-slate-400 group-hover:text-primary group-hover:-translate-x-1 transition-all" />
           </CardTitle>
@@ -91,7 +120,7 @@ export function TripFormsCard() {
               
               {formCount > 0 && (
                 <div className="flex-1 space-y-1">
-                  {todayForms.slice(0, 3).map((form) => (
+                  {periodForms.slice(0, 3).map((form) => (
                     <div key={form.id} className="flex items-center gap-2 text-sm">
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
                       <span className="text-slate-600 truncate">{form.soldier_name}</span>
@@ -113,18 +142,18 @@ export function TripFormsCard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Home className="w-5 h-5 text-emerald-500" />
-              טפסי טיולים - {format(new Date(), 'dd/MM/yyyy', { locale: he })}
+              טפסי טיולים • {rangeLabel}
             </DialogTitle>
           </DialogHeader>
           
-          {todayForms.length === 0 ? (
+          {periodForms.length === 0 ? (
             <div className="text-center py-8">
               <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">אין טפסים להיום</p>
+              <p className="text-slate-500">אין טפסים מאז חמישי</p>
             </div>
           ) : (
             <div className="space-y-3 mt-4">
-              {todayForms.map((form) => (
+              {periodForms.map((form) => (
                 <div
                   key={form.id}
                   className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
