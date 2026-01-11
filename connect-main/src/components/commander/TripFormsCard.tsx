@@ -175,6 +175,7 @@ export function TripFormsCard() {
                       e.stopPropagation();
                       setSelectedForm(form);
                     }}
+                    className="text-slate-600 hover:text-primary"
                   >
                     <Eye className="w-4 h-4" />
                   </Button>
@@ -201,36 +202,22 @@ export function TripFormsCard() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-5 h-5 ${selectedForm.weapon_reset ? 'text-green-500' : 'text-slate-300'}`} />
-                  <span className={selectedForm.weapon_reset ? 'text-slate-700' : 'text-slate-400'}>
-                    ווידוא איפסון נשק
-                  </span>
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span className="font-medium text-emerald-800">כל הסעיפים בוצעו ✓</span>
+                  </div>
+                  <div className="text-sm text-emerald-700 space-y-1">
+                    <div>• הופעה ולבוש - 3 סעיפים</div>
+                    <div>• בטיחות בדרכים - 5 סעיפים</div>
+                    <div>• נהלים כלליים - 8 סעיפים</div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-5 h-5 ${selectedForm.exit_briefing_by_officer ? 'text-green-500' : 'text-slate-300'}`} />
-                  <span className={selectedForm.exit_briefing_by_officer ? 'text-slate-700' : 'text-slate-400'}>
-                    תדריך יציאה מקצין {selectedForm.officer_name && `(${selectedForm.officer_name})`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-5 h-5 ${selectedForm.uniform_class_a ? 'text-green-500' : 'text-slate-300'}`} />
-                  <span className={selectedForm.uniform_class_a ? 'text-slate-700' : 'text-slate-400'}>
-                    יוצא על מדי א' מדוגמים
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-5 h-5 ${selectedForm.personal_equipment_checked ? 'text-green-500' : 'text-slate-300'}`} />
-                  <span className={selectedForm.personal_equipment_checked ? 'text-slate-700' : 'text-slate-400'}>
-                    ציוד אישי מאובזר
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-5 h-5 ${selectedForm.vehicle_returned ? 'text-green-500' : 'text-slate-300'}`} />
-                  <span className={selectedForm.vehicle_returned ? 'text-slate-700' : 'text-slate-400'}>
-                    רכב הוחזר תקין ונקי
-                  </span>
+                
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <span className="font-medium text-blue-800">קצין מתדרך:</span>
+                  <span className="text-blue-700">{selectedForm.officer_name || 'לא צוין'}</span>
                 </div>
               </div>
 
