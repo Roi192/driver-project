@@ -108,14 +108,44 @@ export default function CleaningParades() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("אנא בחר קובץ תמונה");
+      return;
+    }
+
+    // Validate file size (max 10MB for camera photos)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("גודל הקובץ חייב להיות עד 10MB");
+      return;
+    }
+
     setUploadingPhoto(description);
     try {
-      const fileExt = file.name.split('.').pop();
+      // Get file extension from name or type
+      let fileExt = file.name.split('.').pop()?.toLowerCase();
+      
+      // If no extension or it's a blob, use type to determine extension
+      if (!fileExt || fileExt === file.name || file.name.startsWith('image')) {
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': 'jpg',
+          'image/jpg': 'jpg',
+          'image/png': 'png',
+          'image/gif': 'gif',
+          'image/webp': 'webp',
+          'image/heic': 'jpg', // Convert HEIC to jpg in filename
+          'image/heif': 'jpg',
+        };
+        fileExt = mimeToExt[file.type] || 'jpg';
+      }
+      
       const fileName = `${user.id}/${Date.now()}_${index}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('cleaning-parades')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          contentType: file.type || 'image/jpeg',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -137,7 +167,7 @@ export default function CleaningParades() {
       toast.success("התמונה הועלתה בהצלחה");
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      toast.error("שגיאה בהעלאת התמונה");
+      toast.error(error.message || "שגיאה בהעלאת התמונה");
     } finally {
       setUploadingPhoto(null);
     }
