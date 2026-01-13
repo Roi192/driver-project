@@ -54,13 +54,17 @@ export function ImageUpload({
         throw uploadError;
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Get signed URL (1 year validity for display purposes)
+      const { data: signedUrlData, error: signedError } = await supabase.storage
         .from(bucket)
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
 
-      setPreview(publicUrl);
-      onChange(publicUrl);
+      if (signedError || !signedUrlData?.signedUrl) {
+        throw signedError || new Error('Failed to generate signed URL');
+      }
+
+      setPreview(signedUrlData.signedUrl);
+      onChange(signedUrlData.signedUrl);
       toast.success("התמונה הועלתה בהצלחה");
     } catch (error: any) {
       console.error("Upload error:", error);

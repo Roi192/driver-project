@@ -119,13 +119,19 @@ export default function CleaningParades() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // Get signed URL for secure access (1 year validity)
+      const { data: signedUrlData, error: signedError } = await supabase.storage
         .from('cleaning-parades')
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+
+      if (signedError || !signedUrlData?.signedUrl) {
+        throw signedError || new Error('Failed to generate signed URL');
+      }
+      const signedUrl = signedUrlData.signedUrl;
 
       setPhotos(prev => {
         const newPhotos = [...prev];
-        newPhotos[index] = { description, url: publicUrl };
+        newPhotos[index] = { description, url: signedUrl };
         return newPhotos;
       });
       toast.success("התמונה הועלתה בהצלחה");

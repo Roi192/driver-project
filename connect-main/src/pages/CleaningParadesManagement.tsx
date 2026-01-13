@@ -99,9 +99,15 @@ export default function CleaningParadesManagement() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // Get signed URL for secure access (1 year validity)
+      const { data: signedUrlData, error: signedError } = await supabase.storage
         .from('cleaning-examples')
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+
+      if (signedError || !signedUrlData?.signedUrl) {
+        throw signedError || new Error('Failed to generate signed URL');
+      }
+      const signedUrl = signedUrlData.signedUrl;
 
       // Get max order for this outpost
       const existingForOutpost = examples.filter(e => e.outpost === newOutpost);
@@ -115,7 +121,7 @@ export default function CleaningParadesManagement() {
         .insert({
           outpost: newOutpost,
           description: newDescription,
-          image_url: publicUrl,
+          image_url: signedUrl,
           display_order: maxOrder + 1,
         });
 
