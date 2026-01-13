@@ -222,7 +222,13 @@ export default function CleaningParades() {
       setExamplePhotos([]);
     } catch (error: any) {
       console.error('Error submitting parade:', error);
-      toast.error("שגיאה בשמירת המסדר");
+      const message =
+        error?.message ||
+        error?.error_description ||
+        (typeof error === 'string' ? error : null) ||
+        "שגיאה בשמירת המסדר";
+      const details = error?.details || error?.hint;
+      toast.error(details ? `${message} (${details})` : message);
     } finally {
       setIsSubmitting(false);
     }
