@@ -31,6 +31,8 @@ import CleaningParadesManagement from "./pages/CleaningParadesManagement";
 import CleaningParadeHighlightsManagement from "./pages/CleaningParadeHighlightsManagement";
 import FitnessReport from "./pages/FitnessReport";
 import TripForm from "./pages/TripForm";
+import SafetyScoresManagement from "./pages/SafetyScoresManagement";
+import DriverInterviews from "./pages/DriverInterviews";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -236,6 +238,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <TripForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/safety-scores"
+              element={
+                <ProtectedRoute>
+                  <SafetyScoresManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/driver-interviews"
+              element={
+                <ProtectedRoute>
+                  <DriverInterviews />
                 </ProtectedRoute>
               }
             />

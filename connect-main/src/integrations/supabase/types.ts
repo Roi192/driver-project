@@ -335,6 +335,96 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_interviews: {
+        Row: {
+          additional_notes: string | null
+          battalion: string
+          civilian_license_expiry: string | null
+          created_at: string
+          defensive_driving_passed: boolean | null
+          driver_name: string
+          family_status: string | null
+          financial_status: string | null
+          id: string
+          interview_date: string
+          interviewer_name: string
+          interviewer_summary: string | null
+          license_type: string | null
+          military_accidents: string | null
+          military_license_expiry: string | null
+          outpost: string
+          permits: string | null
+          region: string
+          signature: string
+          soldier_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          battalion: string
+          civilian_license_expiry?: string | null
+          created_at?: string
+          defensive_driving_passed?: boolean | null
+          driver_name: string
+          family_status?: string | null
+          financial_status?: string | null
+          id?: string
+          interview_date?: string
+          interviewer_name: string
+          interviewer_summary?: string | null
+          license_type?: string | null
+          military_accidents?: string | null
+          military_license_expiry?: string | null
+          outpost: string
+          permits?: string | null
+          region: string
+          signature: string
+          soldier_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          additional_notes?: string | null
+          battalion?: string
+          civilian_license_expiry?: string | null
+          created_at?: string
+          defensive_driving_passed?: boolean | null
+          driver_name?: string
+          family_status?: string | null
+          financial_status?: string | null
+          id?: string
+          interview_date?: string
+          interviewer_name?: string
+          interviewer_summary?: string | null
+          license_type?: string | null
+          military_accidents?: string | null
+          military_license_expiry?: string | null
+          outpost?: string
+          permits?: string | null
+          region?: string
+          signature?: string
+          soldier_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_interviews_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_interviews_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_attendance: {
         Row: {
           absence_reason: string | null
@@ -587,6 +677,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      monthly_safety_scores: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          harsh_accelerations: number | null
+          harsh_braking: number | null
+          harsh_turns: number | null
+          id: string
+          illegal_overtakes: number | null
+          kilometers: number | null
+          notes: string | null
+          safety_score: number
+          score_month: string
+          soldier_id: string
+          speed_violations: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          harsh_accelerations?: number | null
+          harsh_braking?: number | null
+          harsh_turns?: number | null
+          id?: string
+          illegal_overtakes?: number | null
+          kilometers?: number | null
+          notes?: string | null
+          safety_score: number
+          score_month: string
+          soldier_id: string
+          speed_violations?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          harsh_accelerations?: number | null
+          harsh_braking?: number | null
+          harsh_turns?: number | null
+          id?: string
+          illegal_overtakes?: number | null
+          kilometers?: number | null
+          notes?: string | null
+          safety_score?: number
+          score_month?: string
+          soldier_id?: string
+          speed_violations?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_safety_scores_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_safety_scores_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       procedure_signatures: {
         Row: {
@@ -1011,8 +1167,10 @@ export type Database = {
       soldiers: {
         Row: {
           civilian_license_expiry: string | null
+          consecutive_low_months: number | null
           correct_driving_in_service_date: string | null
           created_at: string
+          current_safety_score: number | null
           defensive_driving_passed: boolean | null
           full_name: string
           id: string
@@ -1022,12 +1180,15 @@ export type Database = {
           personal_number: string
           qualified_date: string | null
           release_date: string | null
+          safety_status: string | null
           updated_at: string
         }
         Insert: {
           civilian_license_expiry?: string | null
+          consecutive_low_months?: number | null
           correct_driving_in_service_date?: string | null
           created_at?: string
+          current_safety_score?: number | null
           defensive_driving_passed?: boolean | null
           full_name: string
           id?: string
@@ -1037,12 +1198,15 @@ export type Database = {
           personal_number: string
           qualified_date?: string | null
           release_date?: string | null
+          safety_status?: string | null
           updated_at?: string
         }
         Update: {
           civilian_license_expiry?: string | null
+          consecutive_low_months?: number | null
           correct_driving_in_service_date?: string | null
           created_at?: string
+          current_safety_score?: number | null
           defensive_driving_passed?: boolean | null
           full_name?: string
           id?: string
@@ -1052,6 +1216,7 @@ export type Database = {
           personal_number?: string
           qualified_date?: string | null
           release_date?: string | null
+          safety_status?: string | null
           updated_at?: string
         }
         Relationships: []

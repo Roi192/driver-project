@@ -70,6 +70,14 @@ const actions = [
     bgGlow: "bg-teal-400/20"
   },
   {
+    to: "/safety-scores",
+    icon: Activity,
+    label: "ציוני בטיחות",
+    description: "ניהול ציוני בטיחות חודשיים",
+    gradient: "from-sky-500 to-blue-600",
+    bgGlow: "bg-sky-400/20"
+  },
+  {
     to: "/cleaning-parades-management",
     icon: Sparkles,
     label: "מסדרי ניקיון",

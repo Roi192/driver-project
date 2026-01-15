@@ -11,15 +11,16 @@ import {
   FileText,
   Calendar,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Gauge
 } from 'lucide-react';
-import { differenceInDays, parseISO, isAfter, startOfWeek, endOfWeek, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { differenceInDays, differenceInMonths, parseISO, isAfter, startOfWeek, endOfWeek, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 interface Alert {
   id: string;
-  type: 'license' | 'attendance' | 'inspection' | 'accident' | 'procedure' | 'event' | 'defensive' | 'accident_trend';
+  type: 'license' | 'attendance' | 'inspection' | 'accident' | 'procedure' | 'event' | 'defensive' | 'accident_trend' | 'correct_driving' | 'safety_score';
   severity: 'critical' | 'warning' | 'info';
   title: string;
   description: string;
@@ -34,6 +35,7 @@ interface Soldier {
   civilian_license_expiry: string | null;
   is_active: boolean | null;
   defensive_driving_passed: boolean | null;
+  correct_driving_in_service_date: string | null;
 }
 
 interface Accident {
@@ -85,12 +87,14 @@ export function SmartAlerts() {
       // 1. Check license expiry
       const { data: soldiers } = await supabase
         .from('soldiers')
-        .select('id, full_name, military_license_expiry, civilian_license_expiry, is_active, defensive_driving_passed')
+        .select('id, full_name, military_license_expiry, civilian_license_expiry, is_active, defensive_driving_passed, correct_driving_in_service_date')
         .eq('is_active', true);
 
       if (soldiers) {
         const expiredLicenses: string[] = [];
         const expiringLicenses: string[] = [];
+        let expiredCorrectDrivingCount = 0;
+        let expiringCorrectDrivingCount = 0;
         let noDefensiveDrivingCount = 0;
 
         soldiers.forEach((soldier: Soldier) => {
@@ -100,6 +104,19 @@ export function SmartAlerts() {
           // Check defensive driving
           if (!soldier.defensive_driving_passed) {
             noDefensiveDrivingCount++;
+          }
+
+          // Check correct driving in service (valid for 12 months)
+          if (soldier.correct_driving_in_service_date) {
+            const correctDrivingDate = parseISO(soldier.correct_driving_in_service_date);
+            const monthsSince = differenceInMonths(today, correctDrivingDate);
+            if (monthsSince > 12) {
+              expiredCorrectDrivingCount++;
+            } else if (monthsSince >= 10) {
+              expiringCorrectDrivingCount++;
+            }
+          } else {
+            expiredCorrectDrivingCount++;
           }
 
           [militaryExpiry, civilianExpiry].forEach((expiry) => {
@@ -152,6 +169,31 @@ export function SmartAlerts() {
             description: `${noDefensiveDrivingCount} נהגים שלא עברו נהיגה מונעת`,
             count: noDefensiveDrivingCount,
             link: '/soldiers-control'
+          });
+        }
+
+        // Alert for correct driving in service
+        if (expiredCorrectDrivingCount > 0) {
+          alertsList.push({
+            id: 'expired-correct-driving',
+            type: 'correct_driving',
+            severity: 'critical',
+            title: 'נהיגה נכונה פגה',
+            description: `${expiredCorrectDrivingCount} נהגים שנהיגה נכונה בשירות פגה או חסרה`,
+            count: expiredCorrectDrivingCount,
+            link: '/fitness-report'
+          });
+        }
+
+        if (expiringCorrectDrivingCount > 0) {
+          alertsList.push({
+            id: 'expiring-correct-driving',
+            type: 'correct_driving',
+            severity: 'warning',
+            title: 'נהיגה נכונה עומדת לפוג',
+            description: `${expiringCorrectDrivingCount} נהגים שנהיגה נכונה בשירות תפוג בקרוב`,
+            count: expiringCorrectDrivingCount,
+            link: '/fitness-report'
           });
         }
       }
@@ -296,6 +338,61 @@ export function SmartAlerts() {
         });
       }
 
+      // 7. Check for low safety scores
+      const { data: lowSafetyScoreSoldiers } = await supabase
+        .from('soldiers')
+        .select('id, full_name, current_safety_score, consecutive_low_months, safety_status')
+        .eq('is_active', true)
+        .lt('current_safety_score', 75);
+
+      if (lowSafetyScoreSoldiers && lowSafetyScoreSoldiers.length > 0) {
+        const suspendedDrivers = lowSafetyScoreSoldiers.filter(s => 
+          s.safety_status === 'suspended' || (s.consecutive_low_months || 0) >= 3
+        );
+        const needsTestDrivers = lowSafetyScoreSoldiers.filter(s => 
+          s.safety_status !== 'suspended' && (s.consecutive_low_months || 0) === 2
+        );
+        const needsTalkDrivers = lowSafetyScoreSoldiers.filter(s => 
+          s.safety_status !== 'suspended' && (s.consecutive_low_months || 0) < 2
+        );
+
+        if (suspendedDrivers.length > 0) {
+          alertsList.push({
+            id: 'suspended-safety',
+            type: 'safety_score',
+            severity: 'critical',
+            title: 'נהגים מושעים',
+            description: `${suspendedDrivers.length} נהגים מושעים מהנהיגה עקב ציון נמוך 3 חודשים ברציפות`,
+            count: suspendedDrivers.length,
+            link: '/soldiers-control'
+          });
+        }
+
+        if (needsTestDrivers.length > 0) {
+          alertsList.push({
+            id: 'safety-needs-test',
+            type: 'safety_score',
+            severity: 'warning',
+            title: 'דורשים מבחן שליטה',
+            description: `${needsTestDrivers.length} נהגים עם ציון נמוך 2 חודשים ברציפות - דורשים בירור ומבחן`,
+            count: needsTestDrivers.length,
+            link: '/soldiers-control'
+          });
+        }
+
+        if (needsTalkDrivers.length > 0) {
+          alertsList.push({
+            id: 'safety-needs-talk',
+            type: 'safety_score',
+            severity: 'info',
+            title: 'דורשים שיחת בירור',
+            description: `${needsTalkDrivers.length} נהגים עם ציון בטיחות מתחת ל-75`,
+            count: needsTalkDrivers.length,
+            link: '/soldiers-control'
+          });
+        }
+      }
+
     } catch (error) {
       console.error('Error fetching alerts:', error);
     }
@@ -314,6 +411,8 @@ export function SmartAlerts() {
       case 'procedure': return FileText;
       case 'event': return Calendar;
       case 'defensive': return Clock;
+      case 'correct_driving': return Car;
+      case 'safety_score': return Gauge;
       default: return AlertTriangle;
     }
   };

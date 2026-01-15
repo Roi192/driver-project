@@ -13,6 +13,13 @@ export const OUTPOSTS = [
   "חשמונאים",
 ] as const;
 
+export const REGIONS = [
+  "ארץ בנימין",
+  "גבעת בנימין",
+  "טלמונים",
+  "מכבים",
+] as const;
+
 export const SHIFT_TYPES = [
   "משמרת בוקר",
   "משמרת צהריים",
@@ -61,6 +68,22 @@ export const VEHICLE_PHOTOS = [
   { id: "steering", label: "תמונה של ההגה של הרכב" },
 ] as const;
 
+export const MONTHS_HEB = [
+  { value: 1, label: "ינואר" },
+  { value: 2, label: "פברואר" },
+  { value: 3, label: "מרץ" },
+  { value: 4, label: "אפריל" },
+  { value: 5, label: "מאי" },
+  { value: 6, label: "יוני" },
+  { value: 7, label: "יולי" },
+  { value: 8, label: "אוגוסט" },
+  { value: 9, label: "ספטמבר" },
+  { value: 10, label: "אוקטובר" },
+  { value: 11, label: "נובמבר" },
+  { value: 12, label: "דצמבר" },
+] as const;
+
 export type Outpost = typeof OUTPOSTS[number];
+export type Region = typeof REGIONS[number];
 export type ShiftType = typeof SHIFT_TYPES[number];
 export type DrillType = typeof DRILLS[number];

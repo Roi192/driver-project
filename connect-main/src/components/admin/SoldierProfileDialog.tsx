@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { format, parseISO, differenceInDays, getYear, getMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Car, AlertTriangle, Gavel, Calendar, User, FileText, CheckCircle, XCircle, Download, Loader2, AlertCircle, ChevronRight, X } from 'lucide-react';
+import { Car, AlertTriangle, Gavel, Calendar, User, FileText, CheckCircle, XCircle, Download, Loader2, AlertCircle, ChevronRight, X, Gauge } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface Soldier {
@@ -44,7 +44,7 @@ const severityColors: Record<string, string> = {
   severe: 'bg-red-100 text-red-800'
 };
 
-type ActiveSection = 'none' | 'accidents' | 'punishments' | 'inspections' | 'attendance';
+type ActiveSection = 'none' | 'accidents' | 'punishments' | 'inspections' | 'attendance' | 'safety_scores';
 
 export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierProfileDialogProps) {
   const [activeSection, setActiveSection] = useState<ActiveSection>('none');
@@ -114,6 +114,22 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
     enabled: !!soldier
   });
 
+  // Fetch safety scores
+  const { data: safetyScores = [], isLoading: safetyScoresLoading } = useQuery({
+    queryKey: ['soldier-safety-scores', soldier?.id],
+    queryFn: async () => {
+      if (!soldier) return [];
+      const { data, error } = await supabase
+        .from('monthly_safety_scores')
+        .select('*')
+        .eq('soldier_id', soldier.id)
+        .order('score_month', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!soldier
+  });
+
   // Reset active section when dialog closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
@@ -124,7 +140,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
 
   if (!soldier) return null;
 
-  const isLoading = accidentsLoading || punishmentsLoading || inspectionsLoading || attendanceLoading;
+  const isLoading = accidentsLoading || punishmentsLoading || inspectionsLoading || attendanceLoading || safetyScoresLoading;
 
   // Filter out "not_in_rotation" for attendance calculations
   const relevantAttendance = attendance.filter(a => a.status !== 'not_in_rotation');
@@ -468,12 +484,59 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
     );
   };
 
+  const renderSafetyScoresList = () => (
+    <ScrollArea className="h-[400px]">
+      {safetyScores.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Gauge className="w-12 h-12 mx-auto mb-2 opacity-30" />
+          <p>אין ציוני בטיחות מתועדים</p>
+        </div>
+      ) : (
+        <div className="space-y-3 pr-2">
+          {safetyScores.map((score) => {
+            const scoreColor = score.safety_score >= 75 ? 'border-r-emerald-500' :
+              score.safety_score >= 60 ? 'border-r-yellow-500' : 'border-r-red-500';
+            const scoreBg = score.safety_score >= 75 ? 'bg-green-100 text-green-800' :
+              score.safety_score >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+            
+            return (
+              <Card key={score.id} className={`border-r-4 ${scoreColor}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-bold">
+                      {format(parseISO(score.score_month), 'MMMM yyyy', { locale: he })}
+                    </span>
+                    <Badge className={scoreBg}>
+                      ציון: {score.safety_score}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <div>ק"מ: {score.kilometers || 0}</div>
+                    <div>חריגות מהירות: {score.speed_violations || 0}</div>
+                    <div>בלימות חדות: {score.harsh_braking || 0}</div>
+                    <div>פניות חדות: {score.harsh_turns || 0}</div>
+                    <div>האצות חדות: {score.harsh_accelerations || 0}</div>
+                    <div>עקיפות מסוכנות: {score.illegal_overtakes || 0}</div>
+                  </div>
+                  {score.notes && (
+                    <p className="text-xs mt-2 text-muted-foreground">{score.notes}</p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </ScrollArea>
+  );
+
   const getSectionTitle = () => {
     switch (activeSection) {
       case 'accidents': return 'תאונות';
       case 'punishments': return 'עונשים';
       case 'inspections': return 'ביקורות';
       case 'attendance': return 'נוכחות';
+      case 'safety_scores': return 'ציוני בטיחות';
       default: return '';
     }
   };
@@ -614,6 +677,28 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
                   </div>
                 </CardContent>
               </Card>
+
+              <Card 
+                className="bg-gradient-to-br from-amber-50 to-yellow-50 border-0 cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] col-span-2"
+                onClick={() => setActiveSection('safety_scores')}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Gauge className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-amber-700">
+                          {safetyScores.length > 0 ? safetyScores[0].safety_score : '-'}
+                        </div>
+                        <div className="text-sm text-amber-600">ציון בטיחות אחרון ({safetyScores.length} רשומות)</div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-6 h-6 text-amber-400" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </>
         ) : (
@@ -632,6 +717,7 @@ export function SoldierProfileDialog({ soldier, open, onOpenChange }: SoldierPro
             {activeSection === 'punishments' && renderPunishmentsList()}
             {activeSection === 'inspections' && renderInspectionsList()}
             {activeSection === 'attendance' && renderAttendanceList()}
+            {activeSection === 'safety_scores' && renderSafetyScoresList()}
           </div>
         )}
       </DialogContent>

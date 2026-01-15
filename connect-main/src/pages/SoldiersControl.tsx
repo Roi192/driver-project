@@ -27,7 +27,8 @@ import {
   Search,
   Eye,
   Car,
-  CheckCircle
+  CheckCircle,
+  Gauge
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -47,6 +48,9 @@ interface Soldier {
   defensive_driving_passed: boolean | null;
   qualified_date: string | null;
   correct_driving_in_service_date: string | null;
+  current_safety_score: number | null;
+  consecutive_low_months: number | null;
+  safety_status: string | null;
 }
 
 // פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
@@ -254,6 +258,26 @@ export default function SoldiersControl() {
     setDialogOpen(true);
   };
 
+  // Safety score status helper
+  const getSafetyScoreStatus = (soldier: Soldier) => {
+    if (soldier.current_safety_score === null || soldier.current_safety_score === undefined) {
+      return { status: "unknown", label: "לא הוזן", color: "bg-slate-400", icon: "❓" };
+    }
+    if (soldier.safety_status === 'suspended') {
+      return { status: "suspended", label: "מושעה", color: "bg-red-600", icon: "🚫" };
+    }
+    if (soldier.current_safety_score < 75) {
+      if ((soldier.consecutive_low_months || 0) >= 3) {
+        return { status: "critical", label: `${soldier.current_safety_score} (מושעה)`, color: "bg-red-600", icon: "🚫" };
+      }
+      if ((soldier.consecutive_low_months || 0) >= 2) {
+        return { status: "warning", label: `${soldier.current_safety_score} (בירור+מבחן)`, color: "bg-amber-500", icon: "⚠️" };
+      }
+      return { status: "low", label: `${soldier.current_safety_score} (בירור)`, color: "bg-amber-500", icon: "⚠️" };
+    }
+    return { status: "ok", label: `${soldier.current_safety_score}`, color: "bg-emerald-500", icon: "✓" };
+  };
+
   const exportToExcel = () => {
     const data = soldiers.map(soldier => ({
       "מספר אישי": soldier.personal_number,
@@ -268,6 +292,9 @@ export default function SoldiersControl() {
       "נהיגה מונעת": soldier.defensive_driving_passed ? "עבר" : "לא עבר",
       "נהיגה נכונה בשירות": soldier.correct_driving_in_service_date ? format(parseISO(soldier.correct_driving_in_service_date), "dd/MM/yyyy") : "-",
       "סטטוס נהיגה נכונה": getCorrectDrivingStatus(soldier).label,
+      "ציון בטיחות": soldier.current_safety_score ?? "-",
+      "חודשים ברציפות מתחת ל-75": soldier.consecutive_low_months ?? 0,
+      "סטטוס בטיחות": getSafetyScoreStatus(soldier).label,
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -530,6 +557,11 @@ export default function SoldiersControl() {
                                 {/* Fitness Badge */}
                                 <Badge className={`${getFitnessStatus(soldier).color} text-white text-xs`}>
                                   {getFitnessStatus(soldier).icon} {getFitnessStatus(soldier).label}
+                                </Badge>
+                                {/* Safety Score Badge */}
+                                <Badge className={`${getSafetyScoreStatus(soldier).color} text-white text-xs flex items-center gap-1`}>
+                                  <Gauge className="w-3 h-3" />
+                                  {getSafetyScoreStatus(soldier).label}
                                 </Badge>
                               </div>
                               
