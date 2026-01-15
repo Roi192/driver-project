@@ -450,7 +450,7 @@ export function MobileNav() {
               </NavLink>
 
               <NavLink
-                to="/driver-interviews"
+                to="/admin-driver-interviews"
                 onClick={() => setIsOpen(false)}
                 className={cn(
                   "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
@@ -462,7 +462,7 @@ export function MobileNav() {
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
                   <ClipboardCheck className="w-6 h-6" />
                 </div>
-                <span className="font-bold text-base relative z-10 flex-1">ראיונות נהגי קו</span>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב ראיונות נהגי קו</span>
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
             </>

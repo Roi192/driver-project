@@ -78,6 +78,14 @@ const actions = [
     bgGlow: "bg-sky-400/20"
   },
   {
+    to: "/admin-driver-interviews",
+    icon: ClipboardCheck,
+    label: "ראיונות נהגי קו",
+    description: "מעקב ראיונות גדודים",
+    gradient: "from-violet-500 to-purple-600",
+    bgGlow: "bg-violet-400/20"
+  },
+  {
     to: "/cleaning-parades-management",
     icon: Sparkles,
     label: "מסדרי ניקיון",

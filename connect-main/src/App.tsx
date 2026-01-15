@@ -33,6 +33,7 @@ import FitnessReport from "./pages/FitnessReport";
 import TripForm from "./pages/TripForm";
 import SafetyScoresManagement from "./pages/SafetyScoresManagement";
 import DriverInterviews from "./pages/DriverInterviews";
+import AdminDriverInterviews from "./pages/AdminDriverInterviews";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -254,6 +255,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DriverInterviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-driver-interviews"
+              element={
+                <ProtectedRoute>
+                  <AdminDriverInterviews />
                 </ProtectedRoute>
               }
             />
