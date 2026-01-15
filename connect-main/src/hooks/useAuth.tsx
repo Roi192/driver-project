@@ -13,6 +13,7 @@ interface SignUpData {
   region?: string;
   militaryRole?: string;
   platoon?: string;
+  personalNumber?: string;
 }
 
 interface AuthContextType {
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           region: data.region || null,
           military_role: data.militaryRole || null,
           platoon: data.platoon || null,
+          personal_number: data.personalNumber || null,
         },
       },
     });

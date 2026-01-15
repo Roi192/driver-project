@@ -652,6 +652,7 @@ export type Database = {
           id: string
           military_role: string | null
           outpost: string | null
+          personal_number: string | null
           platoon: string | null
           region: string | null
           updated_at: string
@@ -664,6 +665,7 @@ export type Database = {
           id?: string
           military_role?: string | null
           outpost?: string | null
+          personal_number?: string | null
           platoon?: string | null
           region?: string | null
           updated_at?: string
@@ -676,6 +678,7 @@ export type Database = {
           id?: string
           military_role?: string | null
           outpost?: string | null
+          personal_number?: string | null
           platoon?: string | null
           region?: string | null
           updated_at?: string

@@ -41,6 +41,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [outpost, setOutpost] = useState('');
+  const [personalNumber, setPersonalNumber] = useState('');
   
   // New fields for battalion users
   const [userType, setUserType] = useState<'driver' | 'battalion' | null>(null);
@@ -136,6 +137,7 @@ export default function Auth() {
       region: userType === 'battalion' ? region : undefined,
       militaryRole: userType === 'battalion' ? militaryRole : undefined,
       platoon: userType === 'battalion' ? platoon : undefined,
+      personalNumber: personalNumber || undefined,
     });
     setIsLoading(false);
 
@@ -166,6 +168,7 @@ export default function Auth() {
     setEmail('');
     setPassword('');
     setOutpost('');
+    setPersonalNumber('');
     setRegion('');
     setMilitaryRole('');
     setPlatoon('');
@@ -348,6 +351,19 @@ export default function Auth() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-personal-number" className="text-slate-800 font-semibold">מספר אישי</Label>
+                    <Input
+                      id="signup-personal-number"
+                      type="text"
+                      placeholder="1234567"
+                      value={personalNumber}
+                      onChange={(e) => setPersonalNumber(e.target.value)}
+                      dir="ltr"
+                      className="text-right bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl"
                     />
                   </div>
 

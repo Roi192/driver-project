@@ -37,6 +37,8 @@ import {
   MapPin,
   Trash2,
   AlertTriangle,
+  Hash,
+  UserPlus,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -59,12 +61,18 @@ interface UserProfile {
   region: string | null;
   military_role: string | null;
   platoon: string | null;
+  personal_number: string | null;
   created_at: string;
 }
 
 interface UserRole {
   user_id: string;
   role: "driver" | "admin";
+}
+
+interface Soldier {
+  id: string;
+  personal_number: string;
 }
 
 const UsersManagement = () => {
@@ -87,6 +95,7 @@ const UsersManagement = () => {
     region: "",
     military_role: "",
     platoon: "",
+    personal_number: "",
     role: "driver" as "driver" | "admin",
   });
   const [saving, setSaving] = useState(false);
@@ -94,6 +103,11 @@ const UsersManagement = () => {
   // Delete dialog
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Add to soldiers dialog
+  const [addingToSoldiers, setAddingToSoldiers] = useState<UserProfile | null>(null);
+  const [addingSoldier, setAddingSoldier] = useState(false);
+  const [existingSoldiers, setExistingSoldiers] = useState<Soldier[]>([]);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -109,9 +123,10 @@ const UsersManagement = () => {
     try {
       setLoading(true);
       
-      const [profilesRes, rolesRes] = await Promise.all([
+      const [profilesRes, rolesRes, soldiersRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
+        supabase.from("soldiers").select("id, personal_number"),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
@@ -119,6 +134,7 @@ const UsersManagement = () => {
 
       setProfiles(profilesRes.data || []);
       setUserRoles(rolesRes.data || []);
+      setExistingSoldiers(soldiersRes.data || []);
 
       // Fetch emails via edge function
       try {
@@ -151,6 +167,7 @@ const UsersManagement = () => {
       region: profile.region || "",
       military_role: profile.military_role || "",
       platoon: profile.platoon || "",
+      personal_number: profile.personal_number || "",
       role: getUserRole(profile.user_id),
     });
   };
@@ -174,6 +191,7 @@ const UsersManagement = () => {
             region: editFormData.region || null,
             military_role: editFormData.military_role || null,
             platoon: editFormData.platoon || null,
+            personal_number: editFormData.personal_number || null,
           },
         },
       });
@@ -221,10 +239,53 @@ const UsersManagement = () => {
     }
   };
 
+  const isUserInSoldiersTable = (profile: UserProfile): boolean => {
+    if (!profile.personal_number) return false;
+    return existingSoldiers.some(s => s.personal_number === profile.personal_number);
+  };
+
+  const handleAddToSoldiers = async () => {
+    if (!addingToSoldiers) return;
+    
+    if (!addingToSoldiers.personal_number) {
+      toast.error("לא ניתן להוסיף משתמש ללא מספר אישי");
+      return;
+    }
+
+    try {
+      setAddingSoldier(true);
+      
+      const { error } = await supabase.from("soldiers").insert({
+        personal_number: addingToSoldiers.personal_number,
+        full_name: addingToSoldiers.full_name,
+        outpost: addingToSoldiers.outpost,
+        is_active: true,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("החייל כבר קיים בטבלת השליטה");
+        } else {
+          throw error;
+        }
+      } else {
+        toast.success("החייל נוסף בהצלחה לטבלת השליטה");
+        setAddingToSoldiers(null);
+        fetchUsers();
+      }
+    } catch (error: any) {
+      console.error("Error adding soldier:", error);
+      toast.error("שגיאה בהוספת החייל לטבלת השליטה");
+    } finally {
+      setAddingSoldier(false);
+    }
+  };
+
   const filteredProfiles = profiles.filter(p =>
     p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (p.outpost?.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (p.platoon?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (p.personal_number?.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (userEmails[p.user_id]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -280,7 +341,7 @@ const UsersManagement = () => {
         <div className="relative mb-4">
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
-            placeholder="חיפוש לפי שם, מוצב, מחלקה או מייל..."
+            placeholder="חיפוש לפי שם, מוצב, מחלקה, מספר אישי או מייל..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pr-10 h-12 rounded-xl bg-muted/50 border-0"
@@ -293,6 +354,7 @@ const UsersManagement = () => {
             const role = getUserRole(profile.user_id);
             const isAdminUser = role === "admin";
             const email = userEmails[profile.user_id];
+            const inSoldiersTable = isUserInSoldiersTable(profile);
             
             return (
               <div
@@ -320,12 +382,23 @@ const UsersManagement = () => {
                           {email}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 mt-1">
+                      {profile.personal_number && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Hash className="w-3 h-3" />
+                          מ"א: {profile.personal_number}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant={isAdminUser ? "default" : "secondary"} className={
                           isAdminUser ? "bg-amber-500/90" : ""
                         }>
                           {isAdminUser ? "מנהל" : "נהג"}
                         </Badge>
+                        {inSoldiersTable && (
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 text-xs">
+                            בטבלת שליטה
+                          </Badge>
+                        )}
                         {profile.outpost && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
@@ -336,6 +409,17 @@ const UsersManagement = () => {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    {!inSoldiersTable && profile.personal_number && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setAddingToSoldiers(profile)}
+                        className="w-10 h-10 rounded-xl text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                        title="הוסף לטבלת שליטה"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -418,6 +502,20 @@ const UsersManagement = () => {
                   onChange={(e) => setEditFormData(prev => ({ ...prev, full_name: e.target.value }))}
                   placeholder="שם מלא"
                   className="h-12 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-foreground">
+                  <Hash className="w-4 h-4 text-blue-500" />
+                  מספר אישי
+                </Label>
+                <Input
+                  value={editFormData.personal_number}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, personal_number: e.target.value }))}
+                  placeholder="מספר אישי"
+                  dir="ltr"
+                  className="h-12 rounded-xl text-right"
                 />
               </div>
 
@@ -550,6 +648,44 @@ const UsersManagement = () => {
                   </>
                 ) : (
                   "מחק משתמש"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Add to Soldiers Confirmation Dialog */}
+        <AlertDialog open={!!addingToSoldiers} onOpenChange={() => setAddingToSoldiers(null)}>
+          <AlertDialogContent className="bg-card" dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+                <UserPlus className="w-5 h-5 text-green-600" />
+                הוספה לטבלת שליטה
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                האם להוסיף את{" "}
+                <span className="font-bold text-foreground">{addingToSoldiers?.full_name}</span>{" "}
+                (מ"א: {addingToSoldiers?.personal_number}) לטבלת השליטה?
+                <br />
+                תוכל לערוך את פרטי הרישיונות והנתונים הנוספים בעמוד טבלת שליטה.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 flex-row-reverse">
+              <AlertDialogCancel className="flex-1 h-12 rounded-xl">
+                ביטול
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleAddToSoldiers}
+                disabled={addingSoldier}
+                className="flex-1 h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white"
+              >
+                {addingSoldier ? (
+                  <>
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    מוסיף...
+                  </>
+                ) : (
+                  "הוסף לטבלת שליטה"
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>
