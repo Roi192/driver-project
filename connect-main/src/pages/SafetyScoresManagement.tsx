@@ -508,9 +508,9 @@ export default function SafetyScoresManagement() {
                   <span className="font-bold text-slate-700">מצב סינון</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`text-sm ${!isRangeMode ? 'font-bold text-primary' : 'text-slate-400'}`}>חודש בודד</span>
+                  <span className={`text-sm ${!isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>חודש בודד</span>
                   <Switch checked={isRangeMode} onCheckedChange={setIsRangeMode} />
-                  <span className={`text-sm ${isRangeMode ? 'font-bold text-primary' : 'text-slate-400'}`}>טווח תאריכים</span>
+                  <span className={`text-sm ${isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>טווח תאריכים</span>
                 </div>
               </div>
 
