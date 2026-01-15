@@ -47,13 +47,47 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     })
 
-    const { targetUserId, displayName, newRole } = await req.json()
+    const { targetUserId, displayName, newRole, profileUpdates } = await req.json()
 
     if (!targetUserId) {
       throw new Error('Target user ID is required')
     }
 
     const updates: any = {}
+
+    // Update profile fields (public.profiles) if provided
+    if (profileUpdates !== undefined || displayName !== undefined) {
+      const profilePayload: Record<string, any> = {
+        ...(profileUpdates ?? {}),
+      }
+
+      // Backward compatible: displayName maps to profiles.full_name
+      if (displayName !== undefined) {
+        profilePayload.full_name = displayName
+      }
+
+      // Avoid sending an empty update
+      if (Object.keys(profilePayload).length > 0) {
+        const { data: updatedProfile, error: profileUpdateError } = await supabaseAdmin
+          .from('profiles')
+          .update(profilePayload)
+          .eq('user_id', targetUserId)
+          .select('id')
+          .maybeSingle()
+
+        if (profileUpdateError) {
+          console.error('Error updating profile:', profileUpdateError)
+          throw new Error('Failed to update profile')
+        }
+
+        // If the profile row doesn't exist, treat it as an error (shouldn't happen)
+        if (!updatedProfile) {
+          throw new Error('Profile not found for target user')
+        }
+
+        updates.profileUpdated = true
+      }
+    }
 
     // Update display name in auth.users if provided
     if (displayName !== undefined) {
@@ -106,10 +140,10 @@ Deno.serve(async (req) => {
     const { data: userData } = await supabaseAdmin.auth.admin.getUserById(targetUserId)
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         updates,
-        email: userData?.user?.email || null
+        email: userData?.user?.email || null,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

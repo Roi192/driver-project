@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       .single()
 
     if (!roleData || roleData.role !== 'admin') {
-      throw new Error('Only admins can update users')
+      throw new Error('Only admins can delete users')
     }
 
     // Create admin client with service role key
@@ -47,70 +47,27 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     })
 
-    const { targetUserId, displayName, newRole } = await req.json()
+    const { targetUserId } = await req.json()
 
     if (!targetUserId) {
       throw new Error('Target user ID is required')
     }
 
-    const updates: any = {}
-
-    // Update display name in auth.users if provided
-    if (displayName !== undefined) {
-      const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(
-        targetUserId,
-        { user_metadata: { full_name: displayName } }
-      )
-      if (updateAuthError) {
-        console.error('Error updating auth user:', updateAuthError)
-        throw new Error('Failed to update auth user')
-      }
-      updates.displayNameUpdated = true
+    // Prevent admin from deleting themselves
+    if (targetUserId === callerUser.id) {
+      throw new Error('Cannot delete your own account')
     }
 
-    // Update role if provided
-    if (newRole !== undefined) {
-      // First check if role entry exists
-      const { data: existingRole } = await supabaseAdmin
-        .from('user_roles')
-        .select('id')
-        .eq('user_id', targetUserId)
-        .single()
+    // Delete the user from auth.users (this will cascade to profiles and user_roles due to ON DELETE CASCADE)
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
 
-      if (existingRole) {
-        // Update existing role
-        const { error: roleError } = await supabaseAdmin
-          .from('user_roles')
-          .update({ role: newRole })
-          .eq('user_id', targetUserId)
-
-        if (roleError) {
-          console.error('Error updating role:', roleError)
-          throw new Error('Failed to update role')
-        }
-      } else {
-        // Insert new role
-        const { error: roleError } = await supabaseAdmin
-          .from('user_roles')
-          .insert({ user_id: targetUserId, role: newRole })
-
-        if (roleError) {
-          console.error('Error inserting role:', roleError)
-          throw new Error('Failed to insert role')
-        }
-      }
-      updates.roleUpdated = true
+    if (deleteError) {
+      console.error('Error deleting user:', deleteError)
+      throw new Error('Failed to delete user')
     }
-
-    // Get user email to return
-    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(targetUserId)
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        updates,
-        email: userData?.user?.email || null
-      }),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
