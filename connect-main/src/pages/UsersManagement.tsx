@@ -35,7 +35,19 @@ import {
   Building2,
   UserCog,
   MapPin,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/shared/PageHeader";
 
 interface UserProfile {
@@ -78,6 +90,10 @@ const UsersManagement = () => {
     role: "driver" as "driver" | "admin",
   });
   const [saving, setSaving] = useState(false);
+  
+  // Delete dialog
+  const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && !isAdmin) {
@@ -141,37 +157,29 @@ const UsersManagement = () => {
 
   const handleSave = async () => {
     if (!editingUser) return;
-    
+
     try {
       setSaving(true);
-      
-      // Update profiles table
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: editFormData.full_name,
-          outpost: editFormData.outpost || null,
-          user_type: editFormData.user_type || null,
-          region: editFormData.region || null,
-          military_role: editFormData.military_role || null,
-          platoon: editFormData.platoon || null,
-        })
-        .eq("id", editingUser.id);
 
-      if (profileError) throw profileError;
-
-      // Update role and auth display name via edge function
-      const { data: updateData, error: updateError } = await supabase.functions.invoke('update-user-admin', {
+      // Admin updates must go through backend function (bypasses RLS)
+      const { error: updateError } = await supabase.functions.invoke("update-user-admin", {
         body: {
           targetUserId: editingUser.user_id,
           displayName: editFormData.full_name,
           newRole: editFormData.role,
-        }
+          profileUpdates: {
+            full_name: editFormData.full_name,
+            outpost: editFormData.outpost || null,
+            user_type: editFormData.user_type || null,
+            region: editFormData.region || null,
+            military_role: editFormData.military_role || null,
+            platoon: editFormData.platoon || null,
+          },
+        },
       });
 
       if (updateError) {
-        console.error('Edge function error:', updateError);
-        toast.error("שגיאה בעדכון הרשאות המשתמש");
+        throw updateError;
       }
 
       toast.success("פרטי המשתמש עודכנו בהצלחה");
@@ -182,6 +190,34 @@ const UsersManagement = () => {
       toast.error("שגיאה בעדכון המשתמש");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    
+    try {
+      setDeleting(true);
+      
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { targetUserId: deletingUser.user_id }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("המשתמש נמחק בהצלחה");
+      setDeletingUser(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      const errorMessage = error.message?.includes('Cannot delete your own account') 
+        ? "לא ניתן למחוק את החשבון שלך"
+        : "שגיאה במחיקת המשתמש";
+      toast.error(errorMessage);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -299,14 +335,24 @@ const UsersManagement = () => {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEditClick(profile)}
-                    className="w-10 h-10 rounded-xl"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditClick(profile)}
+                      className="w-10 h-10 rounded-xl"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeletingUser(profile)}
+                      className="w-10 h-10 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 
                 {/* Additional Details */}
@@ -472,6 +518,43 @@ const UsersManagement = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
+          <AlertDialogContent className="bg-card" dir="rtl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                מחיקת משתמש
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                האם אתה בטוח שברצונך למחוק את המשתמש{" "}
+                <span className="font-bold text-foreground">{deletingUser?.full_name}</span>?
+                <br />
+                פעולה זו לא ניתנת לביטול וכל הנתונים של המשתמש יימחקו לצמיתות.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 flex-row-reverse">
+              <AlertDialogCancel className="flex-1 h-12 rounded-xl">
+                ביטול
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteUser}
+                disabled={deleting}
+                className="flex-1 h-12 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    מוחק...
+                  </>
+                ) : (
+                  "מחק משתמש"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
