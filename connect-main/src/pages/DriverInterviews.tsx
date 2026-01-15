@@ -68,7 +68,7 @@ const INTERVIEW_GUIDELINES = [
 ];
 
 export default function DriverInterviews() {
-  const { userType, loading: authLoading, user } = useAuth();
+  const { userType, loading: authLoading, user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
@@ -100,16 +100,17 @@ export default function DriverInterviews() {
   });
 
   useEffect(() => {
-    if (!authLoading && userType !== 'battalion') {
+    // Allow admin and battalion users
+    if (!authLoading && userType !== 'battalion' && !isAdmin) {
       navigate("/");
     }
-  }, [userType, authLoading, navigate]);
+  }, [userType, isAdmin, authLoading, navigate]);
 
   useEffect(() => {
-    if (userType === 'battalion') {
+    if (userType === 'battalion' || isAdmin) {
       fetchData();
     }
-  }, [userType]);
+  }, [userType, isAdmin]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -148,9 +149,12 @@ export default function DriverInterviews() {
     }
   };
 
-  const filteredSoldiers = soldiers.filter(s => 
-    !formData.outpost || s.outpost === formData.outpost
-  );
+  // Show all soldiers from the selected outpost, or all soldiers if no outpost match
+  const filteredSoldiers = formData.outpost 
+    ? soldiers.filter(s => s.outpost === formData.outpost).length > 0
+      ? soldiers.filter(s => s.outpost === formData.outpost)
+      : soldiers // Show all soldiers if no match found for the outpost
+    : soldiers;
 
   const getSignatureData = (): string => {
     if (signatureRef.current) {
