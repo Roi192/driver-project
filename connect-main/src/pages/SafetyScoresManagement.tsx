@@ -142,21 +142,26 @@ export default function SafetyScoresManagement() {
     if (soldiersData) setSoldiers(soldiersData);
 
     // Fetch scores based on mode
-    if (isRangeMode && selectedSoldierId) {
-      // Date range mode with specific soldier
+    if (isRangeMode) {
+      // Date range mode
       const startMonthStr = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
       const endMonthStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
       
-      const { data: scoresData } = await supabase
+      let query = supabase
         .from("monthly_safety_scores")
         .select("*")
-        .eq("soldier_id", selectedSoldierId)
         .gte("score_month", startMonthStr)
         .lte("score_month", endMonthStr)
         .order("score_month", { ascending: true });
       
+      // If specific soldier selected, filter by soldier
+      if (selectedSoldierId && selectedSoldierId !== "all") {
+        query = query.eq("soldier_id", selectedSoldierId);
+      }
+      
+      const { data: scoresData } = await query;
       if (scoresData) setSafetyScores(scoresData);
-    } else if (!isRangeMode) {
+    } else {
       // Single month mode
       const monthStr = getSelectedMonthStr();
       const { data: scoresData } = await supabase
@@ -166,8 +171,6 @@ export default function SafetyScoresManagement() {
         .order("safety_score", { ascending: true });
       
       if (scoresData) setSafetyScores(scoresData);
-    } else {
-      setSafetyScores([]);
     }
     
     setLoading(false);
@@ -490,8 +493,12 @@ export default function SafetyScoresManagement() {
             </div>
             <h1 className="text-2xl font-black text-white mb-2">ניהול ציוני בטיחות חודשיים</h1>
             <p className="text-amber-200 text-sm">
-              {isRangeMode && selectedSoldierId 
-                ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
+              {isRangeMode 
+                ? selectedSoldierId === "all" 
+                  ? `${safetyScores.length} ציונים לכל החיילים`
+                  : selectedSoldierId 
+                    ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
+                    : "בחר חייל לצפייה בציונים"
                 : `${safetyScores.length} ציונים ל${getMonthLabel()}`
               }
             </p>
@@ -553,10 +560,11 @@ export default function SafetyScoresManagement() {
                       בחר חייל
                     </Label>
                     <Select value={selectedSoldierId} onValueChange={setSelectedSoldierId}>
-                      <SelectTrigger className="w-full rounded-xl">
+                      <SelectTrigger className="w-full rounded-xl bg-white text-slate-800">
                         <SelectValue placeholder="בחר חייל לצפייה בציונים" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all">כל החיילים</SelectItem>
                         {soldiers.map(soldier => (
                           <SelectItem key={soldier.id} value={soldier.id}>
                             {soldier.full_name} ({soldier.personal_number})
@@ -571,7 +579,7 @@ export default function SafetyScoresManagement() {
                       <Label className="text-slate-700 font-bold text-sm">מתאריך</Label>
                       <div className="flex gap-2">
                         <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
-                          <SelectTrigger className="flex-1 rounded-xl">
+                          <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -581,7 +589,7 @@ export default function SafetyScoresManagement() {
                           </SelectContent>
                         </Select>
                         <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
-                          <SelectTrigger className="w-20 rounded-xl">
+                          <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -597,7 +605,7 @@ export default function SafetyScoresManagement() {
                       <Label className="text-slate-700 font-bold text-sm">עד תאריך</Label>
                       <div className="flex gap-2">
                         <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
-                          <SelectTrigger className="flex-1 rounded-xl">
+                          <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -607,7 +615,7 @@ export default function SafetyScoresManagement() {
                           </SelectContent>
                         </Select>
                         <Select value={String(endYear)} onValueChange={(v) => setEndYear(Number(v))}>
-                          <SelectTrigger className="w-20 rounded-xl">
+                          <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -625,7 +633,7 @@ export default function SafetyScoresManagement() {
           </Card>
 
           {/* Stats Cards */}
-          {isRangeMode && selectedSoldierId && safetyScores.length > 0 ? (
+          {isRangeMode && safetyScores.length > 0 ? (
             // Range mode stats with average
             <Card className="border-0 bg-gradient-to-br from-primary/10 to-teal/10 shadow-lg rounded-2xl">
               <CardContent className="p-4">
@@ -633,7 +641,10 @@ export default function SafetyScoresManagement() {
                   <div>
                     <p className="text-sm text-slate-600 font-medium">ממוצע ציונים</p>
                     <p className="text-3xl font-black text-primary">{averageScore}</p>
-                    <p className="text-xs text-slate-500">{safetyScores.length} חודשים</p>
+                    <p className="text-xs text-slate-500">
+                      {safetyScores.length} {selectedSoldierId === "all" ? "רשומות" : "חודשים"}
+                      {selectedSoldierId && selectedSoldierId !== "all" ? ` - ${getSoldierName(selectedSoldierId)}` : ""}
+                    </p>
                   </div>
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center ${getScoreColor(averageScore)}`}>
                     <TrendingUp className="w-8 h-8 text-white" />
