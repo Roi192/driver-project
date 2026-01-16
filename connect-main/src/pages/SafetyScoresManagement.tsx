@@ -520,7 +520,7 @@ export default function SafetyScoresManagement() {
                   <div className="flex items-center gap-2">
                     <Label className="text-slate-700 font-bold">שנה:</Label>
                     <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                      <SelectTrigger className="w-24 rounded-xl">
+                      <SelectTrigger className="w-24 rounded-xl bg-white text-slate-800">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -533,7 +533,7 @@ export default function SafetyScoresManagement() {
                   <div className="flex items-center gap-2">
                     <Label className="text-slate-700 font-bold">חודש:</Label>
                     <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                      <SelectTrigger className="w-32 rounded-xl">
+                      <SelectTrigger className="w-32 rounded-xl bg-white text-slate-800">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

@@ -17,8 +17,11 @@ import {
   ChevronLeft,
   MapPin,
   Shield,
-  UserCheck
+  UserCheck,
+  Edit,
+  Trash2
 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
@@ -72,6 +75,8 @@ export default function AdminDriverInterviews() {
   // Dialog state
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [interviewToDelete, setInterviewToDelete] = useState<Interview | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -165,6 +170,33 @@ export default function AdminDriverInterviews() {
   const handleViewInterview = (interview: Interview) => {
     setSelectedInterview(interview);
     setIsViewDialogOpen(true);
+  };
+
+  const handleEditInterview = (interview: Interview) => {
+    // Navigate to driver interviews page with edit mode (for now just redirect)
+    navigate(`/driver-interviews?edit=${interview.id}`);
+  };
+
+  const handleDeleteInterview = async () => {
+    if (!interviewToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('driver_interviews')
+        .delete()
+        .eq('id', interviewToDelete.id);
+      
+      if (error) throw error;
+      
+      toast.success("הראיון נמחק בהצלחה");
+      setInterviews(prev => prev.filter(i => i.id !== interviewToDelete.id));
+    } catch (error) {
+      console.error('Error deleting interview:', error);
+      toast.error("שגיאה במחיקת הראיון");
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setInterviewToDelete(null);
+    }
   };
 
   const totalInterviews = interviews.length;
@@ -420,15 +452,35 @@ export default function AdminDriverInterviews() {
                     {format(new Date(interview.interview_date), "dd/MM/yyyy", { locale: he })}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleViewInterview(interview)}
-                  className="text-primary hover:bg-primary/10"
-                >
-                  <Eye className="w-4 h-4 mr-1" />
-                  צפייה
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewInterview(interview)}
+                    className="text-primary hover:bg-primary/10"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditInterview(interview)}
+                    className="text-amber-600 hover:bg-amber-50"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setInterviewToDelete(interview);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    className="text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -520,41 +572,41 @@ export default function AdminDriverInterviews() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">שם הנהג</p>
-                  <p className="font-bold">{selectedInterview.driver_name}</p>
+                  <p className="font-bold text-slate-800">{selectedInterview.driver_name}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">תאריך ראיון</p>
-                  <p className="font-bold">{format(new Date(selectedInterview.interview_date), "dd/MM/yyyy")}</p>
+                  <p className="font-bold text-slate-800">{format(new Date(selectedInterview.interview_date), "dd/MM/yyyy")}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">גדוד</p>
-                  <p className="font-bold">{selectedInterview.battalion}</p>
+                  <p className="font-bold text-slate-800">{selectedInterview.battalion}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">מוצב</p>
-                  <p className="font-bold">{selectedInterview.outpost}</p>
+                  <p className="font-bold text-slate-800">{selectedInterview.outpost}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">גזרה</p>
-                  <p className="font-bold">{selectedInterview.region}</p>
+                  <p className="font-bold text-slate-800">{selectedInterview.region}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">מראיין</p>
-                  <p className="font-bold">{selectedInterview.interviewer_name}</p>
+                  <p className="font-bold text-slate-800">{selectedInterview.interviewer_name}</p>
                 </div>
               </div>
 
               {selectedInterview.license_type && (
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">סוג רישיון</p>
-                  <p className="font-medium">{selectedInterview.license_type}</p>
+                  <p className="font-medium text-slate-700">{selectedInterview.license_type}</p>
                 </div>
               )}
 
               {selectedInterview.permits && (
                 <div className="p-3 rounded-lg bg-slate-50">
                   <p className="text-xs text-slate-500">היתרים</p>
-                  <p className="font-medium">{selectedInterview.permits}</p>
+                  <p className="font-medium text-slate-700">{selectedInterview.permits}</p>
                 </div>
               )}
 
@@ -562,13 +614,13 @@ export default function AdminDriverInterviews() {
                 {selectedInterview.civilian_license_expiry && (
                   <div className="p-3 rounded-lg bg-slate-50">
                     <p className="text-xs text-slate-500">תוקף רישיון אזרחי</p>
-                    <p className="font-medium">{format(new Date(selectedInterview.civilian_license_expiry), "dd/MM/yyyy")}</p>
+                    <p className="font-medium text-slate-700">{format(new Date(selectedInterview.civilian_license_expiry), "dd/MM/yyyy")}</p>
                   </div>
                 )}
                 {selectedInterview.military_license_expiry && (
                   <div className="p-3 rounded-lg bg-slate-50">
                     <p className="text-xs text-slate-500">תוקף רישיון צבאי</p>
-                    <p className="font-medium">{format(new Date(selectedInterview.military_license_expiry), "dd/MM/yyyy")}</p>
+                    <p className="font-medium text-slate-700">{format(new Date(selectedInterview.military_license_expiry), "dd/MM/yyyy")}</p>
                   </div>
                 )}
               </div>
@@ -591,33 +643,29 @@ export default function AdminDriverInterviews() {
                 </div>
               )}
 
-              {selectedInterview.family_status && (
-                <div className="p-3 rounded-lg bg-slate-50">
-                  <p className="text-xs text-slate-500">מצב משפחתי</p>
-                  <p className="font-medium">{selectedInterview.family_status}</p>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-xs text-blue-600 font-bold mb-2">מצב משפחתי ורקע כללי</p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-blue-500">מצב משפחתי:</p>
+                    <p className="font-medium text-blue-800">{selectedInterview.family_status || "לא צוין"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-500">מצב כלכלי:</p>
+                    <p className="font-medium text-blue-800">{selectedInterview.financial_status || "לא צוין"}</p>
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {selectedInterview.financial_status && (
-                <div className="p-3 rounded-lg bg-slate-50">
-                  <p className="text-xs text-slate-500">מצב כלכלי</p>
-                  <p className="font-medium">{selectedInterview.financial_status}</p>
-                </div>
-              )}
+              <div className="p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-slate-500">הערות נוספות</p>
+                <p className="font-medium text-slate-700">{selectedInterview.additional_notes || "אין הערות"}</p>
+              </div>
 
-              {selectedInterview.additional_notes && (
-                <div className="p-3 rounded-lg bg-slate-50">
-                  <p className="text-xs text-slate-500">הערות נוספות</p>
-                  <p className="font-medium">{selectedInterview.additional_notes}</p>
-                </div>
-              )}
-
-              {selectedInterview.interviewer_summary && (
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <p className="text-xs text-primary">סיכום המראיין</p>
-                  <p className="font-medium">{selectedInterview.interviewer_summary}</p>
-                </div>
-              )}
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-xs text-primary font-bold">סיכום המראיין</p>
+                <p className="font-medium text-slate-700 mt-1">{selectedInterview.interviewer_summary || "לא הוזן סיכום"}</p>
+              </div>
 
               {selectedInterview.signature && (
                 <div className="p-3 rounded-lg bg-slate-50">
@@ -633,6 +681,24 @@ export default function AdminDriverInterviews() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>האם למחוק את הראיון?</AlertDialogTitle>
+            <AlertDialogDescription>
+              פעולה זו תמחק את הראיון של {interviewToDelete?.driver_name} לצמיתות ולא ניתן יהיה לשחזר אותו.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteInterview} className="bg-red-600 hover:bg-red-700">
+              מחק
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

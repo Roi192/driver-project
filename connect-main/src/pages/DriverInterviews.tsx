@@ -39,6 +39,15 @@ interface Soldier {
   defensive_driving_passed: boolean | null;
 }
 
+interface Accident {
+  id: string;
+  soldier_id: string | null;
+  driver_name: string | null;
+  accident_date: string;
+  description: string | null;
+  severity: string | null;
+}
+
 interface Interview {
   id: string;
   interview_date: string;
@@ -72,6 +81,7 @@ export default function DriverInterviews() {
   const navigate = useNavigate();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [accidents, setAccidents] = useState<Accident[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -115,7 +125,7 @@ export default function DriverInterviews() {
   const fetchData = async () => {
     setLoading(true);
     
-    const [soldiersRes, interviewsRes] = await Promise.all([
+    const [soldiersRes, interviewsRes, accidentsRes] = await Promise.all([
       supabase
         .from("soldiers")
         .select("id, personal_number, full_name, outpost, civilian_license_expiry, military_license_expiry, defensive_driving_passed")
@@ -126,11 +136,16 @@ export default function DriverInterviews() {
         .select("id, interview_date, region, battalion, outpost, driver_name, interviewer_name, created_at")
         .eq("user_id", user?.id)
         .order("interview_date", { ascending: false })
-        .limit(20)
+        .limit(20),
+      supabase
+        .from("accidents")
+        .select("id, soldier_id, driver_name, accident_date, description, severity")
+        .order("accident_date", { ascending: false })
     ]);
 
     if (soldiersRes.data) setSoldiers(soldiersRes.data);
     if (interviewsRes.data) setInterviews(interviewsRes.data as Interview[]);
+    if (accidentsRes.data) setAccidents(accidentsRes.data);
     
     setLoading(false);
   };
@@ -138,6 +153,18 @@ export default function DriverInterviews() {
   const handleSoldierSelect = (soldierId: string) => {
     const soldier = soldiers.find(s => s.id === soldierId);
     if (soldier) {
+      // Get accidents for this soldier from the accidents tracking table
+      const soldierAccidents = accidents.filter(a => 
+        a.soldier_id === soldierId || 
+        (a.driver_name && a.driver_name.toLowerCase() === soldier.full_name.toLowerCase())
+      );
+      
+      const accidentsText = soldierAccidents.length > 0
+        ? soldierAccidents.map(a => 
+            `${format(new Date(a.accident_date), "dd/MM/yyyy")} - ${a.description || 'ללא תיאור'} (${a.severity || 'לא צוין'})`
+          ).join('\n')
+        : "";
+
       setFormData({
         ...formData,
         soldier_id: soldierId,
@@ -145,6 +172,7 @@ export default function DriverInterviews() {
         civilian_license_expiry: soldier.civilian_license_expiry || "",
         military_license_expiry: soldier.military_license_expiry || "",
         defensive_driving_passed: soldier.defensive_driving_passed || false,
+        military_accidents: accidentsText,
       });
     }
   };
