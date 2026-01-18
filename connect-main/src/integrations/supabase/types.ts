@@ -678,6 +678,69 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_excellence: {
+        Row: {
+          accidents_count: number | null
+          avg_inspection_score: number | null
+          calculated_score: number
+          cleaning_parades_on_time: boolean | null
+          created_at: string
+          excellence_month: string
+          id: string
+          kilometers: number
+          punishments_count: number | null
+          safety_score: number
+          selected_by: string | null
+          soldier_id: string
+          speed_violations: number | null
+        }
+        Insert: {
+          accidents_count?: number | null
+          avg_inspection_score?: number | null
+          calculated_score: number
+          cleaning_parades_on_time?: boolean | null
+          created_at?: string
+          excellence_month: string
+          id?: string
+          kilometers: number
+          punishments_count?: number | null
+          safety_score: number
+          selected_by?: string | null
+          soldier_id: string
+          speed_violations?: number | null
+        }
+        Update: {
+          accidents_count?: number | null
+          avg_inspection_score?: number | null
+          calculated_score?: number
+          cleaning_parades_on_time?: boolean | null
+          created_at?: string
+          excellence_month?: string
+          id?: string
+          kilometers?: number
+          punishments_count?: number | null
+          safety_score?: number
+          selected_by?: string | null
+          soldier_id?: string
+          speed_violations?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_excellence_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_excellence_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_safety_scores: {
         Row: {
           created_at: string
@@ -1019,6 +1082,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      safety_followups: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          followup_month: string
+          followup_type: string
+          id: string
+          notes: string | null
+          soldier_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          followup_month: string
+          followup_type: string
+          id?: string
+          notes?: string | null
+          soldier_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          followup_month?: string
+          followup_type?: string
+          id?: string
+          notes?: string | null
+          soldier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_followups_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_followups_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sector_boundaries: {
         Row: {

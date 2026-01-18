@@ -28,7 +28,8 @@ import {
   Eye,
   Car,
   CheckCircle,
-  Gauge
+  Gauge,
+  Crown
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -53,6 +54,11 @@ interface Soldier {
   safety_status: string | null;
   license_type: string | null;
   permits: string[] | null;
+}
+
+interface MonthlyExcellence {
+  soldier_id: string;
+  excellence_month: string;
 }
 
 // Available permits
@@ -108,6 +114,7 @@ export default function SoldiersControl() {
   const [soldierToDelete, setSoldierToDelete] = useState<Soldier | null>(null);
   const [profileSoldier, setProfileSoldier] = useState<Soldier | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [excellenceData, setExcellenceData] = useState<MonthlyExcellence[]>([]);
   
   // Filters
   const [militaryLicenseFilter, setMilitaryLicenseFilter] = useState<string>("all");
@@ -137,7 +144,23 @@ export default function SoldiersControl() {
 
   useEffect(() => {
     fetchSoldiers();
+    fetchExcellenceData();
   }, []);
+
+  const fetchExcellenceData = async () => {
+    const { data, error } = await supabase
+      .from("monthly_excellence")
+      .select("soldier_id, excellence_month")
+      .order("excellence_month", { ascending: false });
+
+    if (!error && data) {
+      setExcellenceData(data);
+    }
+  };
+
+  const getSoldierExcellence = (soldierId: string) => {
+    return excellenceData.filter(e => e.soldier_id === soldierId);
+  };
 
   const fetchSoldiers = async () => {
     setLoading(true);
@@ -597,6 +620,7 @@ export default function SoldiersControl() {
                       const militaryStatus = getLicenseStatus(soldier.military_license_expiry);
                       const civilianStatus = getLicenseStatus(soldier.civilian_license_expiry);
                       const hasAlert = militaryStatus.status !== "valid" || civilianStatus.status !== "valid";
+                      const soldierExcellence = getSoldierExcellence(soldier.id);
                       
                       return (
                         <div
@@ -609,6 +633,20 @@ export default function SoldiersControl() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                                {/* Excellence Crown Badge */}
+                                {soldierExcellence.length > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    {soldierExcellence.map((excellence) => (
+                                      <Badge 
+                                        key={excellence.excellence_month}
+                                        className="bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 text-xs font-bold flex items-center gap-1 shadow-md"
+                                      >
+                                        <Crown className="w-3 h-3" />
+                                        {format(parseISO(excellence.excellence_month + "-01"), "MM/yyyy")}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
                                 <Badge variant="secondary" className="text-xs font-bold">{soldier.personal_number}</Badge>
                                 {/* Fitness Badge */}
                                 <Badge className={`${getFitnessStatus(soldier).color} text-white text-xs`}>
