@@ -51,7 +51,13 @@ interface Soldier {
   current_safety_score: number | null;
   consecutive_low_months: number | null;
   safety_status: string | null;
+  license_type: string | null;
+  permits: string[] | null;
 }
+
+// Available permits
+const PERMITS_LIST = ["דויד", "סוואנה", "טיגריס", "פנתר"];
+const LICENSE_TYPES = ["B", "C1", "C"];
 
 // פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
 const getFitnessStatus = (soldier: Soldier) => {
@@ -107,6 +113,8 @@ export default function SoldiersControl() {
   const [militaryLicenseFilter, setMilitaryLicenseFilter] = useState<string>("all");
   const [civilianLicenseFilter, setCivilianLicenseFilter] = useState<string>("all");
   const [defensiveDrivingFilter, setDefensiveDrivingFilter] = useState<string>("all");
+  const [licenseTypeFilter, setLicenseTypeFilter] = useState<string>("all");
+  const [permitFilter, setPermitFilter] = useState<string>("all");
 
   const [formData, setFormData] = useState({
     personal_number: "",
@@ -117,6 +125,8 @@ export default function SoldiersControl() {
     defensive_driving_passed: false,
     qualified_date: format(new Date(), "yyyy-MM-dd"),
     correct_driving_in_service_date: "",
+    license_type: "",
+    permits: [] as string[],
   });
 
   useEffect(() => {
@@ -176,6 +186,8 @@ export default function SoldiersControl() {
       defensive_driving_passed: formData.defensive_driving_passed,
       qualified_date: formData.qualified_date || null,
       correct_driving_in_service_date: formData.correct_driving_in_service_date || null,
+      license_type: formData.license_type || null,
+      permits: formData.permits.length > 0 ? formData.permits : null,
     };
 
     if (editingSoldier) {
@@ -239,6 +251,8 @@ export default function SoldiersControl() {
       defensive_driving_passed: false,
       qualified_date: format(new Date(), "yyyy-MM-dd"),
       correct_driving_in_service_date: "",
+      license_type: "",
+      permits: [],
     });
     setEditingSoldier(null);
   };
@@ -254,6 +268,8 @@ export default function SoldiersControl() {
       defensive_driving_passed: soldier.defensive_driving_passed || false,
       qualified_date: soldier.qualified_date || format(new Date(), "yyyy-MM-dd"),
       correct_driving_in_service_date: soldier.correct_driving_in_service_date || "",
+      license_type: soldier.license_type || "",
+      permits: soldier.permits || [],
     });
     setDialogOpen(true);
   };
@@ -283,6 +299,8 @@ export default function SoldiersControl() {
       "מספר אישי": soldier.personal_number,
       "שם מלא": soldier.full_name,
       "מוצב": soldier.outpost || "-",
+      "סוג רשיון": soldier.license_type || "-",
+      "היתרים": soldier.permits?.join(", ") || "-",
       "תאריך נהג מוכשר": soldier.qualified_date ? format(parseISO(soldier.qualified_date), "dd/MM/yyyy") : "-",
       "רשיון צבאי": soldier.military_license_expiry ? format(parseISO(soldier.military_license_expiry), "dd/MM/yyyy") : "-",
       "סטטוס רשיון צבאי": getLicenseStatus(soldier.military_license_expiry).label,
@@ -332,6 +350,16 @@ export default function SoldiersControl() {
     if (defensiveDrivingFilter !== "all") {
       if (defensiveDrivingFilter === "passed" && !soldier.defensive_driving_passed) return false;
       if (defensiveDrivingFilter === "not_passed" && soldier.defensive_driving_passed) return false;
+    }
+    
+    // License type filter
+    if (licenseTypeFilter !== "all") {
+      if (soldier.license_type !== licenseTypeFilter) return false;
+    }
+    
+    // Permit filter
+    if (permitFilter !== "all") {
+      if (!soldier.permits || !soldier.permits.includes(permitFilter)) return false;
     }
     
     return true;
@@ -519,6 +547,34 @@ export default function SoldiersControl() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">סוג רשיון</Label>
+                  <Select value={licenseTypeFilter} onValueChange={setLicenseTypeFilter}>
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      {LICENSE_TYPES.map(type => (
+                        <SelectItem key={type} value={type} className="text-slate-700">{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">היתרים</Label>
+                  <Select value={permitFilter} onValueChange={setPermitFilter}>
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      {PERMITS_LIST.map(permit => (
+                        <SelectItem key={permit} value={permit} className="text-slate-700">{permit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -626,6 +682,24 @@ export default function SoldiersControl() {
                                     ? format(parseISO(soldier.correct_driving_in_service_date), "dd/MM/yy")
                                     : "לא הוזן"}
                                 </Badge>
+                              </div>
+                              
+                              {/* License Type & Permits */}
+                              <div className="flex flex-wrap items-center gap-2 mt-2">
+                                {soldier.license_type && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">סוג רשיון:</span>
+                                    <Badge className="bg-indigo-500 text-white text-xs">{soldier.license_type}</Badge>
+                                  </div>
+                                )}
+                                {soldier.permits && soldier.permits.length > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">היתרים:</span>
+                                    {soldier.permits.map(permit => (
+                                      <Badge key={permit} className="bg-teal-500 text-white text-xs">{permit}</Badge>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             
@@ -754,6 +828,49 @@ export default function SoldiersControl() {
                   onChange={(e) => setFormData({ ...formData, correct_driving_in_service_date: e.target.value })}
                   className="bg-white"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>סוג רשיון</Label>
+                  <Select 
+                    value={formData.license_type} 
+                    onValueChange={(value) => setFormData({ ...formData, license_type: value })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="בחר סוג רשיון" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LICENSE_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>היתרים</Label>
+                  <div className="space-y-2 mt-1">
+                    {PERMITS_LIST.map(permit => (
+                      <div key={permit} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`permit-${permit}`}
+                          checked={formData.permits.includes(permit)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({ ...formData, permits: [...formData.permits, permit] });
+                            } else {
+                              setFormData({ ...formData, permits: formData.permits.filter(p => p !== permit) });
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor={`permit-${permit}`} className="text-sm cursor-pointer">{permit}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 

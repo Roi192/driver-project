@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { FileText, Download, Search, Filter, AlertTriangle, CheckCircle, Clock, XCircle } from "lucide-react";
-import { format, parseISO, differenceInDays, differenceInMonths } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { FileText, Download, Search, AlertTriangle, CheckCircle, Clock, XCircle } from "lucide-react";
+import { format, parseISO, differenceInDays, addDays, addYears } from "date-fns";
 import { he } from "date-fns/locale";
-import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
 
 interface Soldier {
@@ -23,6 +23,7 @@ interface Soldier {
   civilian_license_expiry: string | null;
   defensive_driving_passed: boolean | null;
   correct_driving_in_service_date: string | null;
+  qualified_date: string | null;
   is_active: boolean | null;
 }
 
@@ -31,22 +32,32 @@ type FitnessStatus = "fit" | "warning" | "unfit";
 interface SoldierFitness extends Soldier {
   militaryLicenseStatus: FitnessStatus;
   civilianLicenseStatus: FitnessStatus;
-  defensiveDrivingStatus: FitnessStatus;
   correctDrivingStatus: FitnessStatus;
   overallStatus: FitnessStatus;
+  needsCorrectDriving: boolean;
 }
 
 export default function FitnessReport() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [soldiers, setSoldiers] = useState<SoldierFitness[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterOutpost, setFilterOutpost] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterDefensiveDriving, setFilterDefensiveDriving] = useState<string>("all");
+  const [filterNeedsCorrectDriving, setFilterNeedsCorrectDriving] = useState<string>("all");
 
   useEffect(() => {
-    fetchSoldiers();
-  }, []);
+    if (!authLoading && !isAdmin) {
+      navigate("/");
+    }
+  }, [isAdmin, authLoading, navigate]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchSoldiers();
+    }
+  }, [isAdmin]);
 
   const getDateStatus = (dateStr: string | null, daysWarning: number = 30): FitnessStatus => {
     if (!dateStr) return "unfit";
@@ -58,14 +69,31 @@ export default function FitnessReport() {
     return "fit";
   };
 
-  const getCorrectDrivingStatus = (dateStr: string | null): FitnessStatus => {
-    if (!dateStr) return "unfit";
-    const date = parseISO(dateStr);
+  // Updated logic: correct driving is required 1 year from qualified_date OR from last correct_driving_in_service_date
+  const getCorrectDrivingStatus = (soldier: Soldier): { status: FitnessStatus; needsDriving: boolean } => {
     const today = new Date();
-    const monthsDiff = differenceInMonths(today, date);
-    if (monthsDiff > 12) return "unfit";
-    if (monthsDiff >= 10) return "warning";
-    return "fit";
+    
+    // Get the reference date: either correct_driving_in_service_date or qualified_date
+    const correctDrivingDate = soldier.correct_driving_in_service_date ? parseISO(soldier.correct_driving_in_service_date) : null;
+    const qualifiedDate = soldier.qualified_date ? parseISO(soldier.qualified_date) : null;
+    
+    // Use the most recent between correctDriving and qualified date
+    let referenceDate = correctDrivingDate || qualifiedDate;
+    
+    if (!referenceDate) {
+      return { status: "unfit", needsDriving: true };
+    }
+    
+    // The deadline is 1 year from the reference date
+    const deadline = addYears(referenceDate, 1);
+    const daysUntilDeadline = differenceInDays(deadline, today);
+    
+    if (daysUntilDeadline < 0) {
+      return { status: "unfit", needsDriving: true };
+    } else if (daysUntilDeadline <= 60) {
+      return { status: "warning", needsDriving: true };
+    }
+    return { status: "fit", needsDriving: false };
   };
 
   const fetchSoldiers = async () => {
@@ -82,12 +110,12 @@ export default function FitnessReport() {
       const soldiersWithFitness: SoldierFitness[] = (data || []).map(soldier => {
         const militaryLicenseStatus = getDateStatus(soldier.military_license_expiry);
         const civilianLicenseStatus = getDateStatus(soldier.civilian_license_expiry);
-        const defensiveDrivingStatus = soldier.defensive_driving_passed ? "fit" : "unfit";
-        const correctDrivingStatus = getCorrectDrivingStatus(soldier.correct_driving_in_service_date);
+        const correctDrivingResult = getCorrectDrivingStatus(soldier);
 
-        // Overall status: worst of all
+        // Overall status: only based on licenses (not defensive driving)
+        // Defensive driving is informational, not a fitness requirement
         let overallStatus: FitnessStatus = "fit";
-        const statuses = [militaryLicenseStatus, civilianLicenseStatus, defensiveDrivingStatus, correctDrivingStatus];
+        const statuses = [militaryLicenseStatus, civilianLicenseStatus, correctDrivingResult.status];
         if (statuses.includes("unfit")) overallStatus = "unfit";
         else if (statuses.includes("warning")) overallStatus = "warning";
 
@@ -95,9 +123,9 @@ export default function FitnessReport() {
           ...soldier,
           militaryLicenseStatus,
           civilianLicenseStatus,
-          defensiveDrivingStatus,
-          correctDrivingStatus,
+          correctDrivingStatus: correctDrivingResult.status,
           overallStatus,
+          needsCorrectDriving: correctDrivingResult.needsDriving,
         };
       });
 
@@ -109,12 +137,48 @@ export default function FitnessReport() {
     }
   };
 
+  // Calculate deadline for correct driving (for sorting by urgency)
+  const getCorrectDrivingDeadline = (soldier: Soldier): Date | null => {
+    const correctDrivingDate = soldier.correct_driving_in_service_date ? parseISO(soldier.correct_driving_in_service_date) : null;
+    const qualifiedDate = soldier.qualified_date ? parseISO(soldier.qualified_date) : null;
+    
+    let referenceDate = correctDrivingDate || qualifiedDate;
+    if (!referenceDate) return null;
+    
+    return addYears(referenceDate, 1);
+  };
+
   const filteredSoldiers = soldiers.filter(soldier => {
     const matchesSearch = soldier.full_name.includes(searchQuery) || 
                           soldier.personal_number.includes(searchQuery);
-    const matchesOutpost = filterOutpost === "all" || soldier.outpost === filterOutpost;
     const matchesStatus = filterStatus === "all" || soldier.overallStatus === filterStatus;
-    return matchesSearch && matchesOutpost && matchesStatus;
+    
+    // Defensive driving filter
+    const matchesDefensiveDriving = filterDefensiveDriving === "all" || 
+      (filterDefensiveDriving === "passed" && soldier.defensive_driving_passed) ||
+      (filterDefensiveDriving === "not_passed" && !soldier.defensive_driving_passed);
+    
+    // Needs correct driving filter
+    const matchesNeedsCorrectDriving = filterNeedsCorrectDriving === "all" ||
+      (filterNeedsCorrectDriving === "needs" && soldier.needsCorrectDriving) ||
+      (filterNeedsCorrectDriving === "ok" && !soldier.needsCorrectDriving);
+    
+    return matchesSearch && matchesStatus && matchesDefensiveDriving && matchesNeedsCorrectDriving;
+  }).sort((a, b) => {
+    // When filtering by "needs correct driving", sort by urgency
+    if (filterNeedsCorrectDriving === "needs") {
+      const deadlineA = getCorrectDrivingDeadline(a);
+      const deadlineB = getCorrectDrivingDeadline(b);
+      
+      // No deadline = most urgent (put first)
+      if (!deadlineA && !deadlineB) return 0;
+      if (!deadlineA) return -1;
+      if (!deadlineB) return 1;
+      
+      // Earlier deadline = more urgent (put first)
+      return differenceInDays(deadlineA, new Date()) - differenceInDays(deadlineB, new Date());
+    }
+    return 0;
   });
 
   const stats = {
@@ -144,12 +208,12 @@ export default function FitnessReport() {
     const exportData = filteredSoldiers.map(soldier => ({
       "שם מלא": soldier.full_name,
       "מספר אישי": soldier.personal_number,
-      "מוצב": soldier.outpost || "לא משויך",
       "רישיון צבאי": formatDate(soldier.military_license_expiry),
       "סטטוס רישיון צבאי": soldier.militaryLicenseStatus === "fit" ? "תקין" : soldier.militaryLicenseStatus === "warning" ? "בקרוב" : "פג",
       "רישיון אזרחי": formatDate(soldier.civilian_license_expiry),
       "סטטוס רישיון אזרחי": soldier.civilianLicenseStatus === "fit" ? "תקין" : soldier.civilianLicenseStatus === "warning" ? "בקרוב" : "פג",
       "נהיגה מונעת": soldier.defensive_driving_passed ? "עבר" : "לא עבר",
+      "תאריך הכשרה": formatDate(soldier.qualified_date),
       "נהיגה נכונה בשירות": formatDate(soldier.correct_driving_in_service_date),
       "סטטוס נה\"נ בשירות": soldier.correctDrivingStatus === "fit" ? "תקין" : soldier.correctDrivingStatus === "warning" ? "בקרוב" : "פג",
       "סטטוס כללי": soldier.overallStatus === "fit" ? "כשיר" : soldier.overallStatus === "warning" ? "אזהרה" : "לא כשיר",
@@ -160,6 +224,16 @@ export default function FitnessReport() {
     XLSX.utils.book_append_sheet(wb, ws, "דוח כשירות");
     XLSX.writeFile(wb, `דוח_כשירות_${format(new Date(), "dd-MM-yyyy")}.xlsx`);
   };
+
+  if (authLoading || isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -217,19 +291,8 @@ export default function FitnessReport() {
                   className="pr-10"
                 />
               </div>
-              <Select value={filterOutpost} onValueChange={setFilterOutpost}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="מוצב" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">כל המוצבים</SelectItem>
-                  {OUTPOSTS.map(outpost => (
-                    <SelectItem key={outpost} value={outpost}>{outpost}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-40 bg-white text-slate-800">
                   <SelectValue placeholder="סטטוס" />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,6 +300,26 @@ export default function FitnessReport() {
                   <SelectItem value="fit">כשיר</SelectItem>
                   <SelectItem value="warning">אזהרה</SelectItem>
                   <SelectItem value="unfit">לא כשיר</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterDefensiveDriving} onValueChange={setFilterDefensiveDriving}>
+                <SelectTrigger className="w-40 bg-white text-slate-800">
+                  <SelectValue placeholder="נהיגה מונעת" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">הכל</SelectItem>
+                  <SelectItem value="passed">עבר נהיגה מונעת</SelectItem>
+                  <SelectItem value="not_passed">לא עבר נהיגה מונעת</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterNeedsCorrectDriving} onValueChange={setFilterNeedsCorrectDriving}>
+                <SelectTrigger className="w-48 bg-white text-slate-800">
+                  <SelectValue placeholder="נהיגה נכונה בשירות" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">הכל</SelectItem>
+                  <SelectItem value="needs">צריך נהיגה נכונה</SelectItem>
+                  <SelectItem value="ok">תקין</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -249,7 +332,6 @@ export default function FitnessReport() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="text-right">שם</TableHead>
-                    <TableHead className="text-right">מוצב</TableHead>
                     <TableHead className="text-center">רש' צבאי</TableHead>
                     <TableHead className="text-center">רש' אזרחי</TableHead>
                     <TableHead className="text-center">נהיגה מונעת</TableHead>
@@ -258,15 +340,9 @@ export default function FitnessReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {filteredSoldiers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredSoldiers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                         לא נמצאו תוצאות
                       </TableCell>
                     </TableRow>
@@ -274,10 +350,13 @@ export default function FitnessReport() {
                     filteredSoldiers.map(soldier => (
                       <TableRow key={soldier.id}>
                         <TableCell className="font-medium">{soldier.full_name}</TableCell>
-                        <TableCell>{soldier.outpost || "-"}</TableCell>
                         <TableCell className="text-center">{getStatusBadge(soldier.militaryLicenseStatus)}</TableCell>
                         <TableCell className="text-center">{getStatusBadge(soldier.civilianLicenseStatus)}</TableCell>
-                        <TableCell className="text-center">{getStatusBadge(soldier.defensiveDrivingStatus)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={soldier.defensive_driving_passed ? "bg-blue-500 text-white" : "bg-slate-400 text-white"}>
+                            {soldier.defensive_driving_passed ? "עבר" : "לא עבר"}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-center">{getStatusBadge(soldier.correctDrivingStatus)}</TableCell>
                         <TableCell className="text-center">{getStatusBadge(soldier.overallStatus)}</TableCell>
                       </TableRow>

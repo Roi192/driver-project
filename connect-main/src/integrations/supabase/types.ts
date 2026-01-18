@@ -1175,8 +1175,10 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean | null
+          license_type: string | null
           military_license_expiry: string | null
           outpost: string | null
+          permits: string[] | null
           personal_number: string
           qualified_date: string | null
           release_date: string | null
@@ -1193,8 +1195,10 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean | null
+          license_type?: string | null
           military_license_expiry?: string | null
           outpost?: string | null
+          permits?: string[] | null
           personal_number: string
           qualified_date?: string | null
           release_date?: string | null
@@ -1211,8 +1215,10 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean | null
+          license_type?: string | null
           military_license_expiry?: string | null
           outpost?: string | null
+          permits?: string[] | null
           personal_number?: string
           qualified_date?: string | null
           release_date?: string | null

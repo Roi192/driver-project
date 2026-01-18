@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import { he } from "date-fns/locale";
 import { 
   ClipboardList, 
@@ -24,7 +25,9 @@ import {
   Car,
   Shield,
   FileText,
-  Check
+  Check,
+  Gauge,
+  AlertTriangle
 } from "lucide-react";
 import { OUTPOSTS, REGIONS } from "@/lib/constants";
 import unitLogo from "@/assets/unit-logo.png";
@@ -37,6 +40,9 @@ interface Soldier {
   civilian_license_expiry: string | null;
   military_license_expiry: string | null;
   defensive_driving_passed: boolean | null;
+  license_type: string | null;
+  permits: string[] | null;
+  qualified_date: string | null;
 }
 
 interface Accident {
@@ -57,6 +63,20 @@ interface Interview {
   driver_name: string;
   interviewer_name: string;
   created_at: string;
+}
+
+interface SafetyScore {
+  id: string;
+  soldier_id: string;
+  score_month: string;
+  safety_score: number;
+  speed_violations: number | null;
+  harsh_braking: number | null;
+  harsh_accelerations: number | null;
+  harsh_turns: number | null;
+  illegal_overtakes: number | null;
+  kilometers: number | null;
+  notes: string | null;
 }
 
 const INTERVIEW_GUIDELINES = [
@@ -82,6 +102,7 @@ export default function DriverInterviews() {
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [accidents, setAccidents] = useState<Accident[]>([]);
+  const [safetyScores, setSafetyScores] = useState<SafetyScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -107,6 +128,7 @@ export default function DriverInterviews() {
     additional_notes: "",
     interviewer_summary: "",
     interviewer_name: "",
+    qualified_date: "",
   });
 
   useEffect(() => {
@@ -128,7 +150,7 @@ export default function DriverInterviews() {
     const [soldiersRes, interviewsRes, accidentsRes] = await Promise.all([
       supabase
         .from("soldiers")
-        .select("id, personal_number, full_name, outpost, civilian_license_expiry, military_license_expiry, defensive_driving_passed")
+        .select("id, personal_number, full_name, outpost, civilian_license_expiry, military_license_expiry, defensive_driving_passed, license_type, permits, qualified_date")
         .eq("is_active", true)
         .order("full_name"),
       supabase
@@ -150,7 +172,7 @@ export default function DriverInterviews() {
     setLoading(false);
   };
 
-  const handleSoldierSelect = (soldierId: string) => {
+  const handleSoldierSelect = async (soldierId: string) => {
     const soldier = soldiers.find(s => s.id === soldierId);
     if (soldier) {
       // Get accidents for this soldier from the accidents tracking table
@@ -173,7 +195,21 @@ export default function DriverInterviews() {
         military_license_expiry: soldier.military_license_expiry || "",
         defensive_driving_passed: soldier.defensive_driving_passed || false,
         military_accidents: accidentsText,
+        license_type: soldier.license_type || "",
+        permits: soldier.permits?.join(", ") || "",
+        qualified_date: soldier.qualified_date || "",
       });
+
+      // Fetch safety scores for the last 3 months
+      const threeMonthsAgo = format(subMonths(new Date(), 3), "yyyy-MM-01");
+      const { data: scoresData } = await supabase
+        .from("monthly_safety_scores")
+        .select("*")
+        .eq("soldier_id", soldierId)
+        .gte("score_month", threeMonthsAgo)
+        .order("score_month", { ascending: false });
+      
+      setSafetyScores(scoresData || []);
     }
   };
 
@@ -305,9 +341,11 @@ export default function DriverInterviews() {
       additional_notes: "",
       interviewer_summary: "",
       interviewer_name: "",
+      qualified_date: "",
     });
     setCurrentStep(1);
     clearSignature();
+    setSafetyScores([]);
   };
 
   const canProceedToStep2 = formData.region && formData.battalion && formData.outpost && formData.driver_name;
@@ -399,65 +437,74 @@ export default function DriverInterviews() {
             </div>
 
             {/* Driver characteristics */}
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-2 mb-4 text-primary">
-                <Car className="w-5 h-5" />
-                <h3 className="font-bold">מאפייני הנהג</h3>
+            <div className="pt-4 border-t border-slate-600">
+              <div className="flex items-center gap-2 mb-4">
+                <Car className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-amber-400">מאפייני הנהג</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">תוקף רשיון אזרחי</Label>
+                  <Label className="text-xs text-slate-300">נהג מוכשר מתאריך</Label>
+                  <Input
+                    type="date"
+                    value={formData.qualified_date}
+                    readOnly
+                    className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300">סוג רשיון</Label>
+                  <Input
+                    value={formData.license_type}
+                    readOnly
+                    placeholder="מהטבלת שליטה"
+                    className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300">תוקף רשיון אזרחי</Label>
                   <Input
                     type="date"
                     value={formData.civilian_license_expiry}
                     onChange={(e) => setFormData({ ...formData, civilian_license_expiry: e.target.value })}
-                    className="rounded-xl text-sm"
+                    className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">סוג רשיון</Label>
-                  <Input
-                    value={formData.license_type}
-                    onChange={(e) => setFormData({ ...formData, license_type: e.target.value })}
-                    placeholder="B, C1, C..."
-                    className="rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">תוקף רשיון צבאי</Label>
+                  <Label className="text-xs text-slate-300">תוקף רשיון צבאי</Label>
                   <Input
                     type="date"
                     value={formData.military_license_expiry}
                     onChange={(e) => setFormData({ ...formData, military_license_expiry: e.target.value })}
-                    className="rounded-xl text-sm"
+                    className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">היתרים</Label>
+                <div className="col-span-2">
+                  <Label className="text-xs text-slate-300">היתרים</Label>
                   <Input
                     value={formData.permits}
-                    onChange={(e) => setFormData({ ...formData, permits: e.target.value })}
-                    placeholder="הזן היתרים"
-                    className="rounded-xl text-sm"
+                    readOnly
+                    placeholder="מהטבלת שליטה"
+                    className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
                   />
                 </div>
               </div>
 
               <div className="mt-3 flex items-center gap-3">
-                <Label className="text-sm">ביצוע נהיגה מונעת:</Label>
-                <span className={`px-3 py-1 rounded-full text-sm font-bold ${formData.defensive_driving_passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <Label className="text-sm text-slate-300">ביצוע נהיגה מונעת:</Label>
+                <span className={`px-3 py-1 rounded-full text-sm font-bold ${formData.defensive_driving_passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                   {formData.defensive_driving_passed ? 'עבר' : 'לא עבר'}
                 </span>
               </div>
 
               <div className="mt-3">
-                <Label className="text-xs">תאונות במסגרת הצבא</Label>
+                <Label className="text-xs text-slate-300">תאונות במסגרת הצבא</Label>
                 <Textarea
                   value={formData.military_accidents}
                   onChange={(e) => setFormData({ ...formData, military_accidents: e.target.value })}
                   placeholder="פרט תאונות אם היו..."
-                  className="rounded-xl text-sm"
+                  className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
                   rows={2}
                 />
               </div>
@@ -495,6 +542,77 @@ export default function DriverInterviews() {
               <FileText className="w-5 h-5" />
               <h3 className="font-bold">הראיון להכיר את הנהג</h3>
             </div>
+
+            {/* Safety Scores Section - Moved here from step 4 */}
+            {safetyScores.length > 0 && (
+              <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Gauge className="w-5 h-5 text-blue-600" />
+                  <h4 className="font-bold text-blue-800">ציוני בטיחות - 3 חודשים אחרונים</h4>
+                </div>
+                <div className="space-y-3">
+                  {safetyScores.map(score => (
+                    <div key={score.id} className="p-3 rounded-lg bg-white border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-slate-700">
+                          {format(parseISO(score.score_month + ""), "MMMM yyyy", { locale: he })}
+                        </span>
+                        <Badge className={score.safety_score >= 75 ? "bg-green-500" : "bg-red-500"}>
+                          {score.safety_score}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {score.speed_violations !== null && score.speed_violations > 0 && (
+                          <div className="flex items-center gap-1 text-red-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>חריגות מהירות: {score.speed_violations}</span>
+                          </div>
+                        )}
+                        {score.harsh_braking !== null && score.harsh_braking > 0 && (
+                          <div className="flex items-center gap-1 text-amber-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>בלימות חדות: {score.harsh_braking}</span>
+                          </div>
+                        )}
+                        {score.harsh_accelerations !== null && score.harsh_accelerations > 0 && (
+                          <div className="flex items-center gap-1 text-amber-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>האצות חדות: {score.harsh_accelerations}</span>
+                          </div>
+                        )}
+                        {score.harsh_turns !== null && score.harsh_turns > 0 && (
+                          <div className="flex items-center gap-1 text-amber-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>פניות חדות: {score.harsh_turns}</span>
+                          </div>
+                        )}
+                        {score.illegal_overtakes !== null && score.illegal_overtakes > 0 && (
+                          <div className="flex items-center gap-1 text-red-600">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>עקיפות אסורות: {score.illegal_overtakes}</span>
+                          </div>
+                        )}
+                        {score.kilometers !== null && (
+                          <div className="text-slate-500">
+                            <span>ק"מ: {score.kilometers}</span>
+                          </div>
+                        )}
+                      </div>
+                      {score.notes && (
+                        <p className="text-xs text-slate-600 mt-2 italic">{score.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {safetyScores.length === 0 && formData.soldier_id && (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <Gauge className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                <p className="text-sm text-slate-500">אין ציוני בטיחות ל-3 חודשים אחרונים</p>
+              </div>
+            )}
 
             <div>
               <Label>1. מצב משפחתי של החייל ורקע כללי</Label>
@@ -555,7 +673,7 @@ export default function DriverInterviews() {
               <Input
                 value={formData.interviewer_name}
                 onChange={(e) => setFormData({ ...formData, interviewer_name: e.target.value })}
-                placeholder="הזן שם מלא"
+                placeholder="הזן שם מלא של המראיין"
                 className="rounded-xl"
               />
             </div>

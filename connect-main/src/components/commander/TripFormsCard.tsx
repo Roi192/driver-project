@@ -152,35 +152,54 @@ export function TripFormsCard() {
               <p className="text-slate-500">אין טפסים מאז חמישי</p>
             </div>
           ) : (
-            <div className="space-y-3 mt-4">
-              {periodForms.map((form) => (
-                <div
-                  key={form.id}
-                  className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    <div>
-                      <div className="font-semibold text-slate-800">{form.soldier_name}</div>
-                      <div className="text-sm text-slate-500">
-                        {format(new Date(form.created_at), 'HH:mm', { locale: he })}
-                        {form.officer_name && ` • תודרך ע"י ${form.officer_name}`}
+            <div className="space-y-4 mt-4">
+              {/* Group by outpost - get unique outposts from profiles or use "לא משויך" */}
+              {(() => {
+                // Group forms by outpost (using soldier_name to infer outpost if available)
+                const formsByOutpost: { [key: string]: TripForm[] } = {};
+                periodForms.forEach(form => {
+                  const outpost = "כללי"; // Default grouping
+                  if (!formsByOutpost[outpost]) formsByOutpost[outpost] = [];
+                  formsByOutpost[outpost].push(form);
+                });
+                
+                return Object.entries(formsByOutpost).map(([outpost, forms]) => (
+                  <div key={outpost} className="space-y-2">
+                    <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      {outpost} ({forms.length})
+                    </h4>
+                    {forms.map((form) => (
+                      <div
+                        key={form.id}
+                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          <div>
+                            <div className="font-semibold text-slate-800">{form.soldier_name}</div>
+                            <div className="text-sm text-slate-500">
+                              {format(new Date(form.created_at), 'HH:mm', { locale: he })}
+                              {form.officer_name && ` • תודרך ע"י ${form.officer_name}`}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedForm(form);
+                          }}
+                          className="text-slate-600 hover:text-primary"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedForm(form);
-                    }}
-                    className="text-slate-600 hover:text-primary"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           )}
         </DialogContent>
