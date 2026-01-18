@@ -10,11 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { format, startOfMonth } from "date-fns";
+import { format, startOfMonth, subMonths } from "date-fns";
 import { he } from "date-fns/locale";
 import { 
   Gauge, 
@@ -29,7 +30,11 @@ import {
   CheckCircle,
   Calendar,
   TrendingUp,
-  User
+  User,
+  Users,
+  MessageCircle,
+  FileText,
+  ChevronLeft
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import unitLogo from "@/assets/unit-logo.png";
@@ -39,6 +44,7 @@ interface Soldier {
   id: string;
   personal_number: string;
   full_name: string;
+  outpost?: string | null;
 }
 
 interface SafetyScore {
@@ -56,15 +62,30 @@ interface SafetyScore {
   created_at: string;
 }
 
+interface SoldierWithScores extends Soldier {
+  lastMonthScore?: number | null;
+  prevMonthScore?: number | null;
+  needsClarificationTalk: boolean;
+  needsTest: boolean;
+}
+
 export default function SafetyScoresManagement() {
   const { isAdmin, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [safetyScores, setSafetyScores] = useState<SafetyScore[]>([]);
+  const [allScores, setAllScores] = useState<SafetyScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingScore, setEditingScore] = useState<SafetyScore | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Main view mode: soldiers list or scores list
+  const [viewMode, setViewMode] = useState<"soldiers" | "scores">("soldiers");
+  const [selectedSoldierForEntry, setSelectedSoldierForEntry] = useState<Soldier | null>(null);
+  
+  // Alert filter mode
+  const [alertFilter, setAlertFilter] = useState<"all" | "clarification" | "test">("all");
   
   // Filter mode: single month or date range
   const [isRangeMode, setIsRangeMode] = useState(false);
@@ -80,9 +101,14 @@ export default function SafetyScoresManagement() {
   const [endMonth, setEndMonth] = useState(new Date().getMonth() + 1);
   const [selectedSoldierId, setSelectedSoldierId] = useState<string>("");
   
-  // Form dialog year/month selection
-  const [formYear, setFormYear] = useState(new Date().getFullYear());
-  const [formMonth, setFormMonth] = useState(new Date().getMonth() + 1);
+  // Form dialog year/month selection - default to previous month
+  const getDefaultFormMonth = () => {
+    const lastMonth = subMonths(new Date(), 1);
+    return { year: lastMonth.getFullYear(), month: lastMonth.getMonth() + 1 };
+  };
+  const defaultFormDate = getDefaultFormMonth();
+  const [formYear, setFormYear] = useState(defaultFormDate.year);
+  const [formMonth, setFormMonth] = useState(defaultFormDate.month);
   
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [scoreToDelete, setScoreToDelete] = useState<SafetyScore | null>(null);
@@ -103,6 +129,21 @@ export default function SafetyScoresManagement() {
     notes: "",
   });
 
+  // Calculate last month and previous month dates
+  const getLastTwoMonths = () => {
+    const now = new Date();
+    // Last month is the previous month from current date
+    const lastMonth = subMonths(now, 1);
+    const prevMonth = subMonths(now, 2);
+    
+    return {
+      lastMonthStr: `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`,
+      prevMonthStr: `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`,
+      lastMonthLabel: MONTHS_HEB.find(m => m.value === lastMonth.getMonth() + 1)?.label + ' ' + lastMonth.getFullYear(),
+      prevMonthLabel: MONTHS_HEB.find(m => m.value === prevMonth.getMonth() + 1)?.label + ' ' + prevMonth.getFullYear(),
+    };
+  };
+
   useEffect(() => {
     if (!authLoading && !isAdmin) {
       navigate("/");
@@ -111,7 +152,7 @@ export default function SafetyScoresManagement() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedYear, selectedMonth, isRangeMode, startYear, startMonth, endYear, endMonth, selectedSoldierId]);
+  }, [selectedYear, selectedMonth, isRangeMode, startYear, startMonth, endYear, endMonth, selectedSoldierId, viewMode]);
 
   const getSelectedMonthStr = () => {
     const monthStr = String(selectedMonth).padStart(2, '0');
@@ -135,42 +176,50 @@ export default function SafetyScoresManagement() {
     // Fetch soldiers
     const { data: soldiersData } = await supabase
       .from("soldiers")
-      .select("id, personal_number, full_name")
+      .select("id, personal_number, full_name, outpost")
       .eq("is_active", true)
       .order("full_name");
     
     if (soldiersData) setSoldiers(soldiersData);
 
+    // Fetch all scores for alert filtering (last 2 months)
+    const { lastMonthStr, prevMonthStr } = getLastTwoMonths();
+    const { data: recentScoresData } = await supabase
+      .from("monthly_safety_scores")
+      .select("*")
+      .in("score_month", [lastMonthStr, prevMonthStr]);
+    
+    if (recentScoresData) setAllScores(recentScoresData);
+
     // Fetch scores based on mode
-    if (isRangeMode) {
-      // Date range mode
-      const startMonthStr = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
-      const endMonthStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
-      
-      let query = supabase
-        .from("monthly_safety_scores")
-        .select("*")
-        .gte("score_month", startMonthStr)
-        .lte("score_month", endMonthStr)
-        .order("score_month", { ascending: true });
-      
-      // If specific soldier selected, filter by soldier
-      if (selectedSoldierId && selectedSoldierId !== "all") {
-        query = query.eq("soldier_id", selectedSoldierId);
+    if (viewMode === "scores") {
+      if (isRangeMode) {
+        const startMonthStr = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+        const endMonthStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+        
+        let query = supabase
+          .from("monthly_safety_scores")
+          .select("*")
+          .gte("score_month", startMonthStr)
+          .lte("score_month", endMonthStr)
+          .order("score_month", { ascending: true });
+        
+        if (selectedSoldierId && selectedSoldierId !== "all") {
+          query = query.eq("soldier_id", selectedSoldierId);
+        }
+        
+        const { data: scoresData } = await query;
+        if (scoresData) setSafetyScores(scoresData);
+      } else {
+        const monthStr = getSelectedMonthStr();
+        const { data: scoresData } = await supabase
+          .from("monthly_safety_scores")
+          .select("*")
+          .eq("score_month", `${monthStr}-01`)
+          .order("safety_score", { ascending: true });
+        
+        if (scoresData) setSafetyScores(scoresData);
       }
-      
-      const { data: scoresData } = await query;
-      if (scoresData) setSafetyScores(scoresData);
-    } else {
-      // Single month mode
-      const monthStr = getSelectedMonthStr();
-      const { data: scoresData } = await supabase
-        .from("monthly_safety_scores")
-        .select("*")
-        .eq("score_month", `${monthStr}-01`)
-        .order("safety_score", { ascending: true });
-      
-      if (scoresData) setSafetyScores(scoresData);
     }
     
     setLoading(false);
@@ -180,15 +229,49 @@ export default function SafetyScoresManagement() {
     return soldiers.find(s => s.id === soldierId)?.full_name || "לא ידוע";
   };
 
+  // Get soldiers with their last 2 months scores for filtering
+  const getSoldiersWithScores = (): SoldierWithScores[] => {
+    const { lastMonthStr, prevMonthStr } = getLastTwoMonths();
+    
+    return soldiers.map(soldier => {
+      const lastMonthScoreRecord = allScores.find(
+        s => s.soldier_id === soldier.id && s.score_month === lastMonthStr
+      );
+      const prevMonthScoreRecord = allScores.find(
+        s => s.soldier_id === soldier.id && s.score_month === prevMonthStr
+      );
+      
+      const lastMonthScore = lastMonthScoreRecord?.safety_score ?? null;
+      const prevMonthScore = prevMonthScoreRecord?.safety_score ?? null;
+      
+      // Need clarification talk: last month score ≤ 75
+      const needsClarificationTalk = lastMonthScore !== null && lastMonthScore <= 75;
+      
+      // Need test: both last month AND prev month ≤ 75
+      const needsTest = lastMonthScore !== null && prevMonthScore !== null && 
+                        lastMonthScore <= 75 && prevMonthScore <= 75;
+      
+      return {
+        ...soldier,
+        lastMonthScore,
+        prevMonthScore,
+        needsClarificationTalk,
+        needsTest,
+      };
+    });
+  };
+
   const handleSubmit = async () => {
-    if (!formData.soldier_id) {
+    const soldierId = selectedSoldierForEntry?.id || formData.soldier_id;
+    
+    if (!soldierId) {
       toast.error("יש לבחור חייל");
       return;
     }
 
     const scoreMonthStr = `${formYear}-${String(formMonth).padStart(2, '0')}-01`;
     const scoreData = {
-      soldier_id: formData.soldier_id,
+      soldier_id: soldierId,
       score_month: scoreMonthStr,
       safety_score: formData.safety_score,
       kilometers: formData.kilometers,
@@ -211,7 +294,7 @@ export default function SafetyScoresManagement() {
         toast.error("שגיאה בעדכון הציון");
       } else {
         toast.success("הציון עודכן בהצלחה");
-        await updateSoldierSafetyStatus(formData.soldier_id);
+        await updateSoldierSafetyStatus(soldierId);
         fetchData();
       }
     } else {
@@ -227,17 +310,17 @@ export default function SafetyScoresManagement() {
         }
       } else {
         toast.success("הציון נוסף בהצלחה");
-        await updateSoldierSafetyStatus(formData.soldier_id);
+        await updateSoldierSafetyStatus(soldierId);
         fetchData();
       }
     }
 
     setDialogOpen(false);
+    setSelectedSoldierForEntry(null);
     resetForm();
   };
 
   const updateSoldierSafetyStatus = async (soldierId: string) => {
-    // Get last 3 months of scores for this soldier
     const { data: recentScores } = await supabase
       .from("monthly_safety_scores")
       .select("safety_score, score_month")
@@ -300,8 +383,9 @@ export default function SafetyScoresManagement() {
       illegal_overtakes: 0,
       notes: "",
     });
-    setFormYear(new Date().getFullYear());
-    setFormMonth(new Date().getMonth() + 1);
+    const lastMonth = subMonths(new Date(), 1);
+    setFormYear(lastMonth.getFullYear());
+    setFormMonth(lastMonth.getMonth() + 1);
     setEditingScore(null);
   };
 
@@ -324,6 +408,12 @@ export default function SafetyScoresManagement() {
     setDialogOpen(true);
   };
 
+  const openScoreEntryForSoldier = (soldier: Soldier) => {
+    setSelectedSoldierForEntry(soldier);
+    resetForm();
+    setDialogOpen(true);
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -336,7 +426,6 @@ export default function SafetyScoresManagement() {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       
-      // Map the data
       const mappedData = jsonData.map((row: any) => ({
         personal_number: row['מספר אישי'] || row['personal_number'] || '',
         safety_score: Number(row['ציון בטיחות'] || row['safety_score'] || row['ציון'] || 0),
@@ -353,7 +442,6 @@ export default function SafetyScoresManagement() {
     };
     reader.readAsArrayBuffer(file);
     
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -443,6 +531,27 @@ export default function SafetyScoresManagement() {
     toast.success("הקובץ יוצא בהצלחה");
   };
 
+  // Get filtered soldiers based on alert filter and search
+  const soldiersWithScores = getSoldiersWithScores();
+  
+  const filteredSoldiers = soldiersWithScores.filter(soldier => {
+    // Text search
+    const matchesSearch = soldier.full_name.includes(searchTerm) || 
+                          soldier.personal_number.includes(searchTerm);
+    
+    if (!matchesSearch) return false;
+    
+    // Alert filter
+    if (alertFilter === "clarification") {
+      return soldier.needsClarificationTalk;
+    }
+    if (alertFilter === "test") {
+      return soldier.needsTest;
+    }
+    
+    return true;
+  });
+
   const filteredScores = safetyScores.filter(score => {
     const soldierName = getSoldierName(score.soldier_id);
     return soldierName.includes(searchTerm);
@@ -454,7 +563,12 @@ export default function SafetyScoresManagement() {
     return "bg-red-500";
   };
 
-  // Calculate average for range mode
+  // Stats for soldiers view
+  const { lastMonthLabel, prevMonthLabel } = getLastTwoMonths();
+  const clarificationCount = soldiersWithScores.filter(s => s.needsClarificationTalk).length;
+  const testCount = soldiersWithScores.filter(s => s.needsTest).length;
+
+  // Stats for scores view
   const averageScore = safetyScores.length > 0
     ? Math.round(safetyScores.reduce((sum, s) => sum + s.safety_score, 0) / safetyScores.length)
     : 0;
@@ -493,361 +607,555 @@ export default function SafetyScoresManagement() {
             </div>
             <h1 className="text-2xl font-black text-white mb-2">ניהול ציוני בטיחות חודשיים</h1>
             <p className="text-amber-200 text-sm">
-              {isRangeMode 
-                ? selectedSoldierId === "all" 
-                  ? `${safetyScores.length} ציונים לכל החיילים`
-                  : selectedSoldierId 
-                    ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
-                    : "בחר חייל לצפייה בציונים"
-                : `${safetyScores.length} ציונים ל${getMonthLabel()}`
+              {viewMode === "soldiers" 
+                ? `${soldiers.length} חיילים פעילים`
+                : isRangeMode 
+                  ? selectedSoldierId === "all" 
+                    ? `${safetyScores.length} ציונים לכל החיילים`
+                    : selectedSoldierId 
+                      ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
+                      : "בחר חייל לצפייה בציונים"
+                  : `${safetyScores.length} ציונים ל${getMonthLabel()}`
               }
             </p>
           </div>
         </div>
 
         <div className="px-4 py-6 space-y-6">
-          {/* Filter Mode Toggle */}
-          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur rounded-2xl">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <span className="font-bold text-slate-700">מצב סינון</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`text-sm ${!isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>חודש בודד</span>
-                  <Switch checked={isRangeMode} onCheckedChange={setIsRangeMode} />
-                  <span className={`text-sm ${isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>טווח תאריכים</span>
-                </div>
+          {/* View Mode Tabs */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "soldiers" | "scores")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-slate-100">
+              <TabsTrigger value="soldiers" className="rounded-xl data-[state=active]:bg-white">
+                <Users className="w-4 h-4 ml-2" />
+                רשימת חיילים
+              </TabsTrigger>
+              <TabsTrigger value="scores" className="rounded-xl data-[state=active]:bg-white">
+                <Gauge className="w-4 h-4 ml-2" />
+                ציונים לפי חודש
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Soldiers List View */}
+            <TabsContent value="soldiers" className="space-y-4 mt-4">
+              {/* Alert Filters */}
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <span className="font-bold text-slate-700">סינון לפי התראות</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3">
+                    נתונים מבוססים על: {lastMonthLabel} ו-{prevMonthLabel}
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant={alertFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAlertFilter("all")}
+                      className="rounded-xl"
+                    >
+                      <Users className="w-4 h-4 ml-1" />
+                      כל החיילים ({soldiers.length})
+                    </Button>
+                    <Button
+                      variant={alertFilter === "clarification" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAlertFilter("clarification")}
+                      className={`rounded-xl ${alertFilter === "clarification" ? "bg-amber-500 hover:bg-amber-600" : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+                    >
+                      <MessageCircle className="w-4 h-4 ml-1" />
+                      צריכים שיחת בירור ({clarificationCount})
+                    </Button>
+                    <Button
+                      variant={alertFilter === "test" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAlertFilter("test")}
+                      className={`rounded-xl ${alertFilter === "test" ? "bg-red-500 hover:bg-red-600" : "border-red-300 text-red-700 hover:bg-red-50"}`}
+                    >
+                      <FileText className="w-4 h-4 ml-1" />
+                      צריכים מבחן ({testCount})
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Input
+                  placeholder="חיפוש לפי שם או מספר אישי..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pr-10 py-6 rounded-2xl border-2"
+                />
               </div>
 
-              {!isRangeMode ? (
-                // Single month mode
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-slate-700 font-bold">שנה:</Label>
-                    <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                      <SelectTrigger className="w-24 rounded-xl bg-white text-slate-800">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[2024, 2025, 2026, 2027].map(year => (
-                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Soldiers List */}
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-slate-800 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    {alertFilter === "all" && "כל החיילים"}
+                    {alertFilter === "clarification" && "חיילים שצריכים שיחת בירור"}
+                    {alertFilter === "test" && "חיילים שצריכים מבחן"}
+                    <Badge variant="secondary" className="mr-2">{filteredSoldiers.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[50vh]">
+                    <div className="space-y-2">
+                      {filteredSoldiers.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>
+                            {alertFilter === "all" && "אין חיילים"}
+                            {alertFilter === "clarification" && "אין חיילים שצריכים שיחת בירור"}
+                            {alertFilter === "test" && "אין חיילים שצריכים מבחן"}
+                          </p>
+                        </div>
+                      ) : (
+                        filteredSoldiers.map(soldier => (
+                          <div
+                            key={soldier.id}
+                            className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md ${
+                              soldier.needsTest 
+                                ? "bg-red-50/80 border-red-200" 
+                                : soldier.needsClarificationTalk 
+                                  ? "bg-amber-50/80 border-amber-200"
+                                  : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                            }`}
+                            onClick={() => openScoreEntryForSoldier(soldier)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
+                                  <span className="text-xs text-slate-500">({soldier.personal_number})</span>
+                                </div>
+                                {soldier.outpost && (
+                                  <p className="text-xs text-slate-500">{soldier.outpost}</p>
+                                )}
+                                
+                                <div className="flex items-center gap-3 mt-2">
+                                  {/* Last month score */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">{lastMonthLabel.split(' ')[0]}:</span>
+                                    {soldier.lastMonthScore !== null ? (
+                                      <Badge className={`${getScoreColor(soldier.lastMonthScore)} text-white text-xs`}>
+                                        {soldier.lastMonthScore}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">אין ציון</span>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Prev month score */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">{prevMonthLabel.split(' ')[0]}:</span>
+                                    {soldier.prevMonthScore !== null ? (
+                                      <Badge className={`${getScoreColor(soldier.prevMonthScore)} text-white text-xs`}>
+                                        {soldier.prevMonthScore}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-slate-400">אין ציון</span>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Alert badges */}
+                                <div className="flex gap-2 mt-2">
+                                  {soldier.needsTest && (
+                                    <Badge className="bg-red-500 text-white text-xs">
+                                      <FileText className="w-3 h-3 ml-1" />
+                                      דורש מבחן
+                                    </Badge>
+                                  )}
+                                  {soldier.needsClarificationTalk && !soldier.needsTest && (
+                                    <Badge className="bg-amber-500 text-white text-xs">
+                                      <MessageCircle className="w-3 h-3 ml-1" />
+                                      דורש שיחת בירור
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <ChevronLeft className="w-5 h-5 text-slate-400" />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Scores View (existing functionality) */}
+            <TabsContent value="scores" className="space-y-4 mt-4">
+              {/* Filter Mode Toggle */}
+              <Card className="border-0 shadow-lg bg-white/90 backdrop-blur rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <span className="font-bold text-slate-700">מצב סינון</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm ${!isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>חודש בודד</span>
+                      <Switch checked={isRangeMode} onCheckedChange={setIsRangeMode} />
+                      <span className={`text-sm ${isRangeMode ? 'font-bold text-primary' : 'text-slate-600'}`}>טווח תאריכים</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-slate-700 font-bold">חודש:</Label>
-                    <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                      <SelectTrigger className="w-32 rounded-xl bg-white text-slate-800">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MONTHS_HEB.map(month => (
-                          <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ) : (
-                // Date range mode
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-slate-700 font-bold mb-2 block">
-                      <User className="w-4 h-4 inline ml-1" />
-                      בחר חייל
-                    </Label>
-                    <Select value={selectedSoldierId} onValueChange={setSelectedSoldierId}>
-                      <SelectTrigger className="w-full rounded-xl bg-white text-slate-800">
-                        <SelectValue placeholder="בחר חייל לצפייה בציונים" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">כל החיילים</SelectItem>
-                        {soldiers.map(soldier => (
-                          <SelectItem key={soldier.id} value={soldier.id}>
-                            {soldier.full_name} ({soldier.personal_number})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
-                      <Label className="text-slate-700 font-bold text-sm">מתאריך</Label>
-                      <div className="flex gap-2">
-                        <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
-                          <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {MONTHS_HEB.map(month => (
-                              <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
-                          <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
+
+                  {!isRangeMode ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-slate-700 font-bold">שנה:</Label>
+                        <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                          <SelectTrigger className="w-24 rounded-xl bg-white text-slate-800">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {[2024, 2025, 2026, 2027].map(year => (
                               <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-slate-700 font-bold">חודש:</Label>
+                        <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                          <SelectTrigger className="w-32 rounded-xl bg-white text-slate-800">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MONTHS_HEB.map(month => (
+                              <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                    
-                    <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
-                      <Label className="text-slate-700 font-bold text-sm">עד תאריך</Label>
-                      <div className="flex gap-2">
-                        <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
-                          <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
-                            <SelectValue />
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-slate-700 font-bold mb-2 block">
+                          <User className="w-4 h-4 inline ml-1" />
+                          בחר חייל
+                        </Label>
+                        <Select value={selectedSoldierId} onValueChange={setSelectedSoldierId}>
+                          <SelectTrigger className="w-full rounded-xl bg-white text-slate-800">
+                            <SelectValue placeholder="בחר חייל לצפייה בציונים" />
                           </SelectTrigger>
                           <SelectContent>
-                            {MONTHS_HEB.map(month => (
-                              <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={String(endYear)} onValueChange={(v) => setEndYear(Number(v))}>
-                          <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[2024, 2025, 2026, 2027].map(year => (
-                              <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                            <SelectItem value="all">כל החיילים</SelectItem>
+                            {soldiers.map(soldier => (
+                              <SelectItem key={soldier.id} value={soldier.id}>
+                                {soldier.full_name} ({soldier.personal_number})
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
+                          <Label className="text-slate-700 font-bold text-sm">מתאריך</Label>
+                          <div className="flex gap-2">
+                            <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
+                              <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS_HEB.map(month => (
+                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
+                              <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[2024, 2025, 2026, 2027].map(year => (
+                                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
+                          <Label className="text-slate-700 font-bold text-sm">עד תאריך</Label>
+                          <div className="flex gap-2">
+                            <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
+                              <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS_HEB.map(month => (
+                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(endYear)} onValueChange={(v) => setEndYear(Number(v))}>
+                              <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[2024, 2025, 2026, 2027].map(year => (
+                                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Stats Cards */}
+              {isRangeMode && safetyScores.length > 0 ? (
+                <Card className="border-0 bg-gradient-to-br from-primary/10 to-teal/10 shadow-lg rounded-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-600 font-medium">ממוצע ציונים</p>
+                        <p className="text-3xl font-black text-primary">{averageScore}</p>
+                        <p className="text-xs text-slate-500">
+                          {safetyScores.length} {selectedSoldierId === "all" ? "רשומות" : "חודשים"}
+                          {selectedSoldierId && selectedSoldierId !== "all" ? ` - ${getSoldierName(selectedSoldierId)}` : ""}
+                        </p>
+                      </div>
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${getScoreColor(averageScore)}`}>
+                        <TrendingUp className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-4 gap-3">
+                  <Card className="border-0 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg">
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-black text-slate-700">{stats.total}</div>
+                      <p className="text-xs font-bold text-slate-500">סה"כ</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg">
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-black text-emerald-600">{stats.good}</div>
+                      <p className="text-xs font-bold text-emerald-700">75+</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 bg-gradient-to-br from-amber-50 to-yellow-50 shadow-lg">
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-black text-amber-600">{stats.warning}</div>
+                      <p className="text-xs font-bold text-amber-700">60-74</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50 shadow-lg">
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-black text-red-600">{stats.critical}</div>
+                      <p className="text-xs font-bold text-red-700">&lt;60</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() => { resetForm(); setSelectedSoldierForEntry(null); setDialogOpen(true); }}
+                  className="flex-1 bg-gradient-to-r from-primary to-teal text-white py-6 rounded-2xl shadow-lg"
+                >
+                  <Plus className="w-5 h-5 ml-2" />
+                  הוסף ציון
+                </Button>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="py-6 rounded-2xl border-2"
+                >
+                  <Upload className="w-5 h-5 ml-2" />
+                  ייבוא מאקסל
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={downloadTemplate}
+                  variant="outline"
+                  className="py-6 rounded-2xl border-2"
+                >
+                  <FileSpreadsheet className="w-5 h-5" />
+                </Button>
+                <Button
+                  onClick={exportToExcel}
+                  variant="outline"
+                  className="py-6 rounded-2xl border-2"
+                >
+                  ייצוא
+                </Button>
+              </div>
+
+              {/* Search */}
+              {!isRangeMode && (
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Input
+                    placeholder="חיפוש לפי שם..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pr-10 py-6 rounded-2xl border-2"
+                  />
+                </div>
+              )}
+
+              {/* Scores List */}
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
+                <CardHeader>
+                  <CardTitle className="text-slate-800">
+                    {isRangeMode && selectedSoldierId 
+                      ? `ציוני בטיחות - ${getSoldierName(selectedSoldierId)}`
+                      : `ציוני בטיחות - ${getMonthLabel()}`
+                    }
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[50vh]">
+                    <div className="space-y-3">
+                      {isRangeMode && !selectedSoldierId ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>בחר חייל לצפייה בציונים</p>
+                        </div>
+                      ) : filteredScores.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <Gauge className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>אין ציונים {isRangeMode ? 'בטווח הנבחר' : 'לחודש זה'}</p>
+                        </div>
+                      ) : (
+                        filteredScores.map(score => (
+                          <div
+                            key={score.id}
+                            className={`p-4 rounded-2xl border transition-all ${
+                              score.safety_score < 75 ? "bg-red-50/50 border-red-200" : "bg-slate-50 border-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                  {isRangeMode ? (
+                                    <h4 className="font-bold text-slate-800">{getMonthLabelFromDate(score.score_month)}</h4>
+                                  ) : (
+                                    <h4 className="font-bold text-slate-800">{getSoldierName(score.soldier_id)}</h4>
+                                  )}
+                                  <Badge className={`${getScoreColor(score.safety_score)} text-white text-sm font-bold`}>
+                                    {score.safety_score}
+                                  </Badge>
+                                  {score.safety_score < 75 && (
+                                    <Badge variant="outline" className="text-red-600 border-red-300">
+                                      <AlertTriangle className="w-3 h-3 ml-1" />
+                                      דורש שיחה
+                                    </Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="grid grid-cols-3 gap-2 text-sm text-slate-500">
+                                  <div>ק"מ: {score.kilometers || 0}</div>
+                                  <div>מהירות: {score.speed_violations || 0}</div>
+                                  <div>בלימות: {score.harsh_braking || 0}</div>
+                                  <div>פניות: {score.harsh_turns || 0}</div>
+                                  <div>האצות: {score.harsh_accelerations || 0}</div>
+                                  <div>עקיפות: {score.illegal_overtakes || 0}</div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDialog(score)}
+                                  className="rounded-xl"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => { setScoreToDelete(score); setDeleteConfirmOpen(true); }}
+                                  className="rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Add/Edit Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedSoldierForEntry(null); }}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>
+                {editingScore 
+                  ? "עריכת ציון" 
+                  : selectedSoldierForEntry 
+                    ? `הזנת ציון עבור ${selectedSoldierForEntry.full_name}`
+                    : "הוספת ציון חדש"
+                }
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Soldier selection - only show if not pre-selected */}
+              {!selectedSoldierForEntry && (
+                <div>
+                  <Label>חייל *</Label>
+                  <Select 
+                    value={formData.soldier_id} 
+                    onValueChange={(value) => setFormData({ ...formData, soldier_id: value })}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="בחר חייל" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {soldiers.map(soldier => (
+                        <SelectItem key={soldier.id} value={soldier.id}>
+                          {soldier.full_name} ({soldier.personal_number})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Show selected soldier info if pre-selected */}
+              {selectedSoldierForEntry && (
+                <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="font-bold text-slate-800">{selectedSoldierForEntry.full_name}</p>
+                      <p className="text-sm text-slate-500">מ"א: {selectedSoldierForEntry.personal_number}</p>
                     </div>
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Stats Cards */}
-          {isRangeMode && safetyScores.length > 0 ? (
-            // Range mode stats with average
-            <Card className="border-0 bg-gradient-to-br from-primary/10 to-teal/10 shadow-lg rounded-2xl">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 font-medium">ממוצע ציונים</p>
-                    <p className="text-3xl font-black text-primary">{averageScore}</p>
-                    <p className="text-xs text-slate-500">
-                      {safetyScores.length} {selectedSoldierId === "all" ? "רשומות" : "חודשים"}
-                      {selectedSoldierId && selectedSoldierId !== "all" ? ` - ${getSoldierName(selectedSoldierId)}` : ""}
-                    </p>
-                  </div>
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${getScoreColor(averageScore)}`}>
-                    <TrendingUp className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-4 gap-3">
-              <Card className="border-0 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg">
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-black text-slate-700">{stats.total}</div>
-                  <p className="text-xs font-bold text-slate-500">סה"כ</p>
-                </CardContent>
-              </Card>
-              <Card className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg">
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-black text-emerald-600">{stats.good}</div>
-                  <p className="text-xs font-bold text-emerald-700">75+</p>
-                </CardContent>
-              </Card>
-              <Card className="border-0 bg-gradient-to-br from-amber-50 to-yellow-50 shadow-lg">
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-black text-amber-600">{stats.warning}</div>
-                  <p className="text-xs font-bold text-amber-700">60-74</p>
-                </CardContent>
-              </Card>
-              <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50 shadow-lg">
-                <CardContent className="p-3 text-center">
-                  <div className="text-2xl font-black text-red-600">{stats.critical}</div>
-                  <p className="text-xs font-bold text-red-700">&lt;60</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => { resetForm(); setDialogOpen(true); }}
-              className="flex-1 bg-gradient-to-r from-primary to-teal text-white py-6 rounded-2xl shadow-lg"
-            >
-              <Plus className="w-5 h-5 ml-2" />
-              הוסף ציון
-            </Button>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="outline"
-              className="py-6 rounded-2xl border-2"
-            >
-              <Upload className="w-5 h-5 ml-2" />
-              ייבוא מאקסל
-            </Button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <Button
-              onClick={downloadTemplate}
-              variant="outline"
-              className="py-6 rounded-2xl border-2"
-            >
-              <FileSpreadsheet className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={exportToExcel}
-              variant="outline"
-              className="py-6 rounded-2xl border-2"
-            >
-              ייצוא
-            </Button>
-          </div>
-
-          {/* Search */}
-          {!isRangeMode && (
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                placeholder="חיפוש לפי שם..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10 py-6 rounded-2xl border-2"
-              />
-            </div>
-          )}
-
-          {/* Scores List */}
-          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-slate-800">
-                {isRangeMode && selectedSoldierId 
-                  ? `ציוני בטיחות - ${getSoldierName(selectedSoldierId)}`
-                  : `ציוני בטיחות - ${getMonthLabel()}`
-                }
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[50vh]">
-                <div className="space-y-3">
-                  {isRangeMode && !selectedSoldierId ? (
-                    <div className="text-center py-12 text-slate-500">
-                      <User className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p>בחר חייל לצפייה בציונים</p>
-                    </div>
-                  ) : filteredScores.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500">
-                      <Gauge className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p>אין ציונים {isRangeMode ? 'בטווח הנבחר' : 'לחודש זה'}</p>
-                    </div>
-                  ) : (
-                    filteredScores.map(score => (
-                      <div
-                        key={score.id}
-                        className={`p-4 rounded-2xl border transition-all ${
-                          score.safety_score < 75 ? "bg-red-50/50 border-red-200" : "bg-slate-50 border-slate-200"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              {isRangeMode ? (
-                                <h4 className="font-bold text-slate-800">{getMonthLabelFromDate(score.score_month)}</h4>
-                              ) : (
-                                <h4 className="font-bold text-slate-800">{getSoldierName(score.soldier_id)}</h4>
-                              )}
-                              <Badge className={`${getScoreColor(score.safety_score)} text-white text-sm font-bold`}>
-                                {score.safety_score}
-                              </Badge>
-                              {score.safety_score < 75 && (
-                                <Badge variant="outline" className="text-red-600 border-red-300">
-                                  <AlertTriangle className="w-3 h-3 ml-1" />
-                                  דורש שיחה
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-2 text-sm text-slate-500">
-                              <div>ק"מ: {score.kilometers || 0}</div>
-                              <div>מהירות: {score.speed_violations || 0}</div>
-                              <div>בלימות: {score.harsh_braking || 0}</div>
-                              <div>פניות: {score.harsh_turns || 0}</div>
-                              <div>האצות: {score.harsh_accelerations || 0}</div>
-                              <div>עקיפות: {score.illegal_overtakes || 0}</div>
-                            </div>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(score)}
-                              className="rounded-xl"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => { setScoreToDelete(score); setDeleteConfirmOpen(true); }}
-                              className="rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Add/Edit Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>{editingScore ? "עריכת ציון" : "הוספת ציון חדש"}</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div>
-                <Label>חייל *</Label>
-                <Select 
-                  value={formData.soldier_id} 
-                  onValueChange={(value) => setFormData({ ...formData, soldier_id: value })}
-                >
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="בחר חייל" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {soldiers.map(soldier => (
-                      <SelectItem key={soldier.id} value={soldier.id}>
-                        {soldier.full_name} ({soldier.personal_number})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="p-3 rounded-xl bg-slate-50 border">
                 <Label className="font-bold mb-2 block">חודש וציון *</Label>
@@ -891,10 +1199,10 @@ export default function SafetyScoresManagement() {
                   onChange={(e) => setFormData({ ...formData, safety_score: Number(e.target.value) })}
                   className="mt-2 bg-white text-lg font-bold text-center text-slate-800"
                 />
-                {formData.safety_score < 75 && (
+                {formData.safety_score <= 75 && (
                   <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    ציון מתחת ל-75 דורש שיחת בירור
+                    ציון מתחת או שווה ל-75 דורש שיחת בירור
                   </p>
                 )}
               </div>
@@ -969,7 +1277,7 @@ export default function SafetyScoresManagement() {
             </div>
 
             <DialogFooter className="gap-2 mt-4">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => { setDialogOpen(false); setSelectedSoldierForEntry(null); }}>
                 ביטול
               </Button>
               <Button onClick={handleSubmit} className="bg-primary">
