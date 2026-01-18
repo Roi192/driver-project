@@ -34,7 +34,12 @@ import {
   Users,
   MessageCircle,
   FileText,
-  ChevronLeft
+  ChevronLeft,
+  Crown,
+  Trophy,
+  Star,
+  Phone,
+  ClipboardCheck
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import unitLogo from "@/assets/unit-logo.png";
@@ -62,11 +67,47 @@ interface SafetyScore {
   created_at: string;
 }
 
+interface SafetyFollowup {
+  id: string;
+  soldier_id: string;
+  followup_type: 'clarification_talk' | 'test';
+  followup_month: string;
+  completed_at: string;
+  notes: string | null;
+}
+
+interface MonthlyExcellence {
+  id: string;
+  soldier_id: string;
+  excellence_month: string;
+  safety_score: number;
+  kilometers: number;
+  calculated_score: number;
+}
+
 interface SoldierWithScores extends Soldier {
   lastMonthScore?: number | null;
+  lastMonthKm?: number | null;
   prevMonthScore?: number | null;
   needsClarificationTalk: boolean;
   needsTest: boolean;
+  hasClarificationTalkDone?: boolean;
+  hasTestDone?: boolean;
+}
+
+interface ExcellenceCandidate {
+  soldier: Soldier;
+  safetyScore: number;
+  kilometers: number;
+  calculatedScore: number;
+  speedViolations: number;
+  accidentsCount: number;
+  punishmentsCount: number;
+  cleaningOnTime: boolean;
+  avgInspectionScore: number | null;
+  attendanceRate: number | null;
+  isEligible: boolean;
+  disqualifyReasons: string[];
 }
 
 export default function SafetyScoresManagement() {
@@ -75,13 +116,15 @@ export default function SafetyScoresManagement() {
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [safetyScores, setSafetyScores] = useState<SafetyScore[]>([]);
   const [allScores, setAllScores] = useState<SafetyScore[]>([]);
+  const [followups, setFollowups] = useState<SafetyFollowup[]>([]);
+  const [excellenceWinners, setExcellenceWinners] = useState<MonthlyExcellence[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingScore, setEditingScore] = useState<SafetyScore | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Main view mode: soldiers list or scores list
-  const [viewMode, setViewMode] = useState<"soldiers" | "scores">("soldiers");
+  // Main view mode: soldiers list or scores list or excellence
+  const [viewMode, setViewMode] = useState<"soldiers" | "scores" | "excellence">("soldiers");
   const [selectedSoldierForEntry, setSelectedSoldierForEntry] = useState<Soldier | null>(null);
   
   // Alert filter mode
@@ -116,6 +159,19 @@ export default function SafetyScoresManagement() {
   const [importData, setImportData] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Followup dialog
+  const [followupDialogOpen, setFollowupDialogOpen] = useState(false);
+  const [followupSoldier, setFollowupSoldier] = useState<SoldierWithScores | null>(null);
+  const [followupType, setFollowupType] = useState<'clarification_talk' | 'test'>('clarification_talk');
+  const [followupNotes, setFollowupNotes] = useState("");
+  
+  // Excellence dialog
+  const [excellenceDialogOpen, setExcellenceDialogOpen] = useState(false);
+  const [excellenceCandidates, setExcellenceCandidates] = useState<ExcellenceCandidate[]>([]);
+  const [excellenceMonth, setExcellenceMonth] = useState(defaultFormDate.month);
+  const [excellenceYear, setExcellenceYear] = useState(defaultFormDate.year);
+  const [loadingExcellence, setLoadingExcellence] = useState(false);
 
   const [formData, setFormData] = useState({
     soldier_id: "",
@@ -132,7 +188,6 @@ export default function SafetyScoresManagement() {
   // Calculate last month and previous month dates
   const getLastTwoMonths = () => {
     const now = new Date();
-    // Last month is the previous month from current date
     const lastMonth = subMonths(now, 1);
     const prevMonth = subMonths(now, 2);
     
@@ -190,6 +245,22 @@ export default function SafetyScoresManagement() {
       .in("score_month", [lastMonthStr, prevMonthStr]);
     
     if (recentScoresData) setAllScores(recentScoresData);
+    
+    // Fetch followups for last 2 months
+    const { data: followupsData } = await supabase
+      .from("safety_followups")
+      .select("*")
+      .in("followup_month", [lastMonthStr, prevMonthStr]);
+    
+    if (followupsData) setFollowups(followupsData as SafetyFollowup[]);
+    
+    // Fetch excellence winners
+    const { data: excellenceData } = await supabase
+      .from("monthly_excellence")
+      .select("*")
+      .order("excellence_month", { ascending: false });
+    
+    if (excellenceData) setExcellenceWinners(excellenceData as MonthlyExcellence[]);
 
     // Fetch scores based on mode
     if (viewMode === "scores") {
@@ -242,21 +313,39 @@ export default function SafetyScoresManagement() {
       );
       
       const lastMonthScore = lastMonthScoreRecord?.safety_score ?? null;
+      const lastMonthKm = lastMonthScoreRecord?.kilometers ?? null;
       const prevMonthScore = prevMonthScoreRecord?.safety_score ?? null;
       
-      // Need clarification talk: last month score ≤ 75
-      const needsClarificationTalk = lastMonthScore !== null && lastMonthScore <= 75;
+      // Exempt soldiers with < 100 km from clarification requirement
+      const needsClarificationBase = lastMonthScore !== null && lastMonthScore <= 75;
+      const needsClarificationTalk = needsClarificationBase && (lastMonthKm === null || lastMonthKm >= 100);
       
-      // Need test: both last month AND prev month ≤ 75
-      const needsTest = lastMonthScore !== null && prevMonthScore !== null && 
+      // Need test: both last month AND prev month ≤ 75 AND >= 100 km
+      const needsTestBase = lastMonthScore !== null && prevMonthScore !== null && 
                         lastMonthScore <= 75 && prevMonthScore <= 75;
+      const needsTest = needsTestBase && (lastMonthKm === null || lastMonthKm >= 100);
+      
+      // Check if followups are done
+      const hasClarificationTalkDone = followups.some(
+        f => f.soldier_id === soldier.id && 
+             f.followup_type === 'clarification_talk' && 
+             f.followup_month === lastMonthStr
+      );
+      const hasTestDone = followups.some(
+        f => f.soldier_id === soldier.id && 
+             f.followup_type === 'test' && 
+             f.followup_month === lastMonthStr
+      );
       
       return {
         ...soldier,
         lastMonthScore,
+        lastMonthKm,
         prevMonthScore,
         needsClarificationTalk,
         needsTest,
+        hasClarificationTalkDone,
+        hasTestDone,
       };
     });
   };
@@ -413,6 +502,230 @@ export default function SafetyScoresManagement() {
     resetForm();
     setDialogOpen(true);
   };
+  
+  // Followup functions
+  const openFollowupDialog = (soldier: SoldierWithScores, type: 'clarification_talk' | 'test') => {
+    setFollowupSoldier(soldier);
+    setFollowupType(type);
+    setFollowupNotes("");
+    setFollowupDialogOpen(true);
+  };
+  
+  const handleFollowupSubmit = async () => {
+    if (!followupSoldier) return;
+    
+    const { lastMonthStr } = getLastTwoMonths();
+    
+    const { error } = await supabase
+      .from("safety_followups")
+      .insert({
+        soldier_id: followupSoldier.id,
+        followup_type: followupType,
+        followup_month: lastMonthStr,
+        notes: followupNotes || null,
+        created_by: user?.id,
+      });
+    
+    if (error) {
+      toast.error("שגיאה בשמירת המעקב");
+    } else {
+      toast.success(followupType === 'clarification_talk' ? "שיחת בירור נרשמה" : "מבחן נרשם");
+      fetchData();
+    }
+    
+    setFollowupDialogOpen(false);
+    setFollowupSoldier(null);
+  };
+  
+  // Excellence functions
+  const calculateExcellenceCandidates = async () => {
+    setLoadingExcellence(true);
+    
+    // For excellence month X, we use data from month X-1 (the previous month)
+    const dataMonth = excellenceMonth === 1 
+      ? { month: 12, year: excellenceYear - 1 }
+      : { month: excellenceMonth - 1, year: excellenceYear };
+    
+    const dataMonthStr = `${dataMonth.year}-${String(dataMonth.month).padStart(2, '0')}-01`;
+    const nextMonthStr = dataMonth.month === 12
+      ? `${dataMonth.year + 1}-01-01`
+      : `${dataMonth.year}-${String(dataMonth.month + 1).padStart(2, '0')}-01`;
+    
+    const dataMonthLabel = MONTHS_HEB.find(m => m.value === dataMonth.month)?.label + ' ' + dataMonth.year;
+    
+    // Get all safety scores for the DATA month (previous month)
+    const { data: monthScores } = await supabase
+      .from("monthly_safety_scores")
+      .select("*")
+      .eq("score_month", dataMonthStr);
+    
+    if (!monthScores || monthScores.length === 0) {
+      toast.error(`אין ציונים לחודש ${dataMonthLabel}`);
+      setLoadingExcellence(false);
+      return;
+    }
+    
+    // Get all accidents for the data month
+    const { data: accidents } = await supabase
+      .from("accidents")
+      .select("soldier_id")
+      .gte("accident_date", dataMonthStr)
+      .lt("accident_date", nextMonthStr);
+    
+    // Get all punishments for the data month
+    const { data: punishments } = await supabase
+      .from("punishments")
+      .select("soldier_id")
+      .gte("punishment_date", dataMonthStr)
+      .lt("punishment_date", nextMonthStr);
+    
+    // Get cleaning parades for the data month
+    const { data: cleaningParades } = await supabase
+      .from("cleaning_parades")
+      .select("user_id, parade_date")
+      .gte("parade_date", dataMonthStr)
+      .lt("parade_date", nextMonthStr);
+    
+    // Get inspections for the data month
+    const { data: inspections } = await supabase
+      .from("inspections")
+      .select("soldier_id, total_score")
+      .gte("inspection_date", dataMonthStr)
+      .lt("inspection_date", nextMonthStr);
+    
+    // Get event attendance for the data month
+    const { data: eventAttendance } = await supabase
+      .from("event_attendance")
+      .select("soldier_id, attended, event_id, work_plan_events!inner(event_date)")
+      .gte("work_plan_events.event_date", dataMonthStr)
+      .lt("work_plan_events.event_date", nextMonthStr);
+    
+    // Get previous winners to exclude
+    const { data: previousWinners } = await supabase
+      .from("monthly_excellence")
+      .select("soldier_id");
+    
+    const previousWinnerIds = new Set(previousWinners?.map(w => w.soldier_id) || []);
+    
+    const candidates: ExcellenceCandidate[] = [];
+    
+    for (const score of monthScores) {
+      const soldier = soldiers.find(s => s.id === score.soldier_id);
+      if (!soldier) continue;
+      
+      const disqualifyReasons: string[] = [];
+      
+      // Check if already won before
+      if (previousWinnerIds.has(soldier.id)) {
+        disqualifyReasons.push("כבר קיבל הצטיינות בעבר");
+      }
+      
+      // Check speed violations
+      if ((score.speed_violations || 0) > 0) {
+        disqualifyReasons.push(`${score.speed_violations} חריגות מהירות`);
+      }
+      
+      // Check accidents
+      const soldierAccidents = accidents?.filter(a => a.soldier_id === soldier.id).length || 0;
+      if (soldierAccidents > 0) {
+        disqualifyReasons.push(`${soldierAccidents} תאונות`);
+      }
+      
+      // Check punishments
+      const soldierPunishments = punishments?.filter(p => p.soldier_id === soldier.id).length || 0;
+      if (soldierPunishments > 0) {
+        disqualifyReasons.push(`${soldierPunishments} משפטים/שלילות`);
+      }
+      
+      // Check if did cleaning parade (simplified check)
+      const didCleaning = cleaningParades?.some(cp => cp.user_id === soldier.id) ?? true;
+      
+      // Get average inspection score
+      const soldierInspections = inspections?.filter(i => i.soldier_id === soldier.id) || [];
+      const avgInspectionScore = soldierInspections.length > 0
+        ? soldierInspections.reduce((sum, i) => sum + (i.total_score || 0), 0) / soldierInspections.length
+        : null;
+      
+      // Calculate attendance rate
+      const soldierAttendance = eventAttendance?.filter(ea => ea.soldier_id === soldier.id) || [];
+      const attendanceRate = soldierAttendance.length > 0
+        ? (soldierAttendance.filter(ea => ea.attended === true).length / soldierAttendance.length) * 100
+        : null;
+      
+      // Calculate excellence score
+      // Formula: (safety_score * log10(km + 1)) + (avgInspection * 0.1) + (attendanceRate * 0.05)
+      // Higher km with good score = better
+      const km = score.kilometers || 0;
+      const baseScore = score.safety_score;
+      const kmBonus = km > 0 ? Math.log10(km + 1) : 0;
+      const inspectionBonus = avgInspectionScore ? (avgInspectionScore * 0.1) : 0;
+      const attendanceBonus = attendanceRate ? (attendanceRate * 0.05) : 0;
+      const calculatedScore = (baseScore * kmBonus) + inspectionBonus + attendanceBonus;
+      
+      candidates.push({
+        soldier,
+        safetyScore: score.safety_score,
+        kilometers: km,
+        calculatedScore,
+        speedViolations: score.speed_violations || 0,
+        accidentsCount: soldierAccidents,
+        punishmentsCount: soldierPunishments,
+        cleaningOnTime: didCleaning,
+        avgInspectionScore,
+        attendanceRate,
+        isEligible: disqualifyReasons.length === 0,
+        disqualifyReasons,
+      });
+    }
+    
+    // Sort by calculated score (eligible first, then by score)
+    candidates.sort((a, b) => {
+      if (a.isEligible && !b.isEligible) return -1;
+      if (!a.isEligible && b.isEligible) return 1;
+      return b.calculatedScore - a.calculatedScore;
+    });
+    
+    setExcellenceCandidates(candidates);
+    setExcellenceDialogOpen(true);
+    setLoadingExcellence(false);
+  };
+  
+  const selectExcellenceWinner = async (candidate: ExcellenceCandidate) => {
+    if (!candidate.isEligible) {
+      toast.error("חייל זה לא כשיר להצטיינות");
+      return;
+    }
+    
+    const monthStr = `${excellenceYear}-${String(excellenceMonth).padStart(2, '0')}-01`;
+    
+    const { error } = await supabase
+      .from("monthly_excellence")
+      .insert({
+        soldier_id: candidate.soldier.id,
+        excellence_month: monthStr,
+        safety_score: candidate.safetyScore,
+        kilometers: candidate.kilometers,
+        calculated_score: candidate.calculatedScore,
+        speed_violations: candidate.speedViolations,
+        accidents_count: candidate.accidentsCount,
+        punishments_count: candidate.punishmentsCount,
+        cleaning_parades_on_time: candidate.cleaningOnTime,
+        avg_inspection_score: candidate.avgInspectionScore,
+        selected_by: user?.id,
+      });
+    
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("כבר נבחר מצטיין לחודש זה");
+      } else {
+        toast.error("שגיאה בבחירת מצטיין");
+      }
+    } else {
+      toast.success(`${candidate.soldier.full_name} נבחר כמצטיין החודש! 🏆`);
+      fetchData();
+      setExcellenceDialogOpen(false);
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -535,18 +848,16 @@ export default function SafetyScoresManagement() {
   const soldiersWithScores = getSoldiersWithScores();
   
   const filteredSoldiers = soldiersWithScores.filter(soldier => {
-    // Text search
     const matchesSearch = soldier.full_name.includes(searchTerm) || 
                           soldier.personal_number.includes(searchTerm);
     
     if (!matchesSearch) return false;
     
-    // Alert filter
     if (alertFilter === "clarification") {
-      return soldier.needsClarificationTalk;
+      return soldier.needsClarificationTalk && !soldier.hasClarificationTalkDone;
     }
     if (alertFilter === "test") {
-      return soldier.needsTest;
+      return soldier.needsTest && !soldier.hasTestDone;
     }
     
     return true;
@@ -565,8 +876,8 @@ export default function SafetyScoresManagement() {
 
   // Stats for soldiers view
   const { lastMonthLabel, prevMonthLabel } = getLastTwoMonths();
-  const clarificationCount = soldiersWithScores.filter(s => s.needsClarificationTalk).length;
-  const testCount = soldiersWithScores.filter(s => s.needsTest).length;
+  const clarificationCount = soldiersWithScores.filter(s => s.needsClarificationTalk && !s.hasClarificationTalkDone).length;
+  const testCount = soldiersWithScores.filter(s => s.needsTest && !s.hasTestDone).length;
 
   // Stats for scores view
   const averageScore = safetyScores.length > 0
@@ -609,13 +920,15 @@ export default function SafetyScoresManagement() {
             <p className="text-amber-200 text-sm">
               {viewMode === "soldiers" 
                 ? `${soldiers.length} חיילים פעילים`
-                : isRangeMode 
-                  ? selectedSoldierId === "all" 
-                    ? `${safetyScores.length} ציונים לכל החיילים`
-                    : selectedSoldierId 
-                      ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
-                      : "בחר חייל לצפייה בציונים"
-                  : `${safetyScores.length} ציונים ל${getMonthLabel()}`
+                : viewMode === "excellence"
+                  ? `${excellenceWinners.length} מצטיינים`
+                  : isRangeMode 
+                    ? selectedSoldierId === "all" 
+                      ? `${safetyScores.length} ציונים לכל החיילים`
+                      : selectedSoldierId 
+                        ? `${safetyScores.length} ציונים ל${getSoldierName(selectedSoldierId)}`
+                        : "בחר חייל לצפייה בציונים"
+                    : `${safetyScores.length} ציונים ל${getMonthLabel()}`
               }
             </p>
           </div>
@@ -623,15 +936,19 @@ export default function SafetyScoresManagement() {
 
         <div className="px-4 py-6 space-y-6">
           {/* View Mode Tabs */}
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "soldiers" | "scores")} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-slate-100">
-              <TabsTrigger value="soldiers" className="rounded-xl data-[state=active]:bg-white">
-                <Users className="w-4 h-4 ml-2" />
-                רשימת חיילים
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "soldiers" | "scores" | "excellence")} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 rounded-2xl p-1 bg-slate-100">
+              <TabsTrigger value="soldiers" className="rounded-xl data-[state=active]:bg-white text-xs">
+                <Users className="w-4 h-4 ml-1" />
+                חיילים
               </TabsTrigger>
-              <TabsTrigger value="scores" className="rounded-xl data-[state=active]:bg-white">
-                <Gauge className="w-4 h-4 ml-2" />
-                ציונים לפי חודש
+              <TabsTrigger value="scores" className="rounded-xl data-[state=active]:bg-white text-xs">
+                <Gauge className="w-4 h-4 ml-1" />
+                ציונים
+              </TabsTrigger>
+              <TabsTrigger value="excellence" className="rounded-xl data-[state=active]:bg-white text-xs">
+                <Trophy className="w-4 h-4 ml-1" />
+                מצטיינים
               </TabsTrigger>
             </TabsList>
 
@@ -646,6 +963,8 @@ export default function SafetyScoresManagement() {
                   </div>
                   <p className="text-xs text-slate-500 mb-3">
                     נתונים מבוססים על: {lastMonthLabel} ו-{prevMonthLabel}
+                    <br />
+                    <span className="text-emerald-600">* חיילים עם פחות מ-100 ק"מ פטורים משיחת בירור</span>
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     <Button
@@ -717,14 +1036,13 @@ export default function SafetyScoresManagement() {
                         filteredSoldiers.map(soldier => (
                           <div
                             key={soldier.id}
-                            className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md ${
-                              soldier.needsTest 
+                            className={`p-4 rounded-2xl border transition-all ${
+                              soldier.needsTest && !soldier.hasTestDone
                                 ? "bg-red-50/80 border-red-200" 
-                                : soldier.needsClarificationTalk 
+                                : soldier.needsClarificationTalk && !soldier.hasClarificationTalkDone
                                   ? "bg-amber-50/80 border-amber-200"
                                   : "bg-slate-50 border-slate-200 hover:bg-slate-100"
                             }`}
-                            onClick={() => openScoreEntryForSoldier(soldier)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -749,6 +1067,19 @@ export default function SafetyScoresManagement() {
                                     )}
                                   </div>
                                   
+                                  {/* Km */}
+                                  {soldier.lastMonthKm !== null && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs text-slate-500">ק"מ:</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {soldier.lastMonthKm}
+                                      </Badge>
+                                      {soldier.lastMonthKm < 100 && (
+                                        <span className="text-xs text-emerald-600">(פטור)</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  
                                   {/* Prev month score */}
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-slate-500">{prevMonthLabel.split(' ')[0]}:</span>
@@ -762,24 +1093,149 @@ export default function SafetyScoresManagement() {
                                   </div>
                                 </div>
                                 
-                                {/* Alert badges */}
-                                <div className="flex gap-2 mt-2">
+                                {/* Alert badges and actions */}
+                                <div className="flex gap-2 mt-2 flex-wrap">
                                   {soldier.needsTest && (
-                                    <Badge className="bg-red-500 text-white text-xs">
-                                      <FileText className="w-3 h-3 ml-1" />
-                                      דורש מבחן
-                                    </Badge>
+                                    soldier.hasTestDone ? (
+                                      <Badge className="bg-emerald-500 text-white text-xs">
+                                        <CheckCircle className="w-3 h-3 ml-1" />
+                                        מבחן בוצע
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        className="bg-red-500 hover:bg-red-600 text-white text-xs h-7"
+                                        onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'test'); }}
+                                      >
+                                        <ClipboardCheck className="w-3 h-3 ml-1" />
+                                        סמן מבחן
+                                      </Button>
+                                    )
                                   )}
                                   {soldier.needsClarificationTalk && !soldier.needsTest && (
-                                    <Badge className="bg-amber-500 text-white text-xs">
-                                      <MessageCircle className="w-3 h-3 ml-1" />
-                                      דורש שיחת בירור
-                                    </Badge>
+                                    soldier.hasClarificationTalkDone ? (
+                                      <Badge className="bg-emerald-500 text-white text-xs">
+                                        <CheckCircle className="w-3 h-3 ml-1" />
+                                        שיחה בוצעה
+                                      </Badge>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-7"
+                                        onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'clarification_talk'); }}
+                                      >
+                                        <Phone className="w-3 h-3 ml-1" />
+                                        סמן שיחה
+                                      </Button>
+                                    )
                                   )}
                                 </div>
                               </div>
                               
-                              <ChevronLeft className="w-5 h-5 text-slate-400" />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openScoreEntryForSoldier(soldier)}
+                                className="rounded-xl"
+                              >
+                                <Plus className="w-4 h-4 ml-1" />
+                                הזן ציון
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            {/* Excellence View */}
+            <TabsContent value="excellence" className="space-y-4 mt-4">
+              {/* Select Month for Excellence */}
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Trophy className="w-5 h-5 text-amber-600" />
+                    <span className="font-bold text-amber-800">בחירת מצטיין חודשי</span>
+                  </div>
+                  <p className="text-xs text-amber-700 mb-3">
+                    בחר חודש וחפש את המועמדים המתאימים להצטיינות
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Select value={String(excellenceYear)} onValueChange={(v) => setExcellenceYear(Number(v))}>
+                      <SelectTrigger className="w-24 rounded-xl bg-white text-slate-800">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2024, 2025, 2026, 2027].map(year => (
+                          <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={String(excellenceMonth)} onValueChange={(v) => setExcellenceMonth(Number(v))}>
+                      <SelectTrigger className="w-32 rounded-xl bg-white text-slate-800">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTHS_HEB.map(month => (
+                          <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={calculateExcellenceCandidates}
+                      disabled={loadingExcellence}
+                      className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-xl"
+                    >
+                      {loadingExcellence ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Search className="w-4 h-4 ml-1" />}
+                      חפש מועמדים
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Excellence Winners List */}
+              <Card className="border-0 shadow-xl bg-white/90 backdrop-blur rounded-3xl">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-slate-800 flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-amber-500" />
+                    מצטייני העבר
+                    <Badge variant="secondary" className="mr-2">{excellenceWinners.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[40vh]">
+                    <div className="space-y-2">
+                      {excellenceWinners.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                          <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                          <p>עדיין לא נבחרו מצטיינים</p>
+                        </div>
+                      ) : (
+                        excellenceWinners.map(winner => (
+                          <div
+                            key={winner.id}
+                            className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center">
+                                <Crown className="w-6 h-6 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-slate-800">{getSoldierName(winner.soldier_id)}</h4>
+                                  <Badge className="bg-amber-500 text-white text-xs">
+                                    {getMonthLabelFromDate(winner.excellence_month)}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
+                                  <span>ציון: {winner.safety_score}</span>
+                                  <span>ק"מ: {winner.kilometers}</span>
+                                  <span>ניקוד: {winner.calculated_score.toFixed(1)}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -859,52 +1315,51 @@ export default function SafetyScoresManagement() {
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
-                          <Label className="text-slate-700 font-bold text-sm">מתאריך</Label>
+                        <div className="space-y-2">
+                          <Label className="text-slate-700 font-bold">מתאריך</Label>
                           <div className="flex gap-2">
-                            <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
-                              <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MONTHS_HEB.map(month => (
-                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                             <Select value={String(startYear)} onValueChange={(v) => setStartYear(Number(v))}>
-                              <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
+                              <SelectTrigger className="rounded-xl bg-white text-slate-800">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {[2024, 2025, 2026, 2027].map(year => (
                                   <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(startMonth)} onValueChange={(v) => setStartMonth(Number(v))}>
+                              <SelectTrigger className="rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS_HEB.map(month => (
+                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-                        
-                        <div className="space-y-2 p-3 rounded-xl bg-slate-50 border">
-                          <Label className="text-slate-700 font-bold text-sm">עד תאריך</Label>
+                        <div className="space-y-2">
+                          <Label className="text-slate-700 font-bold">עד תאריך</Label>
                           <div className="flex gap-2">
-                            <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
-                              <SelectTrigger className="flex-1 rounded-xl bg-white text-slate-800">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {MONTHS_HEB.map(month => (
-                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
                             <Select value={String(endYear)} onValueChange={(v) => setEndYear(Number(v))}>
-                              <SelectTrigger className="w-20 rounded-xl bg-white text-slate-800">
+                              <SelectTrigger className="rounded-xl bg-white text-slate-800">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {[2024, 2025, 2026, 2027].map(year => (
                                   <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(endMonth)} onValueChange={(v) => setEndMonth(Number(v))}>
+                              <SelectTrigger className="rounded-xl bg-white text-slate-800">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {MONTHS_HEB.map(month => (
+                                  <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -917,81 +1372,63 @@ export default function SafetyScoresManagement() {
               </Card>
 
               {/* Stats Cards */}
-              {isRangeMode && safetyScores.length > 0 ? (
-                <Card className="border-0 bg-gradient-to-br from-primary/10 to-teal/10 shadow-lg rounded-2xl">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-600 font-medium">ממוצע ציונים</p>
-                        <p className="text-3xl font-black text-primary">{averageScore}</p>
-                        <p className="text-xs text-slate-500">
-                          {safetyScores.length} {selectedSoldierId === "all" ? "רשומות" : "חודשים"}
-                          {selectedSoldierId && selectedSoldierId !== "all" ? ` - ${getSoldierName(selectedSoldierId)}` : ""}
-                        </p>
-                      </div>
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${getScoreColor(averageScore)}`}>
-                        <TrendingUp className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid grid-cols-4 gap-3">
-                  <Card className="border-0 bg-gradient-to-br from-slate-50 to-slate-100 shadow-lg">
+              {!isRangeMode && (
+                <div className="grid grid-cols-4 gap-2">
+                  <Card className="border-0 bg-slate-100 shadow">
                     <CardContent className="p-3 text-center">
                       <div className="text-2xl font-black text-slate-700">{stats.total}</div>
-                      <p className="text-xs font-bold text-slate-500">סה"כ</p>
+                      <p className="text-xs text-slate-500">סה"כ</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg">
+                  <Card className="border-0 bg-emerald-100 shadow">
                     <CardContent className="p-3 text-center">
                       <div className="text-2xl font-black text-emerald-600">{stats.good}</div>
-                      <p className="text-xs font-bold text-emerald-700">75+</p>
+                      <p className="text-xs text-emerald-700">75+</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 bg-gradient-to-br from-amber-50 to-yellow-50 shadow-lg">
+                  <Card className="border-0 bg-amber-100 shadow">
                     <CardContent className="p-3 text-center">
                       <div className="text-2xl font-black text-amber-600">{stats.warning}</div>
-                      <p className="text-xs font-bold text-amber-700">60-74</p>
+                      <p className="text-xs text-amber-700">60-74</p>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 bg-gradient-to-br from-red-50 to-orange-50 shadow-lg">
+                  <Card className="border-0 bg-red-100 shadow">
                     <CardContent className="p-3 text-center">
                       <div className="text-2xl font-black text-red-600">{stats.critical}</div>
-                      <p className="text-xs font-bold text-red-700">&lt;60</p>
+                      <p className="text-xs text-red-700">&lt;60</p>
                     </CardContent>
                   </Card>
                 </div>
               )}
 
               {/* Actions */}
-              <div className="flex flex-wrap gap-3">
+              <div className="flex gap-3">
                 <Button
-                  onClick={() => { resetForm(); setSelectedSoldierForEntry(null); setDialogOpen(true); }}
+                  onClick={() => { resetForm(); setDialogOpen(true); }}
                   className="flex-1 bg-gradient-to-r from-primary to-teal text-white py-6 rounded-2xl shadow-lg"
                 >
                   <Plus className="w-5 h-5 ml-2" />
                   הוסף ציון
                 </Button>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  className="py-6 rounded-2xl border-2"
-                >
-                  <Upload className="w-5 h-5 ml-2" />
-                  ייבוא מאקסל
-                </Button>
                 <input
-                  type="file"
                   ref={fileInputRef}
+                  type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
                 <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  className="py-6 rounded-2xl border-2"
+                >
+                  <Upload className="w-5 h-5" />
+                </Button>
+                <Button
                   onClick={downloadTemplate}
                   variant="outline"
                   className="py-6 rounded-2xl border-2"
+                  title="הורד תבנית"
                 >
                   <FileSpreadsheet className="w-5 h-5" />
                 </Button>
@@ -1302,6 +1739,143 @@ export default function SafetyScoresManagement() {
               </Button>
               <Button variant="destructive" onClick={handleDelete}>
                 מחק
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Followup Dialog */}
+        <Dialog open={followupDialogOpen} onOpenChange={setFollowupDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>
+                {followupType === 'clarification_talk' ? 'רישום שיחת בירור' : 'רישום מבחן'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {followupSoldier && (
+                <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="font-bold text-slate-800">{followupSoldier.full_name}</p>
+                      <p className="text-sm text-slate-500">מ"א: {followupSoldier.personal_number}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <Label>הערות (אופציונלי)</Label>
+                <Textarea
+                  value={followupNotes}
+                  onChange={(e) => setFollowupNotes(e.target.value)}
+                  placeholder="פרטים נוספים על השיחה/מבחן..."
+                />
+              </div>
+            </div>
+            
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setFollowupDialogOpen(false)}>
+                ביטול
+              </Button>
+              <Button onClick={handleFollowupSubmit} className="bg-primary">
+                {followupType === 'clarification_talk' ? 'סמן שיחה בוצעה' : 'סמן מבחן בוצע'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Excellence Candidates Dialog */}
+        <Dialog open={excellenceDialogOpen} onOpenChange={setExcellenceDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-amber-500" />
+                מצטיין {MONTHS_HEB.find(m => m.value === excellenceMonth)?.label} {excellenceYear}
+              </DialogTitle>
+              <p className="text-sm text-slate-500 mt-1">
+                (על סמך נתוני {MONTHS_HEB.find(m => m.value === (excellenceMonth === 1 ? 12 : excellenceMonth - 1))?.label} {excellenceMonth === 1 ? excellenceYear - 1 : excellenceYear})
+              </p>
+            </DialogHeader>
+            
+            <div className="space-y-3">
+              {excellenceCandidates.slice(0, 5).map((candidate, index) => (
+                <div
+                  key={candidate.soldier.id}
+                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    candidate.isEligible 
+                      ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-300 hover:shadow-lg cursor-pointer"
+                      : "bg-slate-50 border-slate-200 opacity-60"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                        index === 0 && candidate.isEligible
+                          ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white"
+                          : "bg-slate-200 text-slate-600"
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-800">{candidate.soldier.full_name}</h4>
+                          {index === 0 && candidate.isEligible && (
+                            <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
+                          <span>ציון: <strong>{candidate.safetyScore}</strong></span>
+                          <span>ק"מ: <strong>{candidate.kilometers}</strong></span>
+                          <span>ניקוד משוקלל: <strong>{candidate.calculatedScore.toFixed(1)}</strong></span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                          {candidate.avgInspectionScore !== null && (
+                            <span>ממוצע ביקורות: {candidate.avgInspectionScore.toFixed(0)}</span>
+                          )}
+                          {candidate.attendanceRate !== null && (
+                            <span>נוכחות: {candidate.attendanceRate.toFixed(0)}%</span>
+                          )}
+                        </div>
+                        
+                        {!candidate.isEligible && (
+                          <div className="mt-2">
+                            {candidate.disqualifyReasons.map((reason, i) => (
+                              <Badge key={i} variant="outline" className="text-red-600 border-red-300 mr-1 text-xs">
+                                {reason}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {candidate.isEligible && (
+                      <Button
+                        onClick={() => selectExcellenceWinner(candidate)}
+                        className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white"
+                      >
+                        <Crown className="w-4 h-4 ml-1" />
+                        בחר
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {excellenceCandidates.length === 0 && (
+                <div className="text-center py-12 text-slate-500">
+                  <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>אין מועמדים כשירים להצטיינות</p>
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setExcellenceDialogOpen(false)}>
+                סגור
               </Button>
             </DialogFooter>
           </DialogContent>
