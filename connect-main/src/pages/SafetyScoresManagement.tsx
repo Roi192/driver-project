@@ -889,7 +889,7 @@ export default function SafetyScoresManagement() {
                   max={100}
                   value={formData.safety_score}
                   onChange={(e) => setFormData({ ...formData, safety_score: Number(e.target.value) })}
-                  className="mt-2 bg-white text-lg font-bold text-center"
+                  className="mt-2 bg-white text-lg font-bold text-center text-slate-800"
                 />
                 {formData.safety_score < 75 && (
                   <p className="text-xs text-red-600 mt-1 flex items-center gap-1">

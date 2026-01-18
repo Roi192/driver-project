@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, CheckCircle2, Clock, ChevronLeft, Eye } from "lucide-react";
+import { Home, Users, CheckCircle2, Clock, ChevronLeft, Eye, MapPin, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 
@@ -20,13 +20,21 @@ interface TripForm {
   signature: string;
   notes: string | null;
   created_at: string;
+  user_id: string;
+}
+
+interface Profile {
+  user_id: string;
+  outpost: string | null;
 }
 
 export function TripFormsCard() {
   const [periodForms, setPeriodForms] = useState<TripForm[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState<TripForm | null>(null);
   const [showAllDialog, setShowAllDialog] = useState(false);
+  const [expandedOutposts, setExpandedOutposts] = useState<Set<string>>(new Set());
 
   const getMostRecentThursday = (date: Date) => {
     const d = new Date(date);
@@ -55,19 +63,64 @@ export function TripFormsCard() {
       const periodStart = getMostRecentThursday(now);
       const periodStartStr = format(periodStart, 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
-        .from('trip_forms')
-        .select('*')
-        .gte('form_date', periodStartStr)
-        .order('created_at', { ascending: false });
+      // Fetch trip forms and profiles in parallel
+      const [formsResult, profilesResult] = await Promise.all([
+        supabase
+          .from('trip_forms')
+          .select('*')
+          .gte('form_date', periodStartStr)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('user_id, outpost')
+      ]);
 
-      if (error) throw error;
-      setPeriodForms((data as TripForm[]) || []);
+      if (formsResult.error) throw formsResult.error;
+      if (profilesResult.error) throw profilesResult.error;
+
+      setPeriodForms((formsResult.data as TripForm[]) || []);
+      setProfiles((profilesResult.data as Profile[]) || []);
     } catch (error) {
       console.error('Error fetching trip forms:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getOutpostForUser = (userId: string): string => {
+    const profile = profiles.find(p => p.user_id === userId);
+    return profile?.outpost || "לא משויך";
+  };
+
+  const getFormsByOutpost = (): { [key: string]: TripForm[] } => {
+    const formsByOutpost: { [key: string]: TripForm[] } = {};
+    
+    periodForms.forEach(form => {
+      const outpost = getOutpostForUser(form.user_id);
+      if (!formsByOutpost[outpost]) formsByOutpost[outpost] = [];
+      formsByOutpost[outpost].push(form);
+    });
+    
+    // Sort outposts alphabetically, but put "לא משויך" at the end
+    const sortedEntries = Object.entries(formsByOutpost).sort(([a], [b]) => {
+      if (a === "לא משויך") return 1;
+      if (b === "לא משויך") return -1;
+      return a.localeCompare(b, 'he');
+    });
+    
+    return Object.fromEntries(sortedEntries);
+  };
+
+  const toggleOutpost = (outpost: string) => {
+    setExpandedOutposts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(outpost)) {
+        newSet.delete(outpost);
+      } else {
+        newSet.add(outpost);
+      }
+      return newSet;
+    });
   };
 
   const now = new Date();
@@ -80,6 +133,8 @@ export function TripFormsCard() {
       : `${rangeStartLabel}–${rangeEndLabel}`;
 
   const formCount = periodForms.length;
+  const formsByOutpost = getFormsByOutpost();
+  const outpostCount = Object.keys(formsByOutpost).length;
 
   return (
     <>
@@ -120,14 +175,14 @@ export function TripFormsCard() {
               
               {formCount > 0 && (
                 <div className="flex-1 space-y-1">
-                  {periodForms.slice(0, 3).map((form) => (
-                    <div key={form.id} className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      <span className="text-slate-600 truncate">{form.soldier_name}</span>
+                  {Object.entries(formsByOutpost).slice(0, 3).map(([outpost, forms]) => (
+                    <div key={outpost} className="flex items-center gap-2 text-sm">
+                      <MapPin className="w-4 h-4 text-emerald-500" />
+                      <span className="text-slate-600 truncate">{outpost} ({forms.length})</span>
                     </div>
                   ))}
-                  {formCount > 3 && (
-                    <div className="text-sm text-slate-400">+{formCount - 3} נוספים</div>
+                  {outpostCount > 3 && (
+                    <div className="text-sm text-slate-400">+{outpostCount - 3} מוצבים</div>
                   )}
                 </div>
               )}
@@ -152,54 +207,69 @@ export function TripFormsCard() {
               <p className="text-slate-500">אין טפסים מאז חמישי</p>
             </div>
           ) : (
-            <div className="space-y-4 mt-4">
-              {/* Group by outpost - get unique outposts from profiles or use "לא משויך" */}
-              {(() => {
-                // Group forms by outpost (using soldier_name to infer outpost if available)
-                const formsByOutpost: { [key: string]: TripForm[] } = {};
-                periodForms.forEach(form => {
-                  const outpost = "כללי"; // Default grouping
-                  if (!formsByOutpost[outpost]) formsByOutpost[outpost] = [];
-                  formsByOutpost[outpost].push(form);
-                });
+            <div className="space-y-3 mt-4">
+              {Object.entries(formsByOutpost).map(([outpost, forms]) => {
+                const isExpanded = expandedOutposts.has(outpost);
                 
-                return Object.entries(formsByOutpost).map(([outpost, forms]) => (
-                  <div key={outpost} className="space-y-2">
-                    <h4 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      {outpost} ({forms.length})
-                    </h4>
-                    {forms.map((form) => (
-                      <div
-                        key={form.id}
-                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                          <div>
-                            <div className="font-semibold text-slate-800">{form.soldier_name}</div>
-                            <div className="text-sm text-slate-500">
-                              {format(new Date(form.created_at), 'HH:mm', { locale: he })}
-                              {form.officer_name && ` • תודרך ע"י ${form.officer_name}`}
-                            </div>
-                          </div>
+                return (
+                  <div key={outpost} className="border border-slate-200 rounded-xl overflow-hidden">
+                    {/* Outpost Header - Clickable */}
+                    <button
+                      onClick={() => toggleOutpost(outpost)}
+                      className="w-full p-4 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                          <MapPin className="w-5 h-5 text-white" />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedForm(form);
-                          }}
-                          className="text-slate-600 hover:text-primary"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <div className="text-right">
+                          <div className="font-bold text-slate-800">{outpost}</div>
+                          <div className="text-sm text-slate-500">{forms.length} חיילים</div>
+                        </div>
                       </div>
-                    ))}
+                      {isExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-slate-400" />
+                      )}
+                    </button>
+                    
+                    {/* Soldiers List - Collapsible */}
+                    {isExpanded && (
+                      <div className="p-3 space-y-2 bg-white">
+                        {forms.map((form) => (
+                          <div
+                            key={form.id}
+                            className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between hover:bg-slate-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <CheckCircle2 className="w-5 h-5 text-green-500" />
+                              <div>
+                                <div className="font-semibold text-slate-800">{form.soldier_name}</div>
+                                <div className="text-sm text-slate-500">
+                                  {format(new Date(form.created_at), 'dd/MM HH:mm', { locale: he })}
+                                  {form.officer_name && ` • תודרך ע"י ${form.officer_name}`}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedForm(form);
+                              }}
+                              className="text-slate-600 hover:text-primary"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ));
-              })()}
+                );
+              })}
             </div>
           )}
         </DialogContent>
@@ -218,6 +288,10 @@ export function TripFormsCard() {
                 <div className="font-bold text-lg text-slate-800 mb-1">{selectedForm.soldier_name}</div>
                 <div className="text-sm text-slate-500">
                   {format(new Date(selectedForm.created_at), 'dd/MM/yyyy HH:mm', { locale: he })}
+                </div>
+                <div className="text-sm text-emerald-600 font-medium mt-1">
+                  <MapPin className="w-4 h-4 inline ml-1" />
+                  {getOutpostForUser(selectedForm.user_id)}
                 </div>
               </div>
 
