@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Home, CheckCircle2, Shirt, Car, ClipboardList } from "lucide-react";
+import { Home, CheckCircle2, Shirt, Car, ClipboardList, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { OUTPOSTS } from "@/lib/constants";
 
 interface FormData {
   weaponReset: boolean;
@@ -22,6 +24,7 @@ interface FormData {
   vehicleReturned: boolean;
   notes: string;
   signature: string;
+  outpost: string;
 }
 
 // הגדרת הסעיפים לפי קטגוריות
@@ -75,6 +78,7 @@ export default function TripForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [userName, setUserName] = useState("");
+  const [personalNumber, setPersonalNumber] = useState("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   
@@ -90,15 +94,16 @@ export default function TripForm() {
     vehicleReturned: false,
     notes: "",
     signature: "",
+    outpost: "",
   });
 
   useEffect(() => {
     const fetchUserAndCheck = async () => {
       if (user?.id) {
-        // Fetch user name
+        // Fetch user name and personal number
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, personal_number')
           .eq('user_id', user.id)
           .maybeSingle();
         
@@ -106,6 +111,10 @@ export default function TripForm() {
           setUserName(profile.full_name);
         } else if (user.user_metadata?.full_name) {
           setUserName(user.user_metadata.full_name);
+        }
+        
+        if (profile?.personal_number) {
+          setPersonalNumber(profile.personal_number);
         }
         
         // Check if already submitted this week (since last Thursday)
@@ -228,6 +237,11 @@ export default function TripForm() {
       toast.error("יש להזין את שם החייל");
       return;
     }
+
+    if (!formData.outpost) {
+      toast.error("יש לבחור מוצב");
+      return;
+    }
     
     if (!allItemsChecked) {
       toast.error("יש לסמן את כל הסעיפים");
@@ -249,6 +263,7 @@ export default function TripForm() {
       const { error } = await supabase.from('trip_forms').insert({
         user_id: user?.id,
         soldier_name: userName,
+        outpost: formData.outpost,
         weapon_reset: true, // יש סעיף על איפסון נשק ברשימה
         exit_briefing_by_officer: true, // יש סעיף על תדריך יציאה ברשימה
         officer_name: formData.officerName,
@@ -336,17 +351,51 @@ export default function TripForm() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg text-slate-800">פרטי החייל</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="soldierName" className="text-slate-700">שם החייל *</Label>
+                <Label htmlFor="soldierName" className="text-slate-700">שם החייל</Label>
                 <Input
                   id="soldierName"
                   value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="הזן את שמך המלא"
-                  className="bg-white text-slate-900 placeholder:text-slate-400"
+                  readOnly
+                  disabled
+                  className="bg-slate-100 text-slate-900 font-medium cursor-not-allowed"
                 />
               </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="personalNumber" className="text-slate-700">מספר אישי</Label>
+                <Input
+                  id="personalNumber"
+                  value={personalNumber}
+                  readOnly
+                  disabled
+                  className="bg-slate-100 text-slate-900 font-medium cursor-not-allowed"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-slate-700 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  מוצב *
+                </Label>
+                <Select
+                  value={formData.outpost}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, outpost: value }))}
+                >
+                  <SelectTrigger className="bg-white text-slate-900">
+                    <SelectValue placeholder="בחר מוצב" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OUTPOSTS.map((outpost) => (
+                      <SelectItem key={outpost} value={outpost}>
+                        {outpost}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div className="text-sm text-slate-500">תאריך: {new Date().toLocaleDateString('he-IL')}</div>
             </CardContent>
           </Card>

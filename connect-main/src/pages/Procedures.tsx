@@ -94,6 +94,7 @@ export default function Procedures() {
   const [selectedProcedure, setSelectedProcedure] = useState<ProcedureType | null>(null);
   const [items, setItems] = useState<ProcedureItem[]>([]);
   const [fullName, setFullName] = useState("");
+  const [personalNumber, setPersonalNumber] = useState("");
   const [signature, setSignature] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mySignatures, setMySignatures] = useState<SignatureRecord[]>([]);
@@ -102,7 +103,24 @@ export default function Procedures() {
 
   useEffect(() => {
     fetchMySignatures();
+    fetchUserProfile();
   }, [user]);
+  
+  const fetchUserProfile = async () => {
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, personal_number')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (profile?.full_name) {
+      setFullName(profile.full_name);
+    }
+    if (profile?.personal_number) {
+      setPersonalNumber(profile.personal_number);
+    }
+  };
 
   useEffect(() => {
     if (selectedProcedure) {
@@ -113,7 +131,6 @@ export default function Procedures() {
       }));
       setItems(procedureItems);
       setReadAndUnderstood(false);
-      setFullName("");
       setSignature("");
     }
   }, [selectedProcedure]);
@@ -313,16 +330,29 @@ export default function Procedures() {
 
                   {readAndUnderstood && (
                     <div className="space-y-4 animate-fade-in">
-                      {/* Name Input */}
+                      {/* Name Display (Read Only) */}
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2">
                           שם מלא
                         </label>
                         <Input
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          placeholder="הזן שם מלא"
-                          className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-primary text-slate-800 text-right"
+                          readOnly
+                          disabled
+                          className="h-12 rounded-xl bg-slate-100 border-slate-200 text-slate-800 text-right font-medium cursor-not-allowed"
+                        />
+                      </div>
+
+                      {/* Personal Number Display (Read Only) */}
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">
+                          מספר אישי
+                        </label>
+                        <Input
+                          value={personalNumber}
+                          readOnly
+                          disabled
+                          className="h-12 rounded-xl bg-slate-100 border-slate-200 text-slate-800 text-right font-medium cursor-not-allowed"
                         />
                       </div>
 

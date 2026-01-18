@@ -1265,6 +1265,7 @@ export type Database = {
           id: string
           notes: string | null
           officer_name: string | null
+          outpost: string | null
           personal_equipment_checked: boolean
           signature: string
           soldier_name: string
@@ -1281,6 +1282,7 @@ export type Database = {
           id?: string
           notes?: string | null
           officer_name?: string | null
+          outpost?: string | null
           personal_equipment_checked?: boolean
           signature: string
           soldier_name: string
@@ -1297,6 +1299,7 @@ export type Database = {
           id?: string
           notes?: string | null
           officer_name?: string | null
+          outpost?: string | null
           personal_equipment_checked?: boolean
           signature?: string
           soldier_name?: string

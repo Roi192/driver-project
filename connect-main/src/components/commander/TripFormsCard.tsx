@@ -21,16 +21,11 @@ interface TripForm {
   notes: string | null;
   created_at: string;
   user_id: string;
-}
-
-interface Profile {
-  user_id: string;
   outpost: string | null;
 }
 
 export function TripFormsCard() {
   const [periodForms, setPeriodForms] = useState<TripForm[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState<TripForm | null>(null);
   const [showAllDialog, setShowAllDialog] = useState(false);
@@ -63,23 +58,14 @@ export function TripFormsCard() {
       const periodStart = getMostRecentThursday(now);
       const periodStartStr = format(periodStart, 'yyyy-MM-dd');
 
-      // Fetch trip forms and profiles in parallel
-      const [formsResult, profilesResult] = await Promise.all([
-        supabase
-          .from('trip_forms')
-          .select('*')
-          .gte('form_date', periodStartStr)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('profiles')
-          .select('user_id, outpost')
-      ]);
+      const { data, error } = await supabase
+        .from('trip_forms')
+        .select('*')
+        .gte('form_date', periodStartStr)
+        .order('created_at', { ascending: false });
 
-      if (formsResult.error) throw formsResult.error;
-      if (profilesResult.error) throw profilesResult.error;
-
-      setPeriodForms((formsResult.data as TripForm[]) || []);
-      setProfiles((profilesResult.data as Profile[]) || []);
+      if (error) throw error;
+      setPeriodForms((data as TripForm[]) || []);
     } catch (error) {
       console.error('Error fetching trip forms:', error);
     } finally {
@@ -87,16 +73,11 @@ export function TripFormsCard() {
     }
   };
 
-  const getOutpostForUser = (userId: string): string => {
-    const profile = profiles.find(p => p.user_id === userId);
-    return profile?.outpost || "לא משויך";
-  };
-
   const getFormsByOutpost = (): { [key: string]: TripForm[] } => {
     const formsByOutpost: { [key: string]: TripForm[] } = {};
     
     periodForms.forEach(form => {
-      const outpost = getOutpostForUser(form.user_id);
+      const outpost = form.outpost || "לא משויך";
       if (!formsByOutpost[outpost]) formsByOutpost[outpost] = [];
       formsByOutpost[outpost].push(form);
     });
@@ -291,7 +272,7 @@ export function TripFormsCard() {
                 </div>
                 <div className="text-sm text-emerald-600 font-medium mt-1">
                   <MapPin className="w-4 h-4 inline ml-1" />
-                  {getOutpostForUser(selectedForm.user_id)}
+                  {selectedForm.outpost || "לא צוין"}
                 </div>
               </div>
 
