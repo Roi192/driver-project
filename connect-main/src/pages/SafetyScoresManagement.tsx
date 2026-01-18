@@ -108,6 +108,15 @@ interface ExcellenceCandidate {
   attendanceRate: number | null;
   isEligible: boolean;
   disqualifyReasons: string[];
+  // Additional detailed data
+  harshBraking?: number;
+  harshTurns?: number;
+  harshAccelerations?: number;
+  illegalOvertakes?: number;
+  cleaningParadesCount?: number;
+  inspectionsCount?: number;
+  eventsAttended?: number;
+  eventsTotal?: number;
 }
 
 export default function SafetyScoresManagement() {
@@ -172,6 +181,17 @@ export default function SafetyScoresManagement() {
   const [excellenceMonth, setExcellenceMonth] = useState(defaultFormDate.month);
   const [excellenceYear, setExcellenceYear] = useState(defaultFormDate.year);
   const [loadingExcellence, setLoadingExcellence] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<ExcellenceCandidate | null>(null);
+  const [candidateDetailOpen, setCandidateDetailOpen] = useState(false);
+  const [manualExcellenceDialogOpen, setManualExcellenceDialogOpen] = useState(false);
+  const [manualExcellenceData, setManualExcellenceData] = useState({
+    soldier_id: "",
+    excellence_month: defaultFormDate.month,
+    excellence_year: defaultFormDate.year,
+    safety_score: 100,
+    kilometers: 0,
+    notes: "",
+  });
 
   const [formData, setFormData] = useState({
     soldier_id: "",
@@ -662,6 +682,10 @@ export default function SafetyScoresManagement() {
       const attendanceBonus = attendanceRate ? (attendanceRate * 0.05) : 0;
       const calculatedScore = (baseScore * kmBonus) + inspectionBonus + attendanceBonus;
       
+      // Calculate events attended
+      const soldierAttendedCount = soldierAttendance.filter(ea => ea.attended === true).length;
+      const soldierTotalEvents = soldierAttendance.length;
+      
       candidates.push({
         soldier,
         safetyScore: score.safety_score,
@@ -675,6 +699,14 @@ export default function SafetyScoresManagement() {
         attendanceRate,
         isEligible: disqualifyReasons.length === 0,
         disqualifyReasons,
+        harshBraking: score.harsh_braking || 0,
+        harshTurns: score.harsh_turns || 0,
+        harshAccelerations: score.harsh_accelerations || 0,
+        illegalOvertakes: score.illegal_overtakes || 0,
+        cleaningParadesCount: cleaningParades?.filter(cp => cp.user_id === soldier.id).length || 0,
+        inspectionsCount: soldierInspections.length,
+        eventsAttended: soldierAttendedCount,
+        eventsTotal: soldierTotalEvents,
       });
     }
     
@@ -724,6 +756,56 @@ export default function SafetyScoresManagement() {
       toast.success(`${candidate.soldier.full_name} נבחר כמצטיין החודש! 🏆`);
       fetchData();
       setExcellenceDialogOpen(false);
+    }
+  };
+  
+  const openCandidateDetail = (candidate: ExcellenceCandidate) => {
+    setSelectedCandidate(candidate);
+    setCandidateDetailOpen(true);
+  };
+  
+  const handleManualExcellenceSubmit = async () => {
+    if (!manualExcellenceData.soldier_id) {
+      toast.error("יש לבחור חייל");
+      return;
+    }
+    
+    const monthStr = `${manualExcellenceData.excellence_year}-${String(manualExcellenceData.excellence_month).padStart(2, '0')}-01`;
+    
+    const { error } = await supabase
+      .from("monthly_excellence")
+      .insert({
+        soldier_id: manualExcellenceData.soldier_id,
+        excellence_month: monthStr,
+        safety_score: manualExcellenceData.safety_score,
+        kilometers: manualExcellenceData.kilometers,
+        calculated_score: 0, // External winner - no calculated score
+        speed_violations: 0,
+        accidents_count: 0,
+        punishments_count: 0,
+        cleaning_parades_on_time: true,
+        avg_inspection_score: null,
+        selected_by: user?.id,
+      });
+    
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("כבר נבחר מצטיין לחודש זה");
+      } else {
+        toast.error("שגיאה בהוספת מצטיין");
+      }
+    } else {
+      toast.success("מצטיין חיצוני נוסף בהצלחה! 🏆");
+      fetchData();
+      setManualExcellenceDialogOpen(false);
+      setManualExcellenceData({
+        soldier_id: "",
+        excellence_month: defaultFormDate.month,
+        excellence_year: defaultFormDate.year,
+        safety_score: 100,
+        kilometers: 0,
+        notes: "",
+      });
     }
   };
 
@@ -1191,6 +1273,14 @@ export default function SafetyScoresManagement() {
                     >
                       {loadingExcellence ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Search className="w-4 h-4 ml-1" />}
                       חפש מועמדים
+                    </Button>
+                    <Button
+                      onClick={() => setManualExcellenceDialogOpen(true)}
+                      variant="outline"
+                      className="rounded-xl border-amber-300 text-amber-700 hover:bg-amber-50"
+                    >
+                      <Plus className="w-4 h-4 ml-1" />
+                      הוסף מצטיין חיצוני
                     </Button>
                   </div>
                 </CardContent>
@@ -1801,13 +1891,15 @@ export default function SafetyScoresManagement() {
             </DialogHeader>
             
             <div className="space-y-3">
+              <p className="text-xs text-slate-500">לחץ על מועמד לצפייה בפרטים מלאים</p>
               {excellenceCandidates.slice(0, 5).map((candidate, index) => (
                 <div
                   key={candidate.soldier.id}
-                  className={`p-4 rounded-2xl border-2 transition-all ${
+                  onClick={() => openCandidateDetail(candidate)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
                     candidate.isEligible 
-                      ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-300 hover:shadow-lg cursor-pointer"
-                      : "bg-slate-50 border-slate-200 opacity-60"
+                      ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-300 hover:shadow-lg"
+                      : "bg-slate-50 border-slate-200 opacity-60 hover:opacity-80"
                   }`}
                 >
                   <div className="flex items-start justify-between">
@@ -1831,14 +1923,6 @@ export default function SafetyScoresManagement() {
                           <span>ק"מ: <strong>{candidate.kilometers}</strong></span>
                           <span>ניקוד משוקלל: <strong>{candidate.calculatedScore.toFixed(1)}</strong></span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
-                          {candidate.avgInspectionScore !== null && (
-                            <span>ממוצע ביקורות: {candidate.avgInspectionScore.toFixed(0)}</span>
-                          )}
-                          {candidate.attendanceRate !== null && (
-                            <span>נוכחות: {candidate.attendanceRate.toFixed(0)}%</span>
-                          )}
-                        </div>
                         
                         {!candidate.isEligible && (
                           <div className="mt-2">
@@ -1854,7 +1938,7 @@ export default function SafetyScoresManagement() {
                     
                     {candidate.isEligible && (
                       <Button
-                        onClick={() => selectExcellenceWinner(candidate)}
+                        onClick={(e) => { e.stopPropagation(); selectExcellenceWinner(candidate); }}
                         className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white"
                       >
                         <Crown className="w-4 h-4 ml-1" />
@@ -1942,6 +2026,282 @@ export default function SafetyScoresManagement() {
               <Button onClick={handleImport} disabled={importing} className="bg-primary">
                 {importing ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
                 ייבא ציונים
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Candidate Detail Dialog */}
+        <Dialog open={candidateDetailOpen} onOpenChange={setCandidateDetailOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                פרטי מועמד: {selectedCandidate?.soldier.full_name}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedCandidate && (
+              <div className="space-y-4">
+                {/* Safety Score Section */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200">
+                  <h4 className="font-bold text-amber-800 mb-3 flex items-center gap-2">
+                    <Gauge className="w-4 h-4" />
+                    ציון בטיחות
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">ציון כללי:</span>
+                      <Badge className={`${getScoreColor(selectedCandidate.safetyScore)} text-white`}>
+                        {selectedCandidate.safetyScore}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">קילומטרים:</span>
+                      <strong>{selectedCandidate.kilometers}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">חריגות מהירות:</span>
+                      <strong className={selectedCandidate.speedViolations > 0 ? "text-red-600" : "text-emerald-600"}>
+                        {selectedCandidate.speedViolations}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">בלימות חדות:</span>
+                      <strong>{selectedCandidate.harshBraking || 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">פניות חדות:</span>
+                      <strong>{selectedCandidate.harshTurns || 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">האצות חדות:</span>
+                      <strong>{selectedCandidate.harshAccelerations || 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">עקיפות מסוכנות:</span>
+                      <strong>{selectedCandidate.illegalOvertakes || 0}</strong>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Events Section */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    אירועים
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">תאונות:</span>
+                      <strong className={selectedCandidate.accidentsCount > 0 ? "text-red-600" : "text-emerald-600"}>
+                        {selectedCandidate.accidentsCount}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">עונשים/שלילות:</span>
+                      <strong className={selectedCandidate.punishmentsCount > 0 ? "text-red-600" : "text-emerald-600"}>
+                        {selectedCandidate.punishmentsCount}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Cleaning Parades & Inspections */}
+                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200">
+                  <h4 className="font-bold text-blue-800 mb-3 flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4" />
+                    מסדרים וביקורות
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">מסדרי ניקיון:</span>
+                      <strong>{selectedCandidate.cleaningParadesCount || 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">ביקורות:</span>
+                      <strong>{selectedCandidate.inspectionsCount || 0}</strong>
+                    </div>
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-slate-600">ממוצע ציון ביקורות:</span>
+                      <strong>{selectedCandidate.avgInspectionScore?.toFixed(0) || "אין"}</strong>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Attendance Section */}
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                  <h4 className="font-bold text-emerald-800 mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    נוכחות
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">אירועים שהשתתף:</span>
+                      <strong>{selectedCandidate.eventsAttended || 0} מתוך {selectedCandidate.eventsTotal || 0}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">אחוז נוכחות:</span>
+                      <strong className={
+                        (selectedCandidate.attendanceRate || 0) >= 80 ? "text-emerald-600" : 
+                        (selectedCandidate.attendanceRate || 0) >= 60 ? "text-amber-600" : "text-red-600"
+                      }>
+                        {selectedCandidate.attendanceRate?.toFixed(0) || 0}%
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Calculated Score */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-purple-800">ניקוד משוקלל סופי:</span>
+                    <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-lg px-4 py-1">
+                      {selectedCandidate.calculatedScore.toFixed(2)}
+                    </Badge>
+                  </div>
+                </div>
+                
+                {/* Eligibility Status */}
+                {!selectedCandidate.isEligible && (
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200">
+                    <h4 className="font-bold text-red-800 mb-2">סיבות פסילה:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCandidate.disqualifyReasons.map((reason, i) => (
+                        <Badge key={i} variant="outline" className="text-red-600 border-red-300">
+                          {reason}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCandidateDetailOpen(false)}>
+                סגור
+              </Button>
+              {selectedCandidate?.isEligible && (
+                <Button 
+                  onClick={() => {
+                    selectExcellenceWinner(selectedCandidate);
+                    setCandidateDetailOpen(false);
+                  }}
+                  className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white"
+                >
+                  <Crown className="w-4 h-4 ml-1" />
+                  בחר כמצטיין
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Manual Excellence Dialog */}
+        <Dialog open={manualExcellenceDialogOpen} onOpenChange={setManualExcellenceDialogOpen}>
+          <DialogContent className="max-w-md" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Crown className="w-5 h-5 text-amber-500" />
+                הוספת מצטיין חיצוני
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">
+                הוסף מצטיין חיצוני שלא קשור לחישוב האוטומטי
+              </p>
+              
+              <div>
+                <Label>חייל *</Label>
+                <Select 
+                  value={manualExcellenceData.soldier_id} 
+                  onValueChange={(value) => setManualExcellenceData({ ...manualExcellenceData, soldier_id: value })}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="בחר חייל" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {soldiers.map(soldier => (
+                      <SelectItem key={soldier.id} value={soldier.id}>
+                        {soldier.full_name} ({soldier.personal_number})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>שנה</Label>
+                  <Select 
+                    value={String(manualExcellenceData.excellence_year)} 
+                    onValueChange={(v) => setManualExcellenceData({ ...manualExcellenceData, excellence_year: Number(v) })}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[2024, 2025, 2026, 2027].map(year => (
+                        <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>חודש</Label>
+                  <Select 
+                    value={String(manualExcellenceData.excellence_month)} 
+                    onValueChange={(v) => setManualExcellenceData({ ...manualExcellenceData, excellence_month: Number(v) })}
+                  >
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS_HEB.map(month => (
+                        <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>ציון בטיחות (אופציונלי)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={manualExcellenceData.safety_score}
+                    onChange={(e) => setManualExcellenceData({ ...manualExcellenceData, safety_score: Number(e.target.value) })}
+                    className="rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label>קילומטרים (אופציונלי)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={manualExcellenceData.kilometers}
+                    onChange={(e) => setManualExcellenceData({ ...manualExcellenceData, kilometers: Number(e.target.value) })}
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setManualExcellenceDialogOpen(false)}>
+                ביטול
+              </Button>
+              <Button 
+                onClick={handleManualExcellenceSubmit}
+                className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white"
+              >
+                <Crown className="w-4 h-4 ml-1" />
+                הוסף מצטיין
               </Button>
             </DialogFooter>
           </DialogContent>
