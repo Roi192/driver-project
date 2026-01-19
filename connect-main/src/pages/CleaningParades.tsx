@@ -1,471 +1,691 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Camera, Upload, CheckCircle, AlertCircle, Sparkles, ImageIcon, Info, ListChecks } from "lucide-react";
+import { Camera, CheckCircle, AlertCircle, Sparkles, ListChecks, Image, Play, ArrowLeft, MapPin, Calendar } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { OUTPOSTS } from "@/lib/constants";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { he } from "date-fns/locale";
+import { Badge } from "@/components/ui/badge";
 
 const DAY_OPTIONS = [
-  { value: "monday", label: "יום שני", deadline: "12:00", responsibility: "נהג משמרת צהריים של יום ראשון" },
-  { value: "wednesday", label: "יום רביעי", deadline: "11:00", responsibility: "נהג משמרת צהריים של יום שלישי" },
-  { value: "saturday_night", label: "מוצאי שבת", deadline: "22:00", responsibility: "נהג משמרת בוקר של שבת" },
+  { value: "monday", label: "יום שני", deadline: "12:00" },
+  { value: "wednesday", label: "יום רביעי", deadline: "11:00" },
+  { value: "saturday_night", label: "מוצאי שבת", deadline: "22:00" },
 ];
-
-interface ExamplePhoto {
-  id: string;
-  outpost: string;
-  description: string;
-  image_url: string;
-  display_order: number;
-}
 
 interface Highlight {
   id: string;
   title: string;
   display_order: number;
+  area_id: string | null;
 }
+
+interface ResponsibilityArea {
+  id: string;
+  outpost: string;
+  area_name: string;
+  description: string | null;
+  display_order: number | null;
+}
+
+interface ExamplePhoto {
+  id: string;
+  outpost: string | null;
+  description: string;
+  image_url: string;
+  area_id: string | null;
+}
+
+interface MyAssignment {
+  day_of_week: string;
+  area: ResponsibilityArea;
+  is_completed?: boolean;
+}
+
+type Step = "my-tasks" | "parade" | "completed";
 
 export default function CleaningParades() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedOutpost, setSelectedOutpost] = useState("");
-  const [selectedDay, setSelectedDay] = useState("");
-  const [responsibleDriver, setResponsibleDriver] = useState("");
-  const [photos, setPhotos] = useState<{ description: string; url: string }[]>([]);
-  const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
-  const [examplePhotos, setExamplePhotos] = useState<ExamplePhoto[]>([]);
-  const [loadingExamples, setLoadingExamples] = useState(false);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [loadingHighlights, setLoadingHighlights] = useState(true);
+  const [examples, setExamples] = useState<ExamplePhoto[]>([]);
+  const [myArea, setMyArea] = useState<ResponsibilityArea | null>(null);
+  const [loadingArea, setLoadingArea] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [myWeeklyAssignments, setMyWeeklyAssignments] = useState<MyAssignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Link current auth user -> soldiers table (by personal_number)
+  const [soldierId, setSoldierId] = useState<string | null>(null);
+
+  // User selection state
+  const [selectedDay, setSelectedDay] = useState<string>("");
+  const [currentStep, setCurrentStep] = useState<Step>("my-tasks");
 
   const currentDate = format(new Date(), "yyyy-MM-dd");
-  const currentTime = format(new Date(), "HH:mm");
+  const currentWeekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
-  // Fetch highlights on mount
   useEffect(() => {
-    fetchHighlights();
-  }, []);
+    fetchUserContextAndAssignments();
+  }, [user]);
 
-  const fetchHighlights = async () => {
+  const fetchUserContextAndAssignments = async () => {
+    if (!user) return;
+
+    setLoadingAssignments(true);
     try {
-      const { data, error } = await supabase
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('personal_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const personalNumber = profile?.personal_number ?? user.user_metadata?.personal_number ?? null;
+
+      if (!personalNumber) {
+        setSoldierId(null);
+        setLoadingAssignments(false);
+        return;
+      }
+
+      const { data: soldier } = await supabase
+        .from('soldiers')
+        .select('id')
+        .eq('personal_number', personalNumber)
+        .maybeSingle();
+
+      if (!soldier?.id) {
+        setSoldierId(null);
+        setLoadingAssignments(false);
+        return;
+      }
+
+      setSoldierId(soldier.id);
+
+      // Fetch weekly assignments
+      const { data: assignments } = await supabase
+        .from('cleaning_weekly_assignments')
+        .select('*, cleaning_responsibility_areas(*)')
+        .eq('soldier_id', soldier.id)
+        .eq('week_start_date', currentWeekStart);
+
+      if (assignments && assignments.length > 0) {
+        // Check which are completed
+        const { data: completedParades } = await supabase
+          .from('cleaning_parade_assignments')
+          .select('day_of_week')
+          .eq('soldier_id', soldier.id)
+          .eq('parade_date', currentDate)
+          .eq('is_completed', true);
+
+        const completedDays = new Set(completedParades?.map(p => p.day_of_week) || []);
+
+        const myAssignments: MyAssignment[] = assignments
+          .filter(a => a.cleaning_responsibility_areas)
+          .map(a => ({
+            day_of_week: a.day_of_week,
+            area: a.cleaning_responsibility_areas as ResponsibilityArea,
+            is_completed: completedDays.has(a.day_of_week),
+          }));
+
+        setMyWeeklyAssignments(myAssignments);
+      } else {
+        setMyWeeklyAssignments([]);
+      }
+
+      // Set default day based on current day
+      const day = new Date().getDay();
+      if (day === 1) setSelectedDay("monday");
+      else if (day === 3) setSelectedDay("wednesday");
+      else if (day === 6 || day === 0) setSelectedDay("saturday_night");
+      else if (day <= 2) setSelectedDay("monday");
+      else if (day <= 4) setSelectedDay("wednesday");
+      else setSelectedDay("saturday_night");
+
+    } catch (error) {
+      console.error('Error fetching user context:', error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  const startParadeForDay = async (dayOfWeek: string, area: ResponsibilityArea) => {
+    if (!soldierId) {
+      toast.error("המשתמש לא מקושר לחייל בטבלת השליטה");
+      return;
+    }
+
+    setSelectedDay(dayOfWeek);
+    setMyArea(area);
+    setLoadingArea(true);
+
+    try {
+      // Check if already completed today
+      const { data: existingParade } = await supabase
+        .from('cleaning_parade_assignments')
+        .select('*')
+        .eq('soldier_id', soldierId)
+        .eq('parade_date', currentDate)
+        .eq('day_of_week', dayOfWeek)
+        .eq('is_completed', true)
+        .maybeSingle();
+
+      if (existingParade) {
+        setPhotoUrl(existingParade.photo_url);
+        setCurrentStep("completed");
+        setLoadingArea(false);
+        return;
+      }
+
+      // Fetch highlights and examples for this area
+      await fetchHighlightsAndExamples(area.id);
+      setCurrentStep("parade");
+    } catch (error) {
+      console.error('Error starting parade:', error);
+      toast.error("שגיאה בטעינת נתונים");
+    } finally {
+      setLoadingArea(false);
+    }
+  };
+
+  const fetchHighlightsAndExamples = async (areaId: string) => {
+    const [highlightsRes, examplesRes] = await Promise.all([
+      supabase
         .from('cleaning_parade_highlights')
         .select('*')
+        .eq('area_id', areaId)
         .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setHighlights(data || []);
-    } catch (error: any) {
-      console.error('Error fetching highlights:', error);
-    } finally {
-      setLoadingHighlights(false);
-    }
-  };
-
-  const selectedDayInfo = DAY_OPTIONS.find(d => d.value === selectedDay);
-
-  // Fetch example photos when outpost changes
-  useEffect(() => {
-    if (selectedOutpost) {
-      fetchExamplePhotos(selectedOutpost);
-    } else {
-      setExamplePhotos([]);
-      setPhotos([]);
-    }
-  }, [selectedOutpost]);
-
-  const fetchExamplePhotos = async (outpost: string) => {
-    setLoadingExamples(true);
-    try {
-      const { data, error } = await supabase
+        .order('display_order'),
+      supabase
         .from('cleaning_parade_examples')
         .select('*')
-        .eq('outpost', outpost)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setExamplePhotos(data || []);
-      // Initialize photos array with empty slots for each example
-      setPhotos((data || []).map(ex => ({ description: ex.description, url: "" })));
-    } catch (error: any) {
-      console.error('Error fetching example photos:', error);
-    } finally {
-      setLoadingExamples(false);
-    }
+        .eq('area_id', areaId)
+        .order('display_order'),
+    ]);
+    
+    setHighlights(highlightsRes.data || []);
+    setExamples(examplesRes.data || []);
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number, description: string) => {
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user || !myArea) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast.error("אנא בחר קובץ תמונה");
+      toast.error("אנא צלם תמונה");
       return;
     }
 
-    // Validate file size (max 10MB for camera photos)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("גודל הקובץ חייב להיות עד 10MB");
+      toast.error("גודל התמונה חייב להיות עד 10MB");
       return;
     }
 
-    setUploadingPhoto(description);
+    setUploading(true);
     try {
-      // Get file extension from name or type
-      let fileExt = file.name.split('.').pop()?.toLowerCase();
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/heic': 'jpg',
+        'image/heif': 'jpg',
+      };
+      const fileExt = mimeToExt[file.type] || 'jpg';
+      const fileName = `${user.id}/${currentDate}/${myArea.id}_${Date.now()}.${fileExt}`;
       
-      // If no extension or it's a blob, use type to determine extension
-      if (!fileExt || fileExt === file.name || file.name.startsWith('image')) {
-        const mimeToExt: Record<string, string> = {
-          'image/jpeg': 'jpg',
-          'image/jpg': 'jpg',
-          'image/png': 'png',
-          'image/gif': 'gif',
-          'image/webp': 'webp',
-          'image/heic': 'jpg', // Convert HEIC to jpg in filename
-          'image/heif': 'jpg',
-        };
-        fileExt = mimeToExt[file.type] || 'jpg';
-      }
-      
-      const fileName = `${user.id}/${Date.now()}_${index}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
+      await supabase.storage.from('cleaning-parades').upload(fileName, file, { contentType: file.type || 'image/jpeg' });
+
+      const { data: signedUrlData } = await supabase.storage
         .from('cleaning-parades')
-        .upload(fileName, file, {
-          contentType: file.type || 'image/jpeg',
-        });
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365);
 
-      if (uploadError) throw uploadError;
-
-      // Get signed URL for secure access (1 year validity)
-      const { data: signedUrlData, error: signedError } = await supabase.storage
-        .from('cleaning-parades')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
-
-      if (signedError || !signedUrlData?.signedUrl) {
-        throw signedError || new Error('Failed to generate signed URL');
-      }
-      const signedUrl = signedUrlData.signedUrl;
-
-      setPhotos(prev => {
-        const newPhotos = [...prev];
-        newPhotos[index] = { description, url: signedUrl };
-        return newPhotos;
-      });
+      setPhotoUrl(signedUrlData?.signedUrl || null);
       toast.success("התמונה הועלתה בהצלחה");
     } catch (error: any) {
       console.error('Error uploading photo:', error);
-      toast.error(error.message || "שגיאה בהעלאת התמונה");
+      toast.error("שגיאה בהעלאת התמונה");
     } finally {
-      setUploadingPhoto(null);
+      setUploading(false);
     }
   };
-
-  const removePhoto = (index: number) => {
-    setPhotos(prev => {
-      const newPhotos = [...prev];
-      newPhotos[index] = { ...newPhotos[index], url: "" };
-      return newPhotos;
-    });
-  };
-
-  const allPhotosUploaded = examplePhotos.length > 0 && photos.every(p => p.url !== "");
 
   const handleSubmit = async () => {
-    if (!user || !selectedOutpost || !selectedDay || !responsibleDriver) {
-      toast.error("נא למלא את כל השדות");
-      return;
-    }
-
-    if (examplePhotos.length > 0 && !allPhotosUploaded) {
-      toast.error("נא להעלות את כל התמונות הנדרשות");
-      return;
-    }
-
-    if (examplePhotos.length === 0) {
-      toast.error("אין תמונות דוגמא מוגדרות למוצב זה. פנה למנהל.");
+    if (!user || !myArea || !photoUrl || !soldierId) {
+      toast.error("נא להעלות תמונה של תחום האחריות שלך");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      const { data: paradeData, error: paradeError } = await supabase
         .from('cleaning_parades')
         .insert({
           user_id: user.id,
-          outpost: selectedOutpost,
+          outpost: myArea.outpost,
           day_of_week: selectedDay,
-          responsible_driver: responsibleDriver,
-          photos: photos.map(p => p.url),
-        });
+          responsible_driver: user.user_metadata?.full_name || "לא ידוע",
+          photos: [photoUrl],
+          parade_date: currentDate,
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (paradeError) throw paradeError;
 
-      toast.success("מסדר הניקיון נשמר בהצלחה!");
-      // Reset form
-      setSelectedOutpost("");
-      setSelectedDay("");
-      setResponsibleDriver("");
-      setPhotos([]);
-      setExamplePhotos([]);
+      await supabase.from('cleaning_parade_assignments').insert({
+        parade_id: paradeData.id,
+        soldier_id: soldierId,
+        area_id: myArea.id,
+        parade_date: currentDate,
+        day_of_week: selectedDay,
+        outpost: myArea.outpost,
+        is_completed: true,
+        photo_url: photoUrl,
+      });
+
+      toast.success("המסדר נשמר בהצלחה!");
+      setCurrentStep("completed");
     } catch (error: any) {
       console.error('Error submitting parade:', error);
-      const message =
-        error?.message ||
-        error?.error_description ||
-        (typeof error === 'string' ? error : null) ||
-        "שגיאה בשמירת המסדר";
-      const details = error?.details || error?.hint;
-      toast.error(details ? `${message} (${details})` : message);
+      toast.error("שגיאה בשמירת המסדר");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const goBack = () => {
+    setCurrentStep("my-tasks");
+    setMyArea(null);
+    setPhotoUrl(null);
+    setHighlights([]);
+    setExamples([]);
+  };
+
+  const goToStart = () => {
+    setCurrentStep("my-tasks");
+    setMyArea(null);
+    setPhotoUrl(null);
+    setHighlights([]);
+    setExamples([]);
+    fetchUserContextAndAssignments();
+  };
+
+  const currentDayInfo = DAY_OPTIONS.find(d => d.value === selectedDay);
+
+  // Get unique outposts from assignments
+  const assignedOutposts = [...new Set(myWeeklyAssignments.map(a => a.area.outpost))];
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-gradient-to-br from-white via-slate-50/80 to-cream/20">
         <div className="relative px-4 py-6 space-y-6 pb-24">
-          {/* Header */}
           <PageHeader
             icon={Sparkles}
-            title="מסדרי ניקיון"
-            subtitle="דיווח על ביצוע מסדר ניקיון"
-            badge="מסדרי ניקיון"
+            title="מסדר ניקיון"
+            subtitle={currentStep === "my-tasks" ? "המשימות שלי לשבוע הנוכחי" : currentStep === "parade" ? "צלם את תחום האחריות" : "המסדר הושלם"}
+            badge={format(new Date(), "dd/MM", { locale: he })}
           />
 
-          {/* Current Date/Time Display */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-primary/10 rounded-xl">
-                  <p className="text-xs text-slate-500">תאריך</p>
-                  <p className="font-bold text-lg text-primary">{format(new Date(), "dd/MM/yyyy", { locale: he })}</p>
-                </div>
-                <div className="text-center p-3 bg-accent/10 rounded-xl">
-                  <p className="text-xs text-slate-500">שעה</p>
-                  <p className="font-bold text-lg text-accent">{currentTime}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Highlights Section */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ListChecks className="w-5 h-5 text-primary" />
-                דגשים למסדר ניקיון
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              {loadingHighlights ? (
-                <div className="flex items-center justify-center py-4">
-                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : highlights.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">אין דגשים מוגדרים</p>
-              ) : (
-                <ul className="space-y-2">
-                  {highlights.map((highlight, index) => (
-                    <li key={highlight.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                      <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm text-amber-800 font-medium">{highlight.title}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Form */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardContent className="p-4 space-y-4">
-              <div className="space-y-2">
-                <Label>מוצב</Label>
-                <Select value={selectedOutpost} onValueChange={setSelectedOutpost}>
-                  <SelectTrigger className="bg-white text-slate-900">
-                    <SelectValue placeholder="בחר מוצב" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {OUTPOSTS.map(outpost => (
-                      <SelectItem key={outpost} value={outpost} className="text-slate-900">{outpost}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>יום בשבוע</Label>
-                <Select value={selectedDay} onValueChange={setSelectedDay}>
-                  <SelectTrigger className="bg-white text-slate-900">
-                    <SelectValue placeholder="בחר יום" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {DAY_OPTIONS.map(day => (
-                      <SelectItem key={day.value} value={day.value} className="text-slate-900">
-                        {day.label} - עד {day.deadline}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedDayInfo && (
-                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
-                  <p className="text-sm text-blue-700">
-                    <strong>אחריות:</strong> {selectedDayInfo.responsibility}
-                  </p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    <strong>זמן הגשה:</strong> עד {selectedDayInfo.deadline}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>אחראי מסדר (שם הנהג)</Label>
-                <Input 
-                  value={responsibleDriver}
-                  onChange={(e) => setResponsibleDriver(e.target.value)}
-                  placeholder="הזן את שמך"
-                  className="bg-white text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Example Photos Section */}
-          {selectedOutpost && (
-            <Card className="border-slate-200/60 shadow-lg">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-primary" />
-                  תמונות דוגמא - כך צריך להיראות
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {loadingExamples ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : examplePhotos.length === 0 ? (
-                  <div className="text-center py-8 bg-amber-50 rounded-xl border border-amber-200">
-                    <AlertCircle className="w-10 h-10 text-amber-500 mx-auto mb-2" />
-                    <p className="text-amber-700 font-medium">אין תמונות דוגמא מוגדרות למוצב זה</p>
-                    <p className="text-amber-600 text-sm mt-1">פנה למנהל להוספת תמונות דוגמא</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="p-3 bg-green-50 rounded-xl border border-green-200 flex items-start gap-2">
-                      <Info className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-green-700">
-                        להלן תמונות הדוגמא. עליך לצלם ולהעלות תמונה תואמת לכל אחת מהדוגמאות.
-                      </p>
+          {/* Step: My Weekly Tasks */}
+          {currentStep === "my-tasks" && (
+            <div className="space-y-4">
+              {/* Date Info */}
+              <Card className="border-slate-200/60 shadow-lg bg-gradient-to-r from-primary/5 to-accent/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500">שבוע החל מ-</p>
+                      <p className="font-bold text-lg text-slate-800">{format(new Date(currentWeekStart), "dd/MM/yyyy", { locale: he })}</p>
                     </div>
-
-                    {examplePhotos.map((example, index) => (
-                      <div key={example.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-primary text-white text-sm flex items-center justify-center font-bold">
-                            {index + 1}
-                          </span>
-                          <span className="font-medium text-slate-700">{example.description}</span>
-                          {photos[index]?.url && (
-                            <CheckCircle className="w-5 h-5 text-green-500 mr-auto" />
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Example Photo */}
-                          <div className="space-y-2">
-                            <p className="text-xs text-slate-500 text-center">דוגמא</p>
-                            <div className="aspect-square rounded-xl overflow-hidden border-2 border-primary/30 bg-slate-100">
-                              <img 
-                                src={example.image_url} 
-                                alt={example.description} 
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          </div>
-
-                          {/* User Photo Upload */}
-                          <div className="space-y-2">
-                            <p className="text-xs text-slate-500 text-center">התמונה שלך</p>
-                            {photos[index]?.url ? (
-                              <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-green-400 bg-slate-100">
-                                <img 
-                                  src={photos[index].url} 
-                                  alt={`צילום ${index + 1}`} 
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  onClick={() => removePhoto(index)}
-                                  className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center shadow-lg"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  capture="environment"
-                                  onChange={(e) => handlePhotoUpload(e, index, example.description)}
-                                  className="hidden"
-                                  disabled={uploadingPhoto !== null}
-                                />
-                                {uploadingPhoto === example.description ? (
-                                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <>
-                                    <Camera className="w-8 h-8 text-slate-400 mb-1" />
-                                    <span className="text-xs text-slate-500">צלם</span>
-                                  </>
-                                )}
-                              </label>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="text-left">
+                      <p className="text-sm text-slate-500">היום</p>
+                      <p className="font-bold text-lg text-primary">{format(new Date(), "EEEE", { locale: he })}</p>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
 
-          {/* Submit Button */}
-          {selectedOutpost && examplePhotos.length > 0 && (
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || !selectedOutpost || !selectedDay || !responsibleDriver || !allPhotosUploaded}
-              className="w-full h-14 text-lg font-bold bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-            >
-              {isSubmitting ? (
-                <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+              {/* Loading State */}
+              {loadingAssignments ? (
+                <Card className="border-slate-200/60 shadow-lg">
+                  <CardContent className="p-8 text-center">
+                    <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-slate-600">טוען את המשימות שלך...</p>
+                  </CardContent>
+                </Card>
+              ) : !soldierId ? (
+                <Card className="border-amber-200 shadow-lg bg-amber-50">
+                  <CardContent className="p-6 text-center">
+                    <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                    <p className="text-amber-800 font-medium">המשתמש לא מקושר לחייל</p>
+                    <p className="text-sm text-amber-600 mt-1">פנה למפקד לעדכון המספר האישי בפרופיל</p>
+                  </CardContent>
+                </Card>
+              ) : myWeeklyAssignments.length === 0 ? (
+                <Card className="border-slate-200/60 shadow-lg">
+                  <CardContent className="p-8 text-center">
+                    <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600 font-medium">אין לך שיבוצים לשבוע זה</p>
+                    <p className="text-sm text-slate-400 mt-1">פנה למפקד לשיבוץ במסדרי ניקיון</p>
+                  </CardContent>
+                </Card>
               ) : (
                 <>
-                  <Upload className="w-5 h-5 ml-2" />
-                  שלח מסדר ניקיון
-                  {!allPhotosUploaded && ` (${photos.filter(p => p.url).length}/${examplePhotos.length})`}
+                  {/* Assigned Outposts Badge */}
+                  {assignedOutposts.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <span className="text-sm text-slate-600">משובץ ב:</span>
+                      {assignedOutposts.map(outpost => (
+                        <Badge key={outpost} variant="secondary" className="bg-primary/10 text-primary">
+                          {outpost}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Tasks List */}
+                  <Card className="border-slate-200/60 shadow-lg">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-primary" />
+                        המשימות שלי
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3">
+                      {DAY_OPTIONS.map((day) => {
+                        const assignment = myWeeklyAssignments.find(a => a.day_of_week === day.value);
+                        return (
+                          <div 
+                            key={day.value} 
+                            className={`p-4 rounded-xl border transition-all ${
+                              assignment 
+                                ? 'bg-white border-slate-200 hover:border-primary/30 hover:shadow-md' 
+                                : 'bg-slate-50/50 border-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-semibold text-slate-800">{day.label}</p>
+                                  <Badge variant="outline" className="text-xs text-slate-400">
+                                    עד {day.deadline}
+                                  </Badge>
+                                </div>
+                                {assignment ? (
+                                  <div className="space-y-1">
+                                    <p className="text-sm text-primary font-medium">{assignment.area.area_name}</p>
+                                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                                      <MapPin className="w-3 h-3" />
+                                      {assignment.area.outpost}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-slate-400">לא משובץ</p>
+                                )}
+                              </div>
+                              {assignment && (
+                                assignment.is_completed ? (
+                                  <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1.5">
+                                    <CheckCircle className="w-4 h-4 ml-1" />
+                                    בוצע
+                                  </Badge>
+                                ) : (
+                                  <Button 
+                                    size="sm"
+                                    onClick={() => startParadeForDay(day.value, assignment.area)}
+                                    disabled={loadingArea}
+                                    className="bg-gradient-to-r from-primary to-accent"
+                                  >
+                                    <Play className="w-4 h-4 ml-1" />
+                                    התחל מסדר
+                                  </Button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
                 </>
               )}
-            </Button>
+            </div>
+          )}
+
+          {/* Step: Parade */}
+          {currentStep === "parade" && (
+            <div className="space-y-4">
+              <Button variant="ghost" onClick={goBack} className="text-slate-500">
+                <ArrowLeft className="w-4 h-4 ml-2" />
+                חזרה לרשימת המשימות
+              </Button>
+
+              {/* My Responsibility Area */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    תחום האחריות שלי
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className="bg-primary/20 text-primary">{myArea?.outpost}</Badge>
+                      <Badge variant="outline" className="text-slate-500">
+                        {DAY_OPTIONS.find(d => d.value === selectedDay)?.label}
+                      </Badge>
+                    </div>
+                    <p className="text-xl font-bold text-slate-800">{myArea?.area_name}</p>
+                    {myArea?.description && (
+                      <p className="text-sm text-slate-600 mt-1">{myArea.description}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Highlights Section */}
+              {highlights.length > 0 && (
+                <Card className="border-slate-200/60 shadow-lg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ListChecks className="w-5 h-5 text-amber-500" />
+                      דגשים לתחום זה
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <ul className="space-y-2">
+                      {highlights.map((highlight, index) => (
+                        <li key={highlight.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                          <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <span className="text-sm text-amber-800 font-medium">{highlight.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Photo Comparison Section - Example + User Photo Side by Side */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Camera className="w-5 h-5 text-emerald-500" />
+                    צילום תחום האחריות
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  {/* Side by Side Photos */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Example Photo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                        <Image className="w-3 h-3" />
+                        תמונה לדוגמא
+                      </div>
+                      {examples.length > 0 ? (
+                        <div className="rounded-xl overflow-hidden border-2 border-blue-200 bg-blue-50">
+                          <img 
+                            src={examples[0].image_url} 
+                            alt={examples[0].description} 
+                            className="w-full h-40 object-cover"
+                          />
+                          <p className="text-xs text-blue-700 p-2 text-center font-medium">{examples[0].description}</p>
+                        </div>
+                      ) : (
+                        <div className="h-40 bg-slate-100 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-300">
+                          <p className="text-xs text-slate-400 text-center px-2">אין תמונה לדוגמא</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* User Photo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                        <Camera className="w-3 h-3" />
+                        התמונה שלך
+                      </div>
+                      {photoUrl ? (
+                        <div className="rounded-xl overflow-hidden border-2 border-emerald-200 bg-emerald-50">
+                          <img 
+                            src={photoUrl} 
+                            alt="תמונה שהועלתה" 
+                            className="w-full h-40 object-cover"
+                          />
+                          <button 
+                            onClick={() => {
+                              setPhotoUrl(null);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            }}
+                            className="w-full text-xs text-emerald-700 p-2 text-center font-medium hover:bg-emerald-100 transition-colors"
+                          >
+                            לחץ לצילום מחדש
+                          </button>
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="h-40 bg-slate-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-emerald-300 cursor-pointer hover:bg-emerald-50 hover:border-emerald-400 transition-colors"
+                        >
+                          {uploading ? (
+                            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <>
+                              <Camera className="w-8 h-8 text-emerald-400 mb-2" />
+                              <p className="text-xs text-emerald-600 text-center font-medium">לחץ לצילום</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional Example Photos */}
+                  {examples.length > 1 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-500 font-medium">תמונות נוספות לדוגמא:</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {examples.slice(1).map((example) => (
+                          <div key={example.id} className="rounded-lg overflow-hidden border border-slate-200">
+                            <img 
+                              src={example.image_url} 
+                              alt={example.description} 
+                              className="w-full h-20 object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Camera Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleCameraCapture}
+                    className="hidden"
+                  />
+
+                  {/* Capture Button - Only show if no photo yet */}
+                  {!photoUrl && (
+                    <Button 
+                      className="w-full h-12 bg-gradient-to-r from-emerald-500 to-emerald-600"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Camera className="w-5 h-5 ml-2" />
+                          פתח מצלמה וצלם
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Submit Button */}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!photoUrl || isSubmitting}
+                className="w-full h-14 bg-gradient-to-r from-primary to-accent text-lg font-bold"
+              >
+                {isSubmitting ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5 ml-2" />
+                    שמור מסדר
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Step: Completed */}
+          {currentStep === "completed" && (
+            <div className="space-y-4">
+              <Card className="border-emerald-200 shadow-lg bg-gradient-to-br from-emerald-50 to-white">
+                <CardContent className="p-6 text-center">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-10 h-10 text-emerald-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-emerald-800 mb-2">המסדר הושלם בהצלחה!</h2>
+                  <div className="flex items-center justify-center gap-2 text-emerald-600 mb-4">
+                    <Badge className="bg-emerald-100 text-emerald-700">{myArea?.outpost}</Badge>
+                    <span>•</span>
+                    <span>{myArea?.area_name}</span>
+                    <span>•</span>
+                    <span>{DAY_OPTIONS.find(d => d.value === selectedDay)?.label}</span>
+                  </div>
+                  {photoUrl && (
+                    <img src={photoUrl} alt="תמונה שהועלתה" className="w-full h-48 object-cover rounded-xl mb-4" />
+                  )}
+                  <Button 
+                    onClick={goToStart}
+                    variant="outline"
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    חזור לרשימת המשימות
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>

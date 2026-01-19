@@ -158,38 +158,124 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaning_parade_assignments: {
+        Row: {
+          area_id: string
+          created_at: string
+          day_of_week: string
+          id: string
+          is_completed: boolean | null
+          notes: string | null
+          outpost: string
+          parade_date: string
+          parade_id: string | null
+          photo_url: string | null
+          soldier_id: string
+          updated_at: string
+        }
+        Insert: {
+          area_id: string
+          created_at?: string
+          day_of_week: string
+          id?: string
+          is_completed?: boolean | null
+          notes?: string | null
+          outpost: string
+          parade_date: string
+          parade_id?: string | null
+          photo_url?: string | null
+          soldier_id: string
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          is_completed?: boolean | null
+          notes?: string | null
+          outpost?: string
+          parade_date?: string
+          parade_id?: string | null
+          photo_url?: string | null
+          soldier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_parade_assignments_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_responsibility_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_parade_assignments_parade_id_fkey"
+            columns: ["parade_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_parades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_parade_assignments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_parade_assignments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaning_parade_examples: {
         Row: {
+          area_id: string | null
           created_at: string
           description: string
           display_order: number
           id: string
           image_url: string
-          outpost: string
+          outpost: string | null
           updated_at: string
         }
         Insert: {
+          area_id?: string | null
           created_at?: string
           description: string
           display_order?: number
           id?: string
           image_url: string
-          outpost: string
+          outpost?: string | null
           updated_at?: string
         }
         Update: {
+          area_id?: string | null
           created_at?: string
           description?: string
           display_order?: number
           id?: string
           image_url?: string
-          outpost?: string
+          outpost?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_parade_examples_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_responsibility_areas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cleaning_parade_highlights: {
         Row: {
+          area_id: string | null
           created_at: string
           display_order: number
           id: string
@@ -198,6 +284,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          area_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -206,6 +293,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          area_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -213,7 +301,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_parade_highlights_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_responsibility_areas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cleaning_parades: {
         Row: {
@@ -251,6 +347,124 @@ export type Database = {
           responsible_driver?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      cleaning_responsibility_areas: {
+        Row: {
+          area_name: string
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          outpost: string
+          updated_at: string
+        }
+        Insert: {
+          area_name: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          outpost: string
+          updated_at?: string
+        }
+        Update: {
+          area_name?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          outpost?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cleaning_weekly_assignments: {
+        Row: {
+          area_id: string
+          created_at: string
+          day_of_week: string
+          id: string
+          soldier_id: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          area_id: string
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          soldier_id: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          area_id?: string
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          soldier_id?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_weekly_assignments_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_responsibility_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_weekly_assignments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_weekly_assignments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          duration_days: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          duration_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1274,6 +1488,67 @@ export type Database = {
           work_card_completed?: boolean | null
         }
         Relationships: []
+      }
+      soldier_courses: {
+        Row: {
+          course_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          notes: string | null
+          soldier_id: string
+          start_date: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          notes?: string | null
+          soldier_id: string
+          start_date: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          notes?: string | null
+          soldier_id?: string
+          start_date?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soldier_courses_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soldier_courses_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "soldier_courses_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       soldiers: {
         Row: {

@@ -104,6 +104,15 @@ interface EventAttendance {
   created_at: string;
 }
 
+interface SoldierCourse {
+  id: string;
+  soldier_id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  courses?: { name: string };
+}
+
 interface MonthlyRecord {
   month: number;
   year: number;
@@ -127,6 +136,7 @@ export default function AttendanceTracking() {
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [events, setEvents] = useState<WorkPlanEvent[]>([]);
   const [attendance, setAttendance] = useState<EventAttendance[]>([]);
+  const [soldierCourses, setSoldierCourses] = useState<SoldierCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSoldier, setSelectedSoldier] = useState<Soldier | null>(null);
@@ -171,7 +181,7 @@ export default function AttendanceTracking() {
   const fetchData = async () => {
     setLoading(true);
     
-    const [soldiersRes, eventsRes, attendanceRes] = await Promise.all([
+    const [soldiersRes, eventsRes, attendanceRes, coursesRes] = await Promise.all([
       supabase
         .from("soldiers")
         .select("*")
@@ -184,14 +194,34 @@ export default function AttendanceTracking() {
         .order("event_date", { ascending: false }),
       supabase
         .from("event_attendance")
-        .select("*")
+        .select("*"),
+      supabase
+        .from("soldier_courses")
+        .select("id, soldier_id, start_date, end_date, status, courses(name)")
+        .eq("status", "in_progress")
     ]);
 
     if (!soldiersRes.error) setSoldiers(soldiersRes.data || []);
     if (!eventsRes.error) setEvents((eventsRes.data || []) as WorkPlanEvent[]);
     if (!attendanceRes.error) setAttendance(attendanceRes.data || []);
+    if (!coursesRes.error) setSoldierCourses((coursesRes.data || []) as SoldierCourse[]);
 
     setLoading(false);
+  };
+
+  // Check if soldier is in a course on a specific date
+  const isSoldierInCourse = (soldierId: string, eventDate: string): { inCourse: boolean; courseName: string | null } => {
+    const eventDateParsed = parseISO(eventDate);
+    const course = soldierCourses.find(sc => {
+      if (sc.soldier_id !== soldierId) return false;
+      const start = parseISO(sc.start_date);
+      const end = parseISO(sc.end_date);
+      return eventDateParsed >= start && eventDateParsed <= end;
+    });
+    return {
+      inCourse: !!course,
+      courseName: course?.courses?.name || null
+    };
   };
 
   // Get available years from events
@@ -220,6 +250,16 @@ export default function AttendanceTracking() {
   const getSoldierEventStatus = (soldier: Soldier, event: WorkPlanEvent): { status: AttendanceStatus; reason: string | null; completed: boolean; completedAt?: string } => {
     if (!wasSoldierQualifiedAtDate(soldier, event.event_date)) {
       return { status: "not_qualified", reason: null, completed: false };
+    }
+
+    // Check if soldier is in a course during this event date - auto-mark as "קורס"
+    const { inCourse, courseName } = isSoldierInCourse(soldier.id, event.event_date);
+    if (inCourse) {
+      return { 
+        status: "absent", 
+        reason: "קורס", 
+        completed: false 
+      };
     }
 
     const att = attendance.find(a => a.event_id === event.id && a.soldier_id === soldier.id);

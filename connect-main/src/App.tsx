@@ -27,13 +27,13 @@ import KnowTheArea from "./pages/KnowTheArea";
 import Install from "./pages/Install";
 import UsersManagement from "./pages/UsersManagement";
 import CleaningParades from "./pages/CleaningParades";
-import CleaningParadesManagement from "./pages/CleaningParadesManagement";
-import CleaningParadeHighlightsManagement from "./pages/CleaningParadeHighlightsManagement";
+import CleaningParadesAdmin from "./pages/CleaningParadesAdmin";
 import FitnessReport from "./pages/FitnessReport";
 import TripForm from "./pages/TripForm";
 import SafetyScoresManagement from "./pages/SafetyScoresManagement";
 import DriverInterviews from "./pages/DriverInterviews";
 import AdminDriverInterviews from "./pages/AdminDriverInterviews";
+import CoursesManagement from "./pages/CoursesManagement";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -211,18 +211,10 @@ const App = () => (
               }
             />
             <Route
-              path="/cleaning-parades-management"
+              path="/cleaning-parades-admin"
               element={
                 <ProtectedRoute>
-                  <CleaningParadesManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cleaning-parade-highlights-management"
-              element={
-                <ProtectedRoute>
-                  <CleaningParadeHighlightsManagement />
+                  <CleaningParadesAdmin />
                 </ProtectedRoute>
               }
             />
@@ -263,6 +255,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminDriverInterviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses-management"
+              element={
+                <ProtectedRoute>
+                  <CoursesManagement />
                 </ProtectedRoute>
               }
             />
