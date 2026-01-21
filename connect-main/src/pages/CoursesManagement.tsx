@@ -61,7 +61,7 @@ interface SoldierCourse {
   courses?: { id: string; name: string; category: string };
 }
 
-// רשימת הקורסים העיקריים
+// רשימת הקורסים העיקריים - קורסי רכב
 const MAIN_COURSES = ["משא כבד", "משא", "דוד", "סוואנה", "טיגריס", "פנתר"];
 
 const CoursesManagement = () => {

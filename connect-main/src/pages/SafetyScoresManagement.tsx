@@ -1153,7 +1153,7 @@ export default function SafetyScoresManagement() {
                                   {soldier.lastMonthKm !== null && (
                                     <div className="flex items-center gap-1">
                                       <span className="text-xs text-slate-500">ק"מ:</span>
-                                      <Badge variant="outline" className="text-xs">
+                                      <Badge variant="outline" className="text-xs text-slate-700 border-slate-300">
                                         {soldier.lastMonthKm}
                                       </Badge>
                                       {soldier.lastMonthKm < 100 && (

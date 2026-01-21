@@ -1,9 +1,12 @@
 import { useFormContext } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OUTPOSTS } from "@/lib/constants";
-import { Calendar, Clock, MapPin, User, Car, Sun, Moon, CloudSun, Sparkles } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Car, Sun, Moon, CloudSun, Sparkles, AlertTriangle, TrendingDown, Gauge } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const SHIFT_TYPES_ENHANCED = [
   { value: "morning", label: "משמרת בוקר", icon: Sun },
@@ -11,8 +14,22 @@ const SHIFT_TYPES_ENHANCED = [
   { value: "evening", label: "משמרת ערב", icon: Moon },
 ];
 
+interface PreviousMonthScore {
+  safety_score: number;
+  kilometers: number | null;
+  speed_violations: number | null;
+  harsh_braking: number | null;
+  harsh_turns: number | null;
+  harsh_accelerations: number | null;
+  illegal_overtakes: number | null;
+  score_month: string;
+}
+
 export function GeneralDetails() {
   const { register, setValue, watch } = useFormContext();
+  const { user } = useAuth();
+  const [previousScore, setPreviousScore] = useState<PreviousMonthScore | null>(null);
+  const [loadingScore, setLoadingScore] = useState(true);
   
   const currentDate = new Date();
   const formattedDate = currentDate.toLocaleDateString('he-IL', {
@@ -26,6 +43,86 @@ export function GeneralDetails() {
     minute: '2-digit',
   });
 
+  // Fetch previous month safety score for the logged-in user
+  useEffect(() => {
+    const fetchPreviousScore = async () => {
+      if (!user?.id) {
+        setLoadingScore(false);
+        return;
+      }
+
+      try {
+        // First get the user's profile to find their personal_number
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("personal_number")
+          .eq("user_id", user.id)
+          .single();
+
+        if (!profile?.personal_number) {
+          setLoadingScore(false);
+          return;
+        }
+
+        // Find the soldier by personal_number
+        const { data: soldier } = await supabase
+          .from("soldiers")
+          .select("id")
+          .eq("personal_number", profile.personal_number)
+          .single();
+
+        if (!soldier) {
+          setLoadingScore(false);
+          return;
+        }
+
+        // Get the previous month's score
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const monthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`;
+
+        const { data: scoreData } = await supabase
+          .from("monthly_safety_scores")
+          .select("safety_score, kilometers, speed_violations, harsh_braking, harsh_turns, harsh_accelerations, illegal_overtakes, score_month")
+          .eq("soldier_id", soldier.id)
+          .eq("score_month", monthStr)
+          .single();
+
+        if (scoreData) {
+          setPreviousScore(scoreData);
+        }
+      } catch (error) {
+        console.error("Error fetching previous score:", error);
+      } finally {
+        setLoadingScore(false);
+      }
+    };
+
+    fetchPreviousScore();
+  }, [user?.id]);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return "bg-emerald-500";
+    if (score >= 75) return "bg-amber-500";
+    return "bg-red-500";
+  };
+
+  const getScoreMessage = (score: number) => {
+    if (score >= 90) return "מצוין! המשך כך 🌟";
+    if (score >= 75) return "טוב, אבל יש מה לשפר";
+    return "דורש שיפור משמעותי!";
+  };
+
+  const getImprovementAreas = (score: PreviousMonthScore) => {
+    const areas: string[] = [];
+    if (score.speed_violations && score.speed_violations > 0) areas.push(`חריגות מהירות (${score.speed_violations})`);
+    if (score.harsh_braking && score.harsh_braking > 0) areas.push(`בלימות חדות (${score.harsh_braking})`);
+    if (score.harsh_turns && score.harsh_turns > 0) areas.push(`פניות חדות (${score.harsh_turns})`);
+    if (score.harsh_accelerations && score.harsh_accelerations > 0) areas.push(`האצות חדות (${score.harsh_accelerations})`);
+    if (score.illegal_overtakes && score.illegal_overtakes > 0) areas.push(`עקיפות אסורות (${score.illegal_overtakes})`);
+    return areas;
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="text-center mb-8">
@@ -36,6 +133,85 @@ export function GeneralDetails() {
         <h2 className="text-3xl font-black mb-3 text-slate-800">פרטים כלליים</h2>
         <p className="text-slate-500">מלא את הפרטים הבסיסיים לפני תחילת המשמרת</p>
       </div>
+
+      {/* Previous Month Safety Score - Prominent Alert */}
+      {!loadingScore && previousScore && (
+        <div className={`rounded-2xl p-5 border-2 shadow-lg animate-slide-up ${
+          previousScore.safety_score < 75 
+            ? "bg-red-50 border-red-300" 
+            : previousScore.safety_score < 90 
+              ? "bg-amber-50 border-amber-300"
+              : "bg-emerald-50 border-emerald-300"
+        }`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-md ${getScoreColor(previousScore.safety_score)}`}>
+              <Gauge className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-black text-lg text-slate-800">ציון הבטיחות שלך - חודש קודם</h3>
+              <p className="text-sm text-slate-600">עיין בנתונים לפני יציאה למשמרת</p>
+            </div>
+            <div className={`text-4xl font-black px-4 py-2 rounded-xl text-white ${getScoreColor(previousScore.safety_score)}`}>
+              {previousScore.safety_score}
+            </div>
+          </div>
+          
+          <div className={`p-3 rounded-xl mb-3 ${
+            previousScore.safety_score < 75 
+              ? "bg-red-100/80" 
+              : previousScore.safety_score < 90 
+                ? "bg-amber-100/80"
+                : "bg-emerald-100/80"
+          }`}>
+            <p className={`text-center font-bold ${
+              previousScore.safety_score < 75 
+                ? "text-red-700" 
+                : previousScore.safety_score < 90 
+                  ? "text-amber-700"
+                  : "text-emerald-700"
+            }`}>
+              {previousScore.safety_score < 75 && <AlertTriangle className="w-5 h-5 inline ml-2" />}
+              {getScoreMessage(previousScore.safety_score)}
+            </p>
+          </div>
+
+          {/* Improvement areas */}
+          {previousScore.safety_score < 90 && getImprovementAreas(previousScore).length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-slate-700">
+                <TrendingDown className="w-4 h-4" />
+                <span className="font-bold text-sm">נקודות לשיפור במשמרת הזו:</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {getImprovementAreas(previousScore).map((area, idx) => (
+                  <span 
+                    key={idx} 
+                    className="px-3 py-1.5 bg-white/80 rounded-full text-sm font-medium text-slate-700 border border-slate-200"
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Kilometers */}
+          {previousScore.kilometers !== null && (
+            <div className="mt-3 pt-3 border-t border-slate-200/50">
+              <p className="text-sm text-slate-600">
+                ק"מ בחודש הקודם: <span className="font-bold text-slate-800">{previousScore.kilometers}</span>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loadingScore && !previousScore && (
+        <div className="rounded-2xl p-4 border-2 border-slate-200 bg-slate-50 text-center">
+          <Gauge className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+          <p className="text-slate-500 text-sm">אין ציון בטיחות מהחודש הקודם</p>
+        </div>
+      )}
 
       {/* Date & Time Display */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
