@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { format, parseISO, subMonths } from "date-fns";
 import { he } from "date-fns/locale";
@@ -63,6 +63,17 @@ interface Interview {
   driver_name: string;
   interviewer_name: string;
   created_at: string;
+  soldier_id?: string | null;
+  civilian_license_expiry?: string | null;
+  military_license_expiry?: string | null;
+  defensive_driving_passed?: boolean | null;
+  license_type?: string | null;
+  permits?: string | null;
+  military_accidents?: string | null;
+  family_status?: string | null;
+  financial_status?: string | null;
+  additional_notes?: string | null;
+  interviewer_summary?: string | null;
 }
 
 interface SafetyScore {
@@ -99,6 +110,7 @@ const INTERVIEW_GUIDELINES = [
 export default function DriverInterviews() {
   const { userType, loading: authLoading, user, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [accidents, setAccidents] = useState<Accident[]>([]);
@@ -109,6 +121,7 @@ export default function DriverInterviews() {
   const [saving, setSaving] = useState(false);
   const signatureRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [editingInterviewId, setEditingInterviewId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     interview_date: format(new Date(), "yyyy-MM-dd"),
@@ -143,6 +156,76 @@ export default function DriverInterviews() {
       fetchData();
     }
   }, [userType, isAdmin]);
+
+  // Handle edit mode from URL params
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && !loading && (userType === 'battalion' || isAdmin)) {
+      loadInterviewForEdit(editId);
+    }
+  }, [searchParams, loading, userType, isAdmin]);
+
+  const loadInterviewForEdit = async (interviewId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('driver_interviews')
+        .select('*')
+        .eq('id', interviewId)
+        .single();
+
+      if (error) throw error;
+      if (!data) {
+        toast.error("הראיון לא נמצא");
+        setSearchParams({});
+        return;
+      }
+
+      // Find the soldier if exists
+      const soldier = soldiers.find(s => s.id === data.soldier_id);
+
+      setFormData({
+        interview_date: data.interview_date || format(new Date(), "yyyy-MM-dd"),
+        region: data.region || "",
+        battalion: data.battalion || "",
+        outpost: data.outpost || "",
+        soldier_id: data.soldier_id || "",
+        driver_name: data.driver_name || "",
+        civilian_license_expiry: data.civilian_license_expiry || "",
+        license_type: data.license_type || "",
+        military_license_expiry: data.military_license_expiry || "",
+        permits: data.permits || "",
+        defensive_driving_passed: data.defensive_driving_passed || false,
+        military_accidents: data.military_accidents || "",
+        family_status: data.family_status || "",
+        financial_status: data.financial_status || "",
+        additional_notes: data.additional_notes || "",
+        interviewer_summary: data.interviewer_summary || "",
+        interviewer_name: data.interviewer_name || "",
+        qualified_date: soldier?.qualified_date || "",
+      });
+
+      setEditingInterviewId(interviewId);
+      setDialogOpen(true);
+      setCurrentStep(1);
+
+      // Load safety scores if soldier exists
+      if (data.soldier_id) {
+        const threeMonthsAgo = format(subMonths(new Date(), 3), "yyyy-MM-01");
+        const { data: scoresData } = await supabase
+          .from("monthly_safety_scores")
+          .select("*")
+          .eq("soldier_id", data.soldier_id)
+          .gte("score_month", threeMonthsAgo)
+          .order("score_month", { ascending: false });
+        
+        setSafetyScores(scoresData || []);
+      }
+    } catch (error) {
+      console.error('Error loading interview for edit:', error);
+      toast.error("שגיאה בטעינת הראיון לעריכה");
+      setSearchParams({});
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -278,46 +361,71 @@ export default function DriverInterviews() {
     }
 
     const signature = getSignatureData();
-    if (!signature || signature === "data:,") {
+    // Only require signature for new interviews, not edits
+    if (!editingInterviewId && (!signature || signature === "data:,")) {
       toast.error("יש לחתום על הטופס");
       return;
     }
 
     setSaving(true);
 
-    const { error } = await supabase
-      .from("driver_interviews")
-      .insert({
-        user_id: user?.id,
-        interview_date: formData.interview_date,
-        region: formData.region,
-        battalion: formData.battalion,
-        outpost: formData.outpost,
-        soldier_id: formData.soldier_id || null,
-        driver_name: formData.driver_name,
-        civilian_license_expiry: formData.civilian_license_expiry || null,
-        license_type: formData.license_type || null,
-        military_license_expiry: formData.military_license_expiry || null,
-        permits: formData.permits || null,
-        defensive_driving_passed: formData.defensive_driving_passed,
-        military_accidents: formData.military_accidents || null,
-        family_status: formData.family_status || null,
-        financial_status: formData.financial_status || null,
-        additional_notes: formData.additional_notes || null,
-        interviewer_summary: formData.interviewer_summary || null,
-        interviewer_name: formData.interviewer_name,
-        signature: signature,
-      });
+    const interviewData = {
+      interview_date: formData.interview_date,
+      region: formData.region,
+      battalion: formData.battalion,
+      outpost: formData.outpost,
+      soldier_id: formData.soldier_id || null,
+      driver_name: formData.driver_name,
+      civilian_license_expiry: formData.civilian_license_expiry || null,
+      license_type: formData.license_type || null,
+      military_license_expiry: formData.military_license_expiry || null,
+      permits: formData.permits || null,
+      defensive_driving_passed: formData.defensive_driving_passed,
+      military_accidents: formData.military_accidents || null,
+      family_status: formData.family_status || null,
+      financial_status: formData.financial_status || null,
+      additional_notes: formData.additional_notes || null,
+      interviewer_summary: formData.interviewer_summary || null,
+      interviewer_name: formData.interviewer_name,
+    };
+
+    let error;
+
+    if (editingInterviewId) {
+      // Update existing interview
+      const updateData = signature && signature !== "data:," 
+        ? { ...interviewData, signature } 
+        : interviewData;
+      
+      const result = await supabase
+        .from("driver_interviews")
+        .update(updateData)
+        .eq('id', editingInterviewId);
+      
+      error = result.error;
+    } else {
+      // Insert new interview
+      const result = await supabase
+        .from("driver_interviews")
+        .insert({
+          user_id: user?.id,
+          ...interviewData,
+          signature: signature,
+        });
+      
+      error = result.error;
+    }
 
     setSaving(false);
 
     if (error) {
-      toast.error("שגיאה בשמירת הראיון");
+      toast.error(editingInterviewId ? "שגיאה בעדכון הראיון" : "שגיאה בשמירת הראיון");
       console.error(error);
     } else {
-      toast.success("הראיון נשמר בהצלחה");
+      toast.success(editingInterviewId ? "הראיון עודכן בהצלחה" : "הראיון נשמר בהצלחה");
       setDialogOpen(false);
       resetForm();
+      setSearchParams({});
       fetchData();
     }
   };
@@ -346,6 +454,7 @@ export default function DriverInterviews() {
     setCurrentStep(1);
     clearSignature();
     setSafetyScores([]);
+    setEditingInterviewId(null);
   };
 
   const canProceedToStep2 = formData.region && formData.battalion && formData.outpost && formData.driver_name;
@@ -784,12 +893,18 @@ export default function DriverInterviews() {
         </div>
 
         {/* Interview Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            resetForm();
+            setSearchParams({});
+          }
+        }}>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" dir="rtl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ClipboardList className="w-5 h-5" />
-                ראיון נהג קו - שלב {currentStep} מתוך 4
+                {editingInterviewId ? 'עריכת ראיון' : 'ראיון נהג קו'} - שלב {currentStep} מתוך 4
               </DialogTitle>
             </DialogHeader>
 
@@ -834,7 +949,7 @@ export default function DriverInterviews() {
               ) : (
                 <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700">
                   {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-                  שמור ראיון
+                  {editingInterviewId ? 'עדכן ראיון' : 'שמור ראיון'}
                 </Button>
               )}
             </DialogFooter>
