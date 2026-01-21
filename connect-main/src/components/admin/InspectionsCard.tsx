@@ -195,7 +195,7 @@ export function InspectionsCard() {
                         <div>
                           <p className="font-bold text-slate-800">{inspection.soldiers?.full_name}</p>
                           <p className="text-xs text-slate-500">
-                            {format(parseISO(inspection.inspection_date), "dd/MM/yyyy")} | {inspection.platoon}
+                            {format(parseISO(inspection.inspection_date), "dd/MM/yyyy HH:mm")} | {inspection.platoon}
                           </p>
                         </div>
                       </div>
@@ -322,7 +322,7 @@ export function InspectionsCard() {
               <div className="p-4 rounded-xl bg-slate-50">
                 <h4 className="font-bold text-slate-800 mb-2">{selectedInspection.soldiers?.full_name}</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <p><span className="text-slate-500">תאריך:</span> {format(parseISO(selectedInspection.inspection_date), "dd/MM/yyyy")}</p>
+                  <p><span className="text-slate-500">תאריך:</span> {format(parseISO(selectedInspection.inspection_date), "dd/MM/yyyy HH:mm")}</p>
                   <p><span className="text-slate-500">פלוגה:</span> {selectedInspection.platoon}</p>
                   <p><span className="text-slate-500">מפקד:</span> {selectedInspection.commander_name}</p>
                   <p><span className="text-slate-500">מבצע הביקורת:</span> {selectedInspection.inspector_name}</p>
