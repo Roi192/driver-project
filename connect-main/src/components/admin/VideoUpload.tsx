@@ -57,12 +57,17 @@ export function VideoUpload({
         throw uploadError;
       }
 
-      const { data: urlData } = supabase.storage
+      // Use signed URL for private bucket access
+      const { data: signedUrlData, error: signedError } = await supabase.storage
         .from(bucket)
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year validity
 
-      setPreview(urlData.publicUrl);
-      onChange(urlData.publicUrl);
+      if (signedError || !signedUrlData?.signedUrl) {
+        throw signedError || new Error('Failed to generate signed URL');
+      }
+
+      setPreview(signedUrlData.signedUrl);
+      onChange(signedUrlData.signedUrl);
       toast.success("הסרטון הועלה בהצלחה");
     } catch (error) {
       console.error('Error uploading video:', error);
