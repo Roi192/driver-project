@@ -59,10 +59,12 @@ interface Accident {
   soldiers?: Soldier;
   was_judged: boolean;
   judgment_result: string | null;
+  incident_type: 'accident' | 'stuck' | 'other';
 }
 
 type DriverType = 'security' | 'combat';
 type Severity = 'minor' | 'moderate' | 'severe';
+type IncidentType = 'accident' | 'stuck' | 'other';
 
 const driverTypeLabels: Record<DriverType, string> = {
   security: 'נהג בט"ש',
@@ -81,6 +83,18 @@ const severityColors: Record<Severity, string> = {
   severe: 'bg-red-100 text-red-800'
 };
 
+const incidentTypeLabels: Record<IncidentType, string> = {
+  accident: 'תאונה',
+  stuck: 'התחפרות',
+  other: 'אחר'
+};
+
+const incidentTypeColors: Record<IncidentType, string> = {
+  accident: 'bg-red-100 text-red-800',
+  stuck: 'bg-amber-100 text-amber-800',
+  other: 'bg-gray-100 text-gray-800'
+};
+
 const AccidentsTracking = () => {
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -91,6 +105,7 @@ const AccidentsTracking = () => {
   // Filters
   const [filterDriverType, setFilterDriverType] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [filterIncidentType, setFilterIncidentType] = useState<string>('all');
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
@@ -111,6 +126,7 @@ const AccidentsTracking = () => {
     vehicle_number: '',
     description: '',
     severity: 'minor' as Severity,
+    incident_type: 'accident' as IncidentType,
     location: '',
     notes: '',
     was_judged: false,
@@ -157,6 +173,7 @@ const AccidentsTracking = () => {
         vehicle_number: data.vehicle_number || null,
         description: data.description || null,
         severity: data.severity,
+        incident_type: data.incident_type,
         location: data.location || null,
         notes: data.notes || null,
         soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
@@ -168,11 +185,11 @@ const AccidentsTracking = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accidents'] });
-      toast.success('התאונה נוספה בהצלחה');
+      toast.success('האירוע נוסף בהצלחה');
       setIsAddDialogOpen(false);
       resetForm();
     },
-    onError: () => toast.error('שגיאה בהוספת התאונה')
+    onError: () => toast.error('שגיאה בהוספת האירוע')
   });
 
   // Update accident mutation
@@ -186,6 +203,7 @@ const AccidentsTracking = () => {
           vehicle_number: data.vehicle_number || null,
           description: data.description || null,
           severity: data.severity,
+          incident_type: data.incident_type,
           location: data.location || null,
           notes: data.notes || null,
           soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
@@ -198,11 +216,11 @@ const AccidentsTracking = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accidents'] });
-      toast.success('התאונה עודכנה בהצלחה');
+      toast.success('האירוע עודכן בהצלחה');
       setEditingAccident(null);
       resetForm();
     },
-    onError: () => toast.error('שגיאה בעדכון התאונה')
+    onError: () => toast.error('שגיאה בעדכון האירוע')
   });
 
   // Delete accident mutation
@@ -227,6 +245,7 @@ const AccidentsTracking = () => {
       vehicle_number: '',
       description: '',
       severity: 'minor',
+      incident_type: 'accident',
       location: '',
       notes: '',
       was_judged: false,
@@ -244,6 +263,7 @@ const AccidentsTracking = () => {
       vehicle_number: accident.vehicle_number || '',
       description: accident.description || '',
       severity: accident.severity,
+      incident_type: accident.incident_type || 'accident',
       location: accident.location || '',
       notes: accident.notes || '',
       was_judged: accident.was_judged || false,
@@ -285,11 +305,12 @@ const AccidentsTracking = () => {
     return accidents.filter(a => {
       if (filterDriverType !== 'all' && a.driver_type !== filterDriverType) return false;
       if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
+      if (filterIncidentType !== 'all' && a.incident_type !== filterIncidentType) return false;
       if (filterDateFrom && a.accident_date < filterDateFrom) return false;
       if (filterDateTo && a.accident_date > filterDateTo) return false;
       return true;
     });
-  }, [accidents, filterDriverType, filterSeverity, filterDateFrom, filterDateTo]);
+  }, [accidents, filterDriverType, filterSeverity, filterIncidentType, filterDateFrom, filterDateTo]);
 
   // Calculate statistics - based on filtered accidents
   const stats = useMemo(() => {
@@ -340,6 +361,7 @@ const AccidentsTracking = () => {
       'תאריך': format(parseISO(accident.accident_date), 'dd/MM/yyyy'),
       'שם נהג': getDriverName(accident),
       'סוג נהג': driverTypeLabels[accident.driver_type],
+      'סוג אירוע': incidentTypeLabels[accident.incident_type || 'accident'],
       'מספר רכב': accident.vehicle_number || '-',
       'חומרה': severityLabels[accident.severity],
       'מיקום': accident.location || '-',
@@ -358,6 +380,7 @@ const AccidentsTracking = () => {
   const clearFilters = () => {
     setFilterDriverType('all');
     setFilterSeverity('all');
+    setFilterIncidentType('all');
     setFilterDateFrom('');
     setFilterDateTo('');
   };
@@ -420,6 +443,19 @@ const AccidentsTracking = () => {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label>סוג אירוע *</Label>
+          <Select value={formData.incident_type} onValueChange={(v: IncidentType) => setFormData(p => ({ ...p, incident_type: v }))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="accident">תאונה</SelectItem>
+              <SelectItem value="stuck">התחפרות</SelectItem>
+              <SelectItem value="other">אחר</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
           <Label>מספר רכב</Label>
           <Input
             value={formData.vehicle_number}
@@ -427,6 +463,9 @@ const AccidentsTracking = () => {
             placeholder="מספר רכב"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>חומרה</Label>
           <Select value={formData.severity} onValueChange={(v: Severity) => setFormData(p => ({ ...p, severity: v }))}>
@@ -440,16 +479,16 @@ const AccidentsTracking = () => {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <Label>מיקום</Label>
+          <Input
+            value={formData.location}
+            onChange={(e) => setFormData(p => ({ ...p, location: e.target.value }))}
+            placeholder="מיקום האירוע"
+          />
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>מיקום</Label>
-        <Input
-          value={formData.location}
-          onChange={(e) => setFormData(p => ({ ...p, location: e.target.value }))}
-          placeholder="מיקום התאונה"
-        />
-      </div>
 
       <div className="space-y-2">
         <Label>תיאור התאונה</Label>
@@ -541,7 +580,21 @@ const AccidentsTracking = () => {
               <CardTitle className="text-lg text-slate-800">סינון מתקדם</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-700">סוג אירוע</Label>
+                  <Select value={filterIncidentType} onValueChange={setFilterIncidentType}>
+                    <SelectTrigger className="bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="accident" className="text-slate-700">תאונות</SelectItem>
+                      <SelectItem value="stuck" className="text-slate-700">התחפרויות</SelectItem>
+                      <SelectItem value="other" className="text-slate-700">אחר</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label className="text-slate-700">סוג נהג</Label>
                   <Select value={filterDriverType} onValueChange={setFilterDriverType}>
@@ -677,6 +730,7 @@ const AccidentsTracking = () => {
                     <TableRow>
                       <TableHead>תאריך</TableHead>
                       <TableHead>נהג</TableHead>
+                      <TableHead>סוג אירוע</TableHead>
                       <TableHead>סוג נהג</TableHead>
                       <TableHead>חומרה</TableHead>
                       <TableHead>פעולות</TableHead>
@@ -687,6 +741,11 @@ const AccidentsTracking = () => {
                       <TableRow key={accident.id}>
                         <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
                         <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${incidentTypeColors[accident.incident_type || 'accident']}`}>
+                            {incidentTypeLabels[accident.incident_type || 'accident']}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             accident.driver_type === 'security' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
@@ -705,7 +764,7 @@ const AccidentsTracking = () => {
                               variant="ghost" 
                               size="icon" 
                               onClick={() => { setSelectedAccident(accident); setAccidentDetailOpen(true); }}
-                              title="פרטי תאונה וצ'קליסט"
+                              title="פרטי אירוע וצ'קליסט"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -715,7 +774,7 @@ const AccidentsTracking = () => {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="text-red-500 hover:text-red-600"
+                              className="text-destructive hover:text-destructive/80"
                               onClick={() => { setAccidentToDelete(accident.id); setDeleteConfirmOpen(true); }}
                             >
                               <Trash2 className="h-4 w-4" />

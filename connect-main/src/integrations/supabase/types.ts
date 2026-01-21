@@ -25,6 +25,7 @@ export type Database = {
           driver_name: string | null
           driver_type: string
           id: string
+          incident_type: string | null
           judgment_result: string | null
           location: string | null
           notes: string | null
@@ -45,6 +46,7 @@ export type Database = {
           driver_name?: string | null
           driver_type: string
           id?: string
+          incident_type?: string | null
           judgment_result?: string | null
           location?: string | null
           notes?: string | null
@@ -65,6 +67,7 @@ export type Database = {
           driver_name?: string | null
           driver_type?: string
           id?: string
+          incident_type?: string | null
           judgment_result?: string | null
           location?: string | null
           notes?: string | null
@@ -1179,7 +1182,9 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          driver_type: string | null
           event_date: string | null
+          event_type: string | null
           file_url: string | null
           id: string
           image_url: string | null
@@ -1193,7 +1198,9 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          driver_type?: string | null
           event_date?: string | null
+          event_type?: string | null
           file_url?: string | null
           id?: string
           image_url?: string | null
@@ -1207,7 +1214,9 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          driver_type?: string | null
           event_date?: string | null
+          event_type?: string | null
           file_url?: string | null
           id?: string
           image_url?: string | null

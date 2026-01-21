@@ -26,7 +26,7 @@ import { toast } from "sonner";
 export interface FieldConfig {
   name: string;
   label: string;
-  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media" | "location";
+  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media" | "location" | "date";
   placeholder?: string;
   required?: boolean;
   options?: { value: string; label: string }[];
@@ -34,6 +34,11 @@ export interface FieldConfig {
   // For location type - names of lat/lng fields to update
   latField?: string;
   lngField?: string;
+  // Conditional display based on another field's value
+  dependsOn?: {
+    field: string;
+    value: string | string[];
+  };
 }
 
 interface AddEditDialogProps {
@@ -116,7 +121,15 @@ export function AddEditDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 pt-4">
-          {fields.map((field, index) => (
+          {fields.filter((field) => {
+            // Check if field should be displayed based on dependsOn condition
+            if (!field.dependsOn) return true;
+            const dependentValue = formData[field.dependsOn.field];
+            if (Array.isArray(field.dependsOn.value)) {
+              return field.dependsOn.value.includes(dependentValue);
+            }
+            return dependentValue === field.dependsOn.value;
+          }).map((field, index) => (
             <div 
               key={field.name} 
               className="space-y-2 animate-fade-in"
@@ -182,6 +195,15 @@ export function AddEditDialog({
                   )}
                   {gettingLocation ? "מקבל מיקום..." : "הוסף מיקום בזמן אמת"}
                 </Button>
+              ) : field.type === "date" ? (
+                <Input
+                  id={field.name}
+                  type="date"
+                  value={formData[field.name] || ""}
+                  onChange={(e) => handleChange(field.name, e.target.value)}
+                  required={field.required}
+                  className="h-12 bg-background/60 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all"
+                />
               ) : (
                 <Input
                   id={field.name}

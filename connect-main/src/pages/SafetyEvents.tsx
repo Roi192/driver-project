@@ -9,8 +9,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
-import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
@@ -26,6 +26,8 @@ interface SafetyContent {
   event_date: string | null;
   latitude: number | null;
   longitude: number | null;
+  event_type: string | null;
+  driver_type: string | null;
 }
 
 const categories = [
@@ -66,10 +68,27 @@ const categoryLabels: Record<ContentCategory, string> = {
   monthly_summaries: "סיכומי חודש",
 };
 
-const getFields = (category: ContentCategory): FieldConfig[] => {
+const EVENT_TYPES = [
+  { value: "accident", label: "תאונה" },
+  { value: "stuck", label: "התחפרות" },
+  { value: "other", label: "אחר" },
+] as const;
+
+const DRIVER_TYPES = [
+  { value: "security", label: 'נהג בט"ש' },
+  { value: "combat", label: "נהג גדוד" },
+] as const;
+
+const SEVERITY_TYPES = [
+  { value: "minor", label: "קל" },
+  { value: "moderate", label: "בינוני" },
+  { value: "severe", label: "חמור" },
+] as const;
+
+const getFields = (category: ContentCategory, soldiers: { id: string; full_name: string; personal_number: string }[] = []): FieldConfig[] => {
   const baseFields: FieldConfig[] = [
     { name: "title", label: "כותרת", type: "text", required: true, placeholder: "הזן כותרת..." },
-    { name: "event_date", label: "תאריך", type: "text", placeholder: "2024-01-15" },
+    { name: "event_date", label: "תאריך", type: "date", placeholder: "בחר תאריך" },
     { name: "description", label: "תיאור", type: "textarea", placeholder: "תיאור מפורט..." },
   ];
 
@@ -82,8 +101,48 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
   }
 
   if (category === "sector_events" || category === "neighbor_events") {
-    return [
-      ...baseFields,
+    // For sector events, add event type and driver type selection
+    const sectorFields: FieldConfig[] = [
+      { name: "title", label: "כותרת", type: "text", required: true, placeholder: "הזן כותרת..." },
+      { name: "event_date", label: "תאריך", type: "date", placeholder: "בחר תאריך" },
+      { 
+        name: "event_type", 
+        label: "סוג אירוע", 
+        type: "select",
+        options: EVENT_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר סוג אירוע"
+      },
+      { 
+        name: "driver_type", 
+        label: "סוג נהג", 
+        type: "select",
+        options: DRIVER_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר סוג נהג"
+      },
+      { 
+        name: "soldier_id", 
+        label: "בחר חייל", 
+        type: "select",
+        options: soldiers.map(s => ({ value: s.id, label: `${s.full_name} (${s.personal_number})` })),
+        placeholder: "בחר חייל מהרשימה",
+        dependsOn: { field: "driver_type", value: "security" }
+      },
+      { 
+        name: "driver_name", 
+        label: "שם הנהג", 
+        type: "text",
+        placeholder: "הזן שם נהג...",
+        dependsOn: { field: "driver_type", value: "combat" }
+      },
+      { name: "vehicle_number", label: "מספר רכב צבאי", type: "text", placeholder: "הזן מספר רכב..." },
+      { 
+        name: "severity", 
+        label: "חומרת האירוע", 
+        type: "select",
+        options: SEVERITY_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר חומרה"
+      },
+      { name: "description", label: "תיאור", type: "textarea", placeholder: "תיאור מפורט..." },
       { name: "image_url", label: "תמונה", type: "image" },
       { name: "file_url", label: "קובץ PDF", type: "media", mediaTypes: ["pdf", "file"] },
       { name: "video_url", label: "סרטון (קובץ / YouTube)", type: "media", mediaTypes: ["video", "youtube"] },
@@ -91,6 +150,7 @@ const getFields = (category: ContentCategory): FieldConfig[] => {
       { name: "latitude", label: "קו רוחב", type: "text", placeholder: "31.9" },
       { name: "longitude", label: "קו אורך", type: "text", placeholder: "35.2" },
     ];
+    return sectorFields;
   }
 
   if (category === "monthly_summaries") {
@@ -111,12 +171,29 @@ export default function SafetyEvents() {
   const [selectedCategory, setSelectedCategory] = useState<ContentCategory | null>(null);
   const [selectedItem, setSelectedItem] = useState<SafetyContent | null>(null);
   const [items, setItems] = useState<SafetyContent[]>([]);
+  const [soldiers, setSoldiers] = useState<{ id: string; full_name: string; personal_number: string }[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch soldiers for the dropdown
+  useEffect(() => {
+    const fetchSoldiers = async () => {
+      const { data, error } = await supabase
+        .from("soldiers")
+        .select("id, full_name, personal_number")
+        .eq("is_active", true)
+        .order("full_name");
+      
+      if (!error && data) {
+        setSoldiers(data);
+      }
+    };
+    fetchSoldiers();
+  }, []);
 
   const fetchItems = async (category: ContentCategory) => {
     setLoading(true);
@@ -141,6 +218,8 @@ export default function SafetyEvents() {
 
     const latitude = data.latitude ? parseFloat(data.latitude) : null;
     const longitude = data.longitude ? parseFloat(data.longitude) : null;
+    const eventType = data.event_type || null;
+    const driverType = data.driver_type || null;
 
     const insertData = {
       title: data.title as string,
@@ -152,6 +231,8 @@ export default function SafetyEvents() {
       file_url: data.file_url || null,
       latitude,
       longitude,
+      event_type: eventType,
+      driver_type: driverType,
     };
 
     const { error } = await supabase.from("safety_content").insert([insertData]);
@@ -161,6 +242,31 @@ export default function SafetyEvents() {
       console.error(error);
     } else {
       toast.success("התוכן נוסף בהצלחה");
+      
+      // If it's a sector event with accident or stuck type, sync to accidents table
+      if (selectedCategory === "sector_events" && driverType && (eventType === "accident" || eventType === "stuck")) {
+        // Map driver_type: security stays security, combat (גדוד) maps to combat (לוחם)
+        const accidentDriverType = driverType === "security" ? "security" : "combat";
+        
+        // Get driver name - from soldier selection or manual input
+        let driverName = data.driver_name || null;
+        if (driverType === "security" && data.soldier_id) {
+          const selectedSoldier = soldiers.find(s => s.id === data.soldier_id);
+          driverName = selectedSoldier?.full_name || null;
+        }
+        
+        await supabase.from("accidents").insert([{
+          accident_date: data.event_date || new Date().toISOString().split('T')[0],
+          driver_type: accidentDriverType,
+          soldier_id: driverType === "security" ? data.soldier_id : null,
+          driver_name: driverName,
+          vehicle_number: data.vehicle_number || null,
+          description: data.description || data.title,
+          location: latitude && longitude ? `${latitude}, ${longitude}` : null,
+          incident_type: eventType, // 'accident' or 'stuck'
+          severity: data.severity || 'minor',
+        }]);
+      }
       
       // If it's a sector event with location, also add to safety_events table
       if (selectedCategory === "sector_events" && latitude && longitude) {
@@ -196,6 +302,8 @@ export default function SafetyEvents() {
       file_url: data.file_url || null,
       latitude,
       longitude,
+      event_type: data.event_type || null,
+      driver_type: data.driver_type || null,
     };
 
     const { error } = await supabase
@@ -620,7 +728,7 @@ export default function SafetyEvents() {
     return null;
   };
 
-  const fields = selectedCategory ? getFields(selectedCategory) : [];
+  const fields = selectedCategory ? getFields(selectedCategory, soldiers) : [];
 
   return (
     <AppLayout>
