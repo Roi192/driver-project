@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, AppRole } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ interface UserProfile {
 
 interface UserRole {
   user_id: string;
-  role: "driver" | "admin";
+  role: AppRole;
 }
 
 interface Soldier {
@@ -75,10 +75,18 @@ interface Soldier {
   personal_number: string;
 }
 
+// Role display names in Hebrew
+const ROLE_LABELS: Record<AppRole, string> = {
+  admin: "מנהל מ\"פ נהגים",
+  platoon_commander: "מנהל מ\"מ נהגים",
+  battalion_admin: "מנהל גדוד תע\"ם",
+  driver: "נהג",
+};
+
 const UsersManagement = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { user, canDelete } = useAuth();
+  const { isAdmin, canAccessUsersManagement, isLoading: roleLoading } = useUserRole();
   
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -96,7 +104,7 @@ const UsersManagement = () => {
     military_role: "",
     platoon: "",
     personal_number: "",
-    role: "driver" as "driver" | "admin",
+    role: "driver" as AppRole,
   });
   const [saving, setSaving] = useState(false);
   
@@ -110,14 +118,14 @@ const UsersManagement = () => {
   const [existingSoldiers, setExistingSoldiers] = useState<Soldier[]>([]);
 
   useEffect(() => {
-    if (!roleLoading && !isAdmin) {
+    if (!roleLoading && !canAccessUsersManagement) {
       navigate("/");
       return;
     }
-    if (isAdmin) {
+    if (canAccessUsersManagement) {
       fetchUsers();
     }
-  }, [isAdmin, roleLoading, navigate]);
+  }, [canAccessUsersManagement, roleLoading, navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -133,7 +141,7 @@ const UsersManagement = () => {
       if (rolesRes.error) throw rolesRes.error;
 
       setProfiles(profilesRes.data || []);
-      setUserRoles(rolesRes.data || []);
+      setUserRoles((rolesRes.data || []) as UserRole[]);
       setExistingSoldiers(soldiersRes.data || []);
 
       // Fetch emails via edge function
@@ -153,7 +161,7 @@ const UsersManagement = () => {
     }
   };
 
-  const getUserRole = (userId: string): "driver" | "admin" => {
+  const getUserRole = (userId: string): AppRole => {
     const roleEntry = userRoles.find(r => r.user_id === userId);
     return roleEntry?.role || "driver";
   };
@@ -289,6 +297,32 @@ const UsersManagement = () => {
     (userEmails[p.user_id]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const getRoleBadgeStyle = (role: AppRole) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-amber-500/90 text-white';
+      case 'platoon_commander':
+        return 'bg-blue-500/90 text-white';
+      case 'battalion_admin':
+        return 'bg-purple-500/90 text-white';
+      default:
+        return 'bg-slate-500/90 text-white';
+    }
+  };
+
+  const getRoleIconBg = (role: AppRole) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-gradient-to-br from-amber-500/20 to-orange-500/20';
+      case 'platoon_commander':
+        return 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20';
+      case 'battalion_admin':
+        return 'bg-gradient-to-br from-purple-500/20 to-pink-500/20';
+      default:
+        return 'bg-gradient-to-br from-slate-500/20 to-slate-600/20';
+    }
+  };
+
   if (roleLoading || loading) {
     return (
       <AppLayout>
@@ -299,9 +333,17 @@ const UsersManagement = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!canAccessUsersManagement) {
     return null;
   }
+
+  // Count roles
+  const roleCounts = {
+    admin: userRoles.filter(r => r.role === 'admin').length,
+    platoon_commander: userRoles.filter(r => r.role === 'platoon_commander').length,
+    battalion_admin: userRoles.filter(r => r.role === 'battalion_admin').length,
+    driver: userRoles.filter(r => r.role === 'driver').length,
+  };
 
   return (
     <AppLayout>
@@ -316,7 +358,7 @@ const UsersManagement = () => {
 
         {/* Stats Card */}
         <div className="glass-card p-4 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 flex items-center justify-center">
                 <UserCog className="w-6 h-6 text-blue-500" />
@@ -326,12 +368,18 @@ const UsersManagement = () => {
                 <p className="text-sm text-muted-foreground">משתמשים רשומים</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
-                {userRoles.filter(r => r.role === "admin").length} מנהלים
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                {roleCounts.admin} מנהלי מ"פ
               </Badge>
               <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
-                {userRoles.filter(r => r.role === "driver").length} נהגים
+                {roleCounts.platoon_commander} מנהלי מ"מ
+              </Badge>
+              <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/30">
+                {roleCounts.battalion_admin} מנהלי גדוד
+              </Badge>
+              <Badge variant="outline" className="bg-slate-500/10 text-slate-600 border-slate-500/30">
+                {roleCounts.driver} נהגים
               </Badge>
             </div>
           </div>
@@ -352,7 +400,6 @@ const UsersManagement = () => {
         <div className="space-y-3">
           {filteredProfiles.map((profile) => {
             const role = getUserRole(profile.user_id);
-            const isAdminUser = role === "admin";
             const email = userEmails[profile.user_id];
             const inSoldiersTable = isUserInSoldiersTable(profile);
             
@@ -363,15 +410,15 @@ const UsersManagement = () => {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      isAdminUser 
-                        ? "bg-gradient-to-br from-amber-500/20 to-orange-500/20" 
-                        : "bg-gradient-to-br from-blue-500/20 to-indigo-500/20"
-                    }`}>
-                      {isAdminUser ? (
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getRoleIconBg(role)}`}>
+                      {role === 'admin' ? (
                         <Shield className="w-6 h-6 text-amber-500" />
+                      ) : role === 'platoon_commander' ? (
+                        <Shield className="w-6 h-6 text-blue-500" />
+                      ) : role === 'battalion_admin' ? (
+                        <Shield className="w-6 h-6 text-purple-500" />
                       ) : (
-                        <User className="w-6 h-6 text-blue-500" />
+                        <User className="w-6 h-6 text-slate-500" />
                       )}
                     </div>
                     <div>
@@ -389,10 +436,8 @@ const UsersManagement = () => {
                         </p>
                       )}
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <Badge variant={isAdminUser ? "default" : "secondary"} className={
-                          isAdminUser ? "bg-amber-500/90" : ""
-                        }>
-                          {isAdminUser ? "מנהל" : "נהג"}
+                        <Badge className={getRoleBadgeStyle(role)}>
+                          {ROLE_LABELS[role]}
                         </Badge>
                         {inSoldiersTable && (
                           <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30 text-xs">
@@ -428,14 +473,17 @@ const UsersManagement = () => {
                     >
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeletingUser(profile)}
-                      className="w-10 h-10 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {/* Only show delete button for admin users */}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeletingUser(profile)}
+                        className="w-10 h-10 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
@@ -519,7 +567,7 @@ const UsersManagement = () => {
                 />
               </div>
 
-              {/* Role Selection */}
+              {/* Role Selection - Updated with new roles */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-foreground">
                   <Shield className="w-4 h-4 text-amber-500" />
@@ -527,16 +575,24 @@ const UsersManagement = () => {
                 </Label>
                 <Select
                   value={editFormData.role}
-                  onValueChange={(value: "driver" | "admin") => setEditFormData(prev => ({ ...prev, role: value }))}
+                  onValueChange={(value: AppRole) => setEditFormData(prev => ({ ...prev, role: value }))}
                 >
                   <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border">
                     <SelectValue placeholder="בחר הרשאה" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border z-[10000]">
+                    <SelectItem value="admin">מנהל מ"פ נהגים (גישה מלאה)</SelectItem>
+                    <SelectItem value="platoon_commander">מנהל מ"מ נהגים</SelectItem>
+                    <SelectItem value="battalion_admin">מנהל גדוד תע"ם</SelectItem>
                     <SelectItem value="driver">נהג (משתמש רגיל)</SelectItem>
-                    <SelectItem value="admin">מנהל (גישה מלאה)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {editFormData.role === 'admin' && '✓ גישה מלאה לכל הפיצ\'רים כולל מחיקה וניהול משתמשים'}
+                  {editFormData.role === 'platoon_commander' && '✓ ללא דו"ח בו"מ, ניהול משתמשים ומחיקות'}
+                  {editFormData.role === 'battalion_admin' && '✓ גישה מוגבלת: ללא תוכנית עבודה, בו"מ, שליטה, נוכחות, עונשים, ביקורות, חגים, ניהול משתמשים ומחיקות'}
+                  {editFormData.role === 'driver' && '✓ צפייה בלבד + מילוי טפסים'}
+                </p>
               </div>
               
               <div className="space-y-2">

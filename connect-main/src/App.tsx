@@ -34,6 +34,7 @@ import SafetyScoresManagement from "./pages/SafetyScoresManagement";
 import DriverInterviews from "./pages/DriverInterviews";
 import AdminDriverInterviews from "./pages/AdminDriverInterviews";
 import CoursesManagement from "./pages/CoursesManagement";
+import WorkSchedule from "./pages/WorkSchedule";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -263,6 +264,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CoursesManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/work-schedule"
+              element={
+                <ProtectedRoute>
+                  <WorkSchedule />
                 </ProtectedRoute>
               }
             />

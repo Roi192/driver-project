@@ -42,7 +42,7 @@ const getFields = (): FieldConfig[] => [
 ];
 
 export default function SafetyFiles() {
-  const { isAdmin } = useAuth();
+  const { canEditSafetyFiles: canEdit, canDelete } = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState<View>("outposts");
   const [selectedOutpost, setSelectedOutpost] = useState<string | null>(null);
@@ -237,7 +237,7 @@ export default function SafetyFiles() {
               </p>
             )}
           </div>
-          {isAdmin && view === "points" && (
+          {canEdit && view === "points" && (
             <Button 
               size="sm" 
               onClick={() => setAddDialogOpen(true)}
@@ -247,24 +247,28 @@ export default function SafetyFiles() {
               הוסף
             </Button>
           )}
-          {isAdmin && view === "pointDetail" && (
+          {(canEdit || canDelete) && view === "pointDetail" && (
             <div className="flex gap-2">
-              <Button
-                size="icon"
-                variant="secondary"
-                onClick={() => setEditDialogOpen(true)}
-                className="rounded-xl"
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="destructive"
-                onClick={() => setDeleteDialogOpen(true)}
-                className="rounded-xl"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              {canEdit && (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={() => setEditDialogOpen(true)}
+                  className="rounded-xl"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  size="icon"
+                  variant="destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className="rounded-xl"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -325,7 +329,7 @@ export default function SafetyFiles() {
               <FolderOpen className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground">אין נקודות להצגה</p>
-            {isAdmin && (
+            {canEdit && (
               <p className="text-sm text-muted-foreground mt-2">
                 לחץ על "הוסף" להוספת נקודה חדשה
               </p>

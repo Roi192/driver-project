@@ -1498,6 +1498,60 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_notifications_log: {
+        Row: {
+          error_message: string | null
+          id: string
+          outpost: string
+          phone: string
+          sent_at: string
+          shift_date: string
+          shift_type: string
+          soldier_id: string | null
+          soldier_name: string
+          status: string
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          outpost: string
+          phone: string
+          sent_at?: string
+          shift_date: string
+          shift_type: string
+          soldier_id?: string | null
+          soldier_name: string
+          status?: string
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          outpost?: string
+          phone?: string
+          sent_at?: string
+          shift_date?: string
+          shift_type?: string
+          soldier_id?: string | null
+          soldier_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       soldier_courses: {
         Row: {
           course_id: string
@@ -1575,6 +1629,7 @@ export type Database = {
           outpost: string | null
           permits: string[] | null
           personal_number: string
+          phone: string | null
           qualified_date: string | null
           release_date: string | null
           safety_status: string | null
@@ -1595,6 +1650,7 @@ export type Database = {
           outpost?: string | null
           permits?: string[] | null
           personal_number: string
+          phone?: string | null
           qualified_date?: string | null
           release_date?: string | null
           safety_status?: string | null
@@ -1615,6 +1671,7 @@ export type Database = {
           outpost?: string | null
           permits?: string[] | null
           personal_number?: string
+          phone?: string | null
           qualified_date?: string | null
           release_date?: string | null
           safety_status?: string | null
@@ -1781,6 +1838,88 @@ export type Database = {
         }
         Relationships: []
       }
+      work_schedule: {
+        Row: {
+          afternoon_soldier_id: string | null
+          created_at: string
+          created_by: string | null
+          day_of_week: number
+          evening_soldier_id: string | null
+          id: string
+          morning_soldier_id: string | null
+          outpost: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          afternoon_soldier_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          day_of_week: number
+          evening_soldier_id?: string | null
+          id?: string
+          morning_soldier_id?: string | null
+          outpost: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          afternoon_soldier_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number
+          evening_soldier_id?: string | null
+          id?: string
+          morning_soldier_id?: string | null
+          outpost?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedule_afternoon_soldier_id_fkey"
+            columns: ["afternoon_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_afternoon_soldier_id_fkey"
+            columns: ["afternoon_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_evening_soldier_id_fkey"
+            columns: ["evening_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_evening_soldier_id_fkey"
+            columns: ["evening_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_morning_soldier_id_fkey"
+            columns: ["morning_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_morning_soldier_id_fkey"
+            columns: ["morning_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       soldiers_basic: {
@@ -1818,7 +1957,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "driver" | "admin"
+      app_role: "driver" | "admin" | "platoon_commander" | "battalion_admin"
       drill_type: "descent" | "rollover" | "fire"
       safety_category: "vardim" | "vulnerability" | "parsa"
       safety_event_category:
@@ -1955,7 +2094,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["driver", "admin"],
+      app_role: ["driver", "admin", "platoon_commander", "battalion_admin"],
       drill_type: ["descent", "rollover", "fire"],
       safety_category: ["vardim", "vulnerability", "parsa"],
       safety_event_category: ["fire", "accident", "weapon", "vehicle", "other"],

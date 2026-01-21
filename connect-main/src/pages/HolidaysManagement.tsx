@@ -34,8 +34,9 @@ interface Holiday {
 }
 
 export default function HolidaysManagement() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, canAccessHolidays, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasAccess = canAccessHolidays;
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -51,10 +52,10 @@ export default function HolidaysManagement() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !hasAccess) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [hasAccess, authLoading, navigate]);
 
   useEffect(() => {
     fetchHolidays();

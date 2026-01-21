@@ -90,7 +90,7 @@ const shiftTypeMap: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
-  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isAdmin, isPlatoonCommander, isBattalionAdmin, isLoading: roleLoading } = useUserRole();
   const navigate = useNavigate();
   const [reports, setReports] = useState<ShiftReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,11 +103,14 @@ export default function AdminDashboard() {
   const [reportToDelete, setReportToDelete] = useState<ShiftReport | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Allow admin, platoon commander, and battalion admin access
+  const hasAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
+
   useEffect(() => {
-    if (!roleLoading && !isAdmin) {
+    if (!roleLoading && !hasAccess) {
       navigate('/');
     }
-  }, [isAdmin, roleLoading, navigate]);
+  }, [hasAccess, roleLoading, navigate]);
 
   const fetchReports = async () => {
     setIsLoading(true);
@@ -149,16 +152,16 @@ export default function AdminDashboard() {
       }
     };
     
-    if (isAdmin) {
+    if (hasAccess) {
       cleanupOldReports();
     }
-  }, [isAdmin]);
+  }, [hasAccess]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (hasAccess) {
       fetchReports();
     }
-  }, [isAdmin, filterOutpost, filterDate]);
+  }, [hasAccess, filterOutpost, filterDate]);
 
   const clearFilters = () => {
     setFilterOutpost('all');
@@ -214,7 +217,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!isAdmin) {
+  if (!hasAccess) {
     return null;
   }
 

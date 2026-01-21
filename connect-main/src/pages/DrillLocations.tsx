@@ -76,7 +76,7 @@ const getAddFields = (): FieldConfig[] => [
 ];
 
 export default function DrillLocations() {
-  const { isAdmin } = useAuth();
+  const { canEditDrillLocations: canEdit, canDelete } = useAuth();
   const [view, setView] = useState<View>("outposts");
   const [selectedOutpost, setSelectedOutpost] = useState<string | null>(null);
   const [selectedDrillType, setSelectedDrillType] = useState<DrillType | null>(null);
@@ -294,7 +294,7 @@ export default function DrillLocations() {
               </p>
             )}
           </div>
-          {isAdmin && view === "detail" && (
+          {canEdit && view === "detail" && (
             <Button 
               size="sm" 
               onClick={() => setAddDialogOpen(true)}
@@ -367,7 +367,7 @@ export default function DrillLocations() {
               <MapPin className="w-10 h-10 text-primary" />
             </div>
             <p className="text-muted-foreground text-lg">אין נקודות תרגולת להצגה</p>
-            {isAdmin && (
+            {canEdit && (
               <p className="text-sm text-muted-foreground mt-2">
                 לחץ על "הוסף" להוספת נקודת תרגולת חדשה
               </p>
@@ -397,30 +397,34 @@ export default function DrillLocations() {
       <div className="space-y-6">
         {drillLocations.map((location) => (
           <div key={location.id} className="glass-card overflow-hidden animate-fade-in relative">
-            {isAdmin && (
+            {(canEdit || canDelete) && (
               <div className="absolute top-3 left-3 z-10 flex gap-2">
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="w-9 h-9 backdrop-blur-sm bg-secondary/80"
-                  onClick={() => {
-                    setSelectedLocation(location);
-                    setEditDialogOpen(true);
-                  }}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="w-9 h-9"
-                  onClick={() => {
-                    setSelectedLocation(location);
-                    setDeleteDialogOpen(true);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="w-9 h-9 backdrop-blur-sm bg-secondary/80"
+                    onClick={() => {
+                      setSelectedLocation(location);
+                      setEditDialogOpen(true);
+                    }}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="w-9 h-9"
+                    onClick={() => {
+                      setSelectedLocation(location);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             )}
             {location.image_url && (
@@ -471,7 +475,7 @@ export default function DrillLocations() {
                 </div>
                 <h3 className="font-bold text-lg text-slate-800">הוראות ביצוע התרגולת</h3>
               </div>
-              {isAdmin && drillLocations.length > 0 && (
+              {canEdit && drillLocations.length > 0 && (
                 <Button
                   size="icon"
                   variant="secondary"

@@ -114,7 +114,7 @@ const SIMULATION_QUESTIONS = [
 ];
 
 export default function Inspections() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isPlatoonCommander, canAccessInspections, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [inspections, setInspections] = useState<InspectionFull[]>([]);
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
@@ -190,10 +190,10 @@ export default function Inspections() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !canAccessInspections) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [canAccessInspections, authLoading, navigate]);
 
   useEffect(() => {
     fetchData();

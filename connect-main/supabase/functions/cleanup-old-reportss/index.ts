@@ -49,18 +49,18 @@ Deno.serve(async (req) => {
 
     console.log(`User ${user.id} attempting cleanup operation`)
 
-    // Verify the user has admin role
+    // Verify the user has admin or platoon_commander role
     const { data: roleData, error: roleError } = await supabaseUser
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single()
+      .in('role', ['admin', 'platoon_commander'])
+      .maybeSingle()
 
     if (roleError || !roleData) {
-      console.error('Admin role check failed for user:', user.id)
+      console.error('Admin/platoon_commander role check failed for user:', user.id)
       return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden - admin access required' }),
+        JSON.stringify({ success: false, error: 'Forbidden - admin or platoon commander access required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
           status: 403 

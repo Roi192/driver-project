@@ -103,8 +103,9 @@ const getCorrectDrivingStatus = (soldier: Soldier) => {
 };
 
 export default function SoldiersControl() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isPlatoonCommander, canAccessSoldiersControl, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasAccess = canAccessSoldiersControl;
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -126,6 +127,7 @@ export default function SoldiersControl() {
   const [formData, setFormData] = useState({
     personal_number: "",
     full_name: "",
+    phone: "",
     military_license_expiry: "",
     civilian_license_expiry: "",
     release_date: "",
@@ -137,10 +139,10 @@ export default function SoldiersControl() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !hasAccess) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [hasAccess, authLoading, navigate]);
 
   useEffect(() => {
     fetchSoldiers();
@@ -203,6 +205,7 @@ export default function SoldiersControl() {
     const soldierData = {
       personal_number: formData.personal_number,
       full_name: formData.full_name,
+      phone: formData.phone || null,
       military_license_expiry: formData.military_license_expiry || null,
       civilian_license_expiry: formData.civilian_license_expiry || null,
       release_date: formData.release_date || null,
@@ -268,6 +271,7 @@ export default function SoldiersControl() {
     setFormData({
       personal_number: "",
       full_name: "",
+      phone: "",
       military_license_expiry: "",
       civilian_license_expiry: "",
       release_date: "",
@@ -285,6 +289,7 @@ export default function SoldiersControl() {
     setFormData({
       personal_number: soldier.personal_number,
       full_name: soldier.full_name,
+      phone: (soldier as any).phone || "",
       military_license_expiry: soldier.military_license_expiry || "",
       civilian_license_expiry: soldier.civilian_license_expiry || "",
       release_date: soldier.release_date || "",
@@ -802,6 +807,21 @@ export default function SoldiersControl() {
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   placeholder="הזן שם מלא"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-lime-50 border border-lime-200">
+                <Label className="text-lime-700 font-bold flex items-center gap-2">
+                  <span>📱</span> מספר טלפון (לקבלת SMS)
+                </Label>
+                <p className="text-xs text-lime-600 mb-2">הזן מספר טלפון לקבלת התראות על משמרות</p>
+                <Input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="050-1234567"
+                  className="bg-white"
+                  dir="ltr"
                 />
               </div>
 

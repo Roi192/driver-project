@@ -131,8 +131,9 @@ interface MonthlyRecord {
 }
 
 export default function AttendanceTracking() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isPlatoonCommander, canAccessAttendance, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasAccess = canAccessAttendance;
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [events, setEvents] = useState<WorkPlanEvent[]>([]);
   const [attendance, setAttendance] = useState<EventAttendance[]>([]);
@@ -169,10 +170,10 @@ export default function AttendanceTracking() {
   const [selectedEventForAttendance, setSelectedEventForAttendance] = useState<WorkPlanEvent | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !hasAccess) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [hasAccess, authLoading, navigate]);
 
   useEffect(() => {
     fetchData();

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-type AppRole = 'driver' | 'admin';
+// Updated roles: admin (מ"פ), platoon_commander (מ"מ), battalion_admin (גדוד), driver (נהג)
+export type AppRole = 'driver' | 'admin' | 'platoon_commander' | 'battalion_admin';
 
 interface SignUpData {
   email: string;
@@ -27,6 +28,31 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isPlatoonCommander: boolean;
+  isBattalionAdmin: boolean;
+  canDelete: boolean;
+  canEdit: boolean;
+  canEditDrillLocations: boolean;
+  canEditSafetyFiles: boolean;
+  canEditSafetyEvents: boolean;
+  canEditTrainingVideos: boolean;
+  canEditProcedures: boolean;
+  canAccessUsersManagement: boolean;
+  canAccessBomReport: boolean;
+  canAccessAnnualWorkPlan: boolean;
+  canAccessSoldiersControl: boolean;
+  canAccessAttendance: boolean;
+  canAccessPunishments: boolean;
+  canAccessInspections: boolean;
+  canAccessHolidays: boolean;
+  canAccessFitnessReport: boolean;
+  canAccessAccidents: boolean;
+  canAccessCourses: boolean;
+  canAccessCleaningManagement: boolean;
+  canAccessSafetyScores: boolean;
+  canAccessDriverInterviews: boolean;
+  canAccessAdminDashboard: boolean;
+  canAccessWorkSchedule: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -147,6 +173,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserType(null);
   };
 
+  // Permission calculations
+  const isAdmin = role === 'admin';
+  const isPlatoonCommander = role === 'platoon_commander';
+  const isBattalionAdmin = role === 'battalion_admin';
+  
+  // Only admin (מ"פ) can delete
+  const canDelete = role === 'admin';
+  
+  // Admin (מ"פ), platoon_commander (מ"מ), and battalion_admin (גדוד) can add/edit
+  // Battalion admin can edit drill locations, safety files, safety events
+  const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  
+  // Battalion admin specific permissions - can edit these specific sections
+  const canEditDrillLocations = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  const canEditSafetyFiles = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  const canEditSafetyEvents = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  // Battalion admin cannot edit training videos or procedures
+  const canEditTrainingVideos = role === 'admin' || role === 'platoon_commander';
+  const canEditProcedures = role === 'admin' || role === 'platoon_commander';
+  
+  // Only admin (מ"פ) can access users management
+  const canAccessUsersManagement = role === 'admin';
+  
+  // Only admin (מ"פ) can access BOM report
+  const canAccessBomReport = role === 'admin';
+  
+  // Only admin (מ"פ) and platoon_commander (מ"מ) can access annual work plan
+  // battalion_admin cannot
+  const canAccessAnnualWorkPlan = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin and platoon_commander can access soldiers control
+  // battalion_admin can see soldier data in dropdowns but not access the page
+  const canAccessSoldiersControl = role === 'admin' || role === 'platoon_commander';
+  
+  // Only admin and platoon_commander can access attendance tracking
+  const canAccessAttendance = role === 'admin' || role === 'platoon_commander';
+  
+  // Only admin and platoon_commander can access punishments tracking
+  const canAccessPunishments = role === 'admin' || role === 'platoon_commander';
+  
+  // Only admin and platoon_commander can access inspections
+  const canAccessInspections = role === 'admin' || role === 'platoon_commander';
+  
+  // Only admin can access holidays management
+  const canAccessHolidays = role === 'admin';
+  
+  // Only admin can access fitness report
+  const canAccessFitnessReport = role === 'admin';
+  
+  // Admin and platoon_commander can access accidents tracking
+  const canAccessAccidents = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin and platoon_commander can access courses management
+  const canAccessCourses = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin and platoon_commander can access cleaning management
+  const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin and platoon_commander can access safety scores
+  const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin, platoon_commander, and battalion_admin can access driver interviews
+  const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  
+  // Battalion admin can access admin dashboard
+  const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  
+  // Admin and platoon_commander can access work schedule
+  const canAccessWorkSchedule = role === 'admin' || role === 'platoon_commander';
+
   const value = {
     user,
     session,
@@ -157,7 +253,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signInWithGoogle,
     signOut,
-    isAdmin: role === 'admin',
+    isAdmin,
+    isPlatoonCommander,
+    isBattalionAdmin,
+    canDelete,
+    canEdit,
+    canEditDrillLocations,
+    canEditSafetyFiles,
+    canEditSafetyEvents,
+    canEditTrainingVideos,
+    canEditProcedures,
+    canAccessUsersManagement,
+    canAccessBomReport,
+    canAccessAnnualWorkPlan,
+    canAccessSoldiersControl,
+    canAccessAttendance,
+    canAccessPunishments,
+    canAccessInspections,
+    canAccessHolidays,
+    canAccessFitnessReport,
+    canAccessAccidents,
+    canAccessCourses,
+    canAccessCleaningManagement,
+    canAccessSafetyScores,
+    canAccessDriverInterviews,
+    canAccessAdminDashboard,
+    canAccessWorkSchedule,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

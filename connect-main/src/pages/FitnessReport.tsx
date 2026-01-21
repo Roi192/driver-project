@@ -38,8 +38,9 @@ interface SoldierFitness extends Soldier {
 }
 
 export default function FitnessReport() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, canAccessFitnessReport, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasAccess = canAccessFitnessReport;
   const [soldiers, setSoldiers] = useState<SoldierFitness[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,16 +49,16 @@ export default function FitnessReport() {
   const [filterNeedsCorrectDriving, setFilterNeedsCorrectDriving] = useState<string>("all");
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !hasAccess) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [hasAccess, authLoading, navigate]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (hasAccess) {
       fetchSoldiers();
     }
-  }, [isAdmin]);
+  }, [hasAccess]);
 
   const getDateStatus = (dateStr: string | null, daysWarning: number = 30): FitnessStatus => {
     if (!dateStr) return "unfit";

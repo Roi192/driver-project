@@ -145,7 +145,7 @@ const categoryLabels = {
 };
 
 export default function AnnualWorkPlan() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isPlatoonCommander, canAccessAnnualWorkPlan, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [events, setEvents] = useState<WorkPlanEvent[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -176,10 +176,10 @@ export default function AnnualWorkPlan() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !canAccessAnnualWorkPlan) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [canAccessAnnualWorkPlan, authLoading, navigate]);
 
   useEffect(() => {
     fetchData();

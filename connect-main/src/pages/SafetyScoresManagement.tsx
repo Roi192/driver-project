@@ -120,7 +120,7 @@ interface ExcellenceCandidate {
 }
 
 export default function SafetyScoresManagement() {
-  const { isAdmin, loading: authLoading, user } = useAuth();
+  const { role, canAccessSafetyScores, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [safetyScores, setSafetyScores] = useState<SafetyScore[]>([]);
@@ -220,10 +220,12 @@ export default function SafetyScoresManagement() {
   };
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      navigate("/");
-    }
-  }, [isAdmin, authLoading, navigate]);
+    if (authLoading) return;
+    // Wait for role resolution to avoid redirecting before roles load
+    if (!role) return;
+    // Access: admin + platoon_commander
+    if (!canAccessSafetyScores) navigate("/");
+  }, [authLoading, role, canAccessSafetyScores, navigate]);
 
   useEffect(() => {
     fetchData();

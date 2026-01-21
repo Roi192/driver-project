@@ -26,7 +26,6 @@ import {
   Car,
   Map,
   UserCog,
-  ListChecks,
   Gauge,
   GraduationCap
 } from "lucide-react";
@@ -37,7 +36,7 @@ import { toast } from "sonner";
 import unitLogo from "@/assets/unit-logo.png";
 
 // Base nav items - shift-form will be filtered based on user type
-const getNavItems = (userType: string | null) => {
+const getNavItems = (userType: string | null, isBattalionAdmin: boolean) => {
   const items = [
     { to: "/", icon: Home, label: "דף הבית" },
     { to: "/shift-form", icon: FileText, label: "טופס לפני משמרת", featured: true },
@@ -51,9 +50,14 @@ const getNavItems = (userType: string | null) => {
     { to: "/my-reports", icon: ClipboardList, label: "הדיווחים שלי" },
   ];
   
-  // Hide shift-form, trip-form and cleaning-parades for battalion users
-  if (userType === 'battalion') {
-    return items.filter(item => item.to !== '/shift-form' && item.to !== '/trip-form' && item.to !== '/cleaning-parades');
+  // Hide shift-form, trip-form, cleaning-parades, and my-reports for battalion users
+  if (userType === 'battalion' || isBattalionAdmin) {
+    return items.filter(item => 
+      item.to !== '/shift-form' && 
+      item.to !== '/trip-form' && 
+      item.to !== '/cleaning-parades' &&
+      item.to !== '/my-reports'
+    );
   }
   
   return items;
@@ -62,10 +66,35 @@ const getNavItems = (userType: string | null) => {
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [userName, setUserName] = useState<string>("");
-  const { signOut, isAdmin, user, userType } = useAuth();
+  const { 
+    signOut, 
+    isAdmin, 
+    isPlatoonCommander, 
+    isBattalionAdmin,
+    user, 
+    userType,
+    canAccessUsersManagement,
+    canAccessBomReport,
+    canAccessAnnualWorkPlan,
+    canAccessSoldiersControl,
+    canAccessAttendance,
+    canAccessPunishments,
+    canAccessInspections,
+    canAccessHolidays,
+    canAccessFitnessReport,
+    canAccessAccidents,
+    canAccessCourses,
+    canAccessCleaningManagement,
+    canAccessSafetyScores,
+    canAccessDriverInterviews,
+    canAccessWorkSchedule,
+  } = useAuth();
   const navigate = useNavigate();
   
-  const navItems = getNavItems(userType);
+  const navItems = getNavItems(userType, isBattalionAdmin);
+
+  // Check if user has any admin-level role
+  const hasAdminAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
 
   useEffect(() => {
     const fetchUserName = async () => {
@@ -209,8 +238,8 @@ export function MobileNav() {
         </div>
 
         <div className="p-4 space-y-2 relative z-10">
-          {/* Admin Links - Premium Gold Style */}
-          {isAdmin && (
+          {/* Admin Links - Show for any admin-level role */}
+          {hasAdminAccess && (
             <>
               <NavLink
                 to="/admin"
@@ -229,124 +258,145 @@ export function MobileNav() {
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-gold group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
 
-              <NavLink
-                to="/annual-work-plan"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Calendar className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">תוכנית עבודה שנתית</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Annual Work Plan - Admin and Platoon Commander only */}
+              {canAccessAnnualWorkPlan && (
+                <NavLink
+                  to="/annual-work-plan"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">תוכנית עבודה שנתית</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/bom-report"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <ClipboardCheck className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">דו"ח בו"מ</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* BOM Report - Admin only */}
+              {canAccessBomReport && (
+                <NavLink
+                  to="/bom-report"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <ClipboardCheck className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">דו"ח בו"מ</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/soldiers-control"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Users className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">טבלת שליטה</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Soldiers Control - Admin and Platoon Commander only */}
+              {canAccessSoldiersControl && (
+                <NavLink
+                  to="/soldiers-control"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">טבלת שליטה</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/attendance-tracking"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <UserCheck className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">מעקב נוכחות</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-teal-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Attendance Tracking - Admin and Platoon Commander only */}
+              {canAccessAttendance && (
+                <NavLink
+                  to="/attendance-tracking"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <UserCheck className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">מעקב נוכחות</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-teal-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/punishments"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Gavel className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">מעקב עונשים</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-red-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Punishments Tracking - Admin and Platoon Commander only */}
+              {canAccessPunishments && (
+                <NavLink
+                  to="/punishments"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Gavel className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">מעקב עונשים</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-red-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/inspections"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <FileSearch className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ביקורות</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Inspections - Admin and Platoon Commander only */}
+              {canAccessInspections && (
+                <NavLink
+                  to="/inspections"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <FileSearch className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ביקורות</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/safety-scores"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Gauge className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ציוני בטיחות</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-sky-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Safety Scores - Admin and Platoon Commander only */}
+              {canAccessSafetyScores && (
+                <NavLink
+                  to="/safety-scores"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Gauge className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ציוני בטיחות</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-sky-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
               <NavLink
                 to="/accidents-tracking"
@@ -382,112 +432,170 @@ export function MobileNav() {
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
 
-              <NavLink
-                to="/users-management"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <UserCog className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ניהול משתמשים</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-pink-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Users Management - Admin only */}
+              {canAccessUsersManagement && (
+                <NavLink
+                  to="/users-management"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <UserCog className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ניהול משתמשים</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-pink-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/cleaning-parades-admin"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ניהול מסדרי ניקיון</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Cleaning Parades Admin - Admin and Platoon Commander only */}
+              {canAccessCleaningManagement && (
+                <NavLink
+                  to="/cleaning-parades-admin"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ניהול מסדרי ניקיון</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/courses-management"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <GraduationCap className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ניהול קורסים</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Courses Management - Admin and Platoon Commander only */}
+              {canAccessCourses && (
+                <NavLink
+                  to="/courses-management"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ניהול קורסים</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/admin-driver-interviews"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <ClipboardCheck className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">מעקב ראיונות נהגי קו</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Driver Interviews Admin - Admin and Platoon Commander only */}
+              {canAccessDriverInterviews && (
+                <NavLink
+                  to="/admin-driver-interviews"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <ClipboardCheck className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">מעקב ראיונות נהגי קו</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/driver-interviews"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <ClipboardCheck className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ביצוע ראיון נהג קו</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Driver Interviews Form - Admin and Platoon Commander only */}
+              {canAccessDriverInterviews && (
+                <NavLink
+                  to="/driver-interviews"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <ClipboardCheck className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ביצוע ראיון נהג קו</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
 
-              <NavLink
-                to="/fitness-report"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <FileSearch className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">דוח כשירות מרוכז</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-green-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
+              {/* Fitness Report - Admin only */}
+              {canAccessFitnessReport && (
+                <NavLink
+                  to="/fitness-report"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <FileSearch className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">דוח כשירות מרוכז</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-green-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
+
+              {/* Work Schedule - Admin and Platoon Commander only */}
+              {canAccessWorkSchedule && (
+                <NavLink
+                  to="/work-schedule"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-lime-500 to-lime-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">סידור עבודה</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-lime-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
+
+              {/* Holidays Management - Admin and Platoon Commander only */}
+              {canAccessHolidays && (
+                <NavLink
+                  to="/holidays-management"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">חגים ואזכורים</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-yellow-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
             </>
           )}
 
-          {/* Links for battalion users */}
-          {userType === 'battalion' && (
+          {/* Links for battalion users ONLY (not platoon commanders) - these are duplicated in admin section so only show for non-admin battalion users */}
+          {userType === 'battalion' && !hasAdminAccess && (
             <>
               <NavLink
                 to="/know-the-area"

@@ -24,8 +24,9 @@ interface ExamplePhoto {
 }
 
 export default function CleaningParadesManagement() {
-  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { isAdmin, isPlatoonCommander, canAccessCleaningManagement, isLoading: roleLoading } = useUserRole();
   const navigate = useNavigate();
+  const hasAccess = canAccessCleaningManagement;
   const [examples, setExamples] = useState<ExamplePhoto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOutpost, setSelectedOutpost] = useState<string>("");
@@ -39,13 +40,13 @@ export default function CleaningParadesManagement() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!roleLoading && !isAdmin) {
+    if (!roleLoading && !hasAccess) {
       navigate('/');
     }
-  }, [isAdmin, roleLoading, navigate]);
+  }, [hasAccess, roleLoading, navigate]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (hasAccess) {
       fetchExamples();
     }
   }, [isAdmin]);

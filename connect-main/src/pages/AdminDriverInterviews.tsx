@@ -61,7 +61,7 @@ const REGIONS = Object.keys(REGIONS_OUTPOSTS);
 type ViewLevel = "regions" | "battalions" | "outposts" | "interviews";
 
 export default function AdminDriverInterviews() {
-  const { isAdmin, user } = useAuth();
+  const { canAccessDriverInterviews, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,12 +79,14 @@ export default function AdminDriverInterviews() {
   const [interviewToDelete, setInterviewToDelete] = useState<Interview | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!authLoading && !canAccessDriverInterviews) {
       navigate("/");
       return;
     }
-    fetchData();
-  }, [isAdmin, navigate]);
+    if (canAccessDriverInterviews) {
+      fetchData();
+    }
+  }, [canAccessDriverInterviews, authLoading, navigate]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -288,7 +290,7 @@ export default function AdminDriverInterviews() {
                   <div>
                     <h3 className="font-bold text-lg text-slate-800">{region}</h3>
                     <p className="text-sm text-slate-500">
-                      {outposts.length} מוצבים • {battalions.length} גדודים
+                      {outposts.length} מוצבים • {battalions.length} גדודות
                     </p>
                   </div>
                 </div>
@@ -315,8 +317,8 @@ export default function AdminDriverInterviews() {
         <Card>
           <CardContent className="p-8 text-center">
             <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-            <p className="text-slate-500">לא נמצאו גדודים בגזרה זו</p>
-            <p className="text-sm text-slate-400 mt-1">גדודים יופיעו כאן לאחר שיזינו ראיונות</p>
+            <p className="text-slate-500">לא נמצאו גדודות בגזרה זו</p>
+            <p className="text-sm text-slate-400 mt-1">גדודות יופיעו כאן לאחר שיזינו ראיונות</p>
           </CardContent>
         </Card>
       );
@@ -493,7 +495,7 @@ export default function AdminDriverInterviews() {
     <AppLayout>
       <PageHeader 
         title="מעקב ראיונות נהגי קו" 
-        subtitle="צפייה ובקרה על ראיונות כל הגדודים"
+        subtitle="צפייה ובקרה על ראיונות כל הגדודות"
         icon={ClipboardCheck}
       />
 
@@ -544,7 +546,7 @@ export default function AdminDriverInterviews() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             {viewLevel === "regions" && <><MapPin className="w-5 h-5 text-primary" />בחר גזרה</>}
-            {viewLevel === "battalions" && <><Shield className="w-5 h-5 text-primary" />גדודים ב{selectedRegion}</>}
+            {viewLevel === "battalions" && <><Shield className="w-5 h-5 text-primary" />גדודות ב{selectedRegion}</>}
             {viewLevel === "outposts" && <><Building2 className="w-5 h-5 text-primary" />מוצבים של {selectedBattalion}</>}
             {viewLevel === "interviews" && <><ClipboardCheck className="w-5 h-5 text-primary" />ראיונות במוצב {selectedOutpost}</>}
           </CardTitle>

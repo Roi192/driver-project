@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { OUTPOSTS } from "@/lib/constants";
 import { useNavigate } from "react-router-dom";
@@ -77,7 +77,7 @@ const DAY_OPTIONS = [
 ];
 
 export default function CleaningParadesAdmin() {
-  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { canAccessCleaningManagement, loading: roleLoading } = useAuth();
   const navigate = useNavigate();
   
   // Data state
@@ -116,22 +116,22 @@ export default function CleaningParadesAdmin() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!roleLoading && !isAdmin) {
+    if (!roleLoading && !canAccessCleaningManagement) {
       navigate('/');
     }
-  }, [isAdmin, roleLoading, navigate]);
+  }, [canAccessCleaningManagement, roleLoading, navigate]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canAccessCleaningManagement) {
       fetchAllData();
     }
-  }, [isAdmin, selectedOutpost]);
+  }, [canAccessCleaningManagement, selectedOutpost]);
 
   useEffect(() => {
-    if (isAdmin && selectedOutpost) {
+    if (canAccessCleaningManagement && selectedOutpost) {
       fetchDayAssignments();
     }
-  }, [isAdmin, selectedOutpost, currentWeekStart]);
+  }, [canAccessCleaningManagement, selectedOutpost, currentWeekStart]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -392,7 +392,7 @@ export default function CleaningParadesAdmin() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!canAccessCleaningManagement) return null;
 
   return (
     <AppLayout>

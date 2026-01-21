@@ -445,7 +445,7 @@ const parseRoutePoints = (points: any): Array<{ lat: number; lng: number }> => {
 const KnowTheArea = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, canEdit, canDelete } = useUserRole();
   const mapRef = useRef<L.Map | null>(null);
   
   // Data states
@@ -1363,7 +1363,7 @@ const KnowTheArea = () => {
         </div>
 
         {/* Admin Drawing Controls */}
-        {isAdmin && (
+        {canEdit && (
           <div className="px-4 mb-4">
             {isDrawingRoute ? (
               <div className="glass-card p-4 border-red-500/30 bg-red-500/5">
@@ -1489,7 +1489,7 @@ const KnowTheArea = () => {
                       <h3 className="font-bold text-lg mb-2">{boundary.name}</h3>
                       <Badge className="mb-2" style={{ backgroundColor: boundary.color }}>גבול גזרה</Badge>
                       {boundary.description && <p className="text-sm text-gray-600 mt-2">{boundary.description}</p>}
-                      {isAdmin && (
+                      {canDelete && (
                         <Button variant="destructive" size="sm" className="w-full mt-3" onClick={() => handleDeleteBoundary(boundary.id)}>
                           <Trash2 className="w-4 h-4 ml-2" />מחק
                         </Button>
@@ -1531,14 +1531,18 @@ const KnowTheArea = () => {
                       <h3 className="font-bold text-lg mb-2">{route.name}</h3>
                       <Badge className="bg-red-500 text-white mb-2">ציר מסוכן</Badge>
                       {route.description && <p className="text-sm text-gray-600 mt-2">{route.description}</p>}
-                      {isAdmin && (
+                      {(canEdit || canDelete) && (
                         <div className="flex gap-2 mt-3">
-                          <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditRoute(route)}>
-                            <Pencil className="w-4 h-4 ml-1" />עריכה
-                          </Button>
-                          <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteRoute(route.id)}>
-                            <Trash2 className="w-4 h-4 ml-1" />מחק
-                          </Button>
+                          {canEdit && (
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditRoute(route)}>
+                              <Pencil className="w-4 h-4 ml-1" />עריכה
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteRoute(route.id)}>
+                              <Trash2 className="w-4 h-4 ml-1" />מחק
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1567,7 +1571,7 @@ const KnowTheArea = () => {
                       <h3 className="font-bold text-lg mb-2">{point.name}</h3>
                       <Badge className="bg-amber-500 text-white mb-2">מוצב</Badge>
                       {point.description && <p className="text-sm text-gray-600 mt-2">{point.description}</p>}
-                      {isAdmin && (
+                      {canDelete && (
                         <Button variant="destructive" size="sm" className="w-full mt-3" onClick={() => handleDeletePoint(point.id)}>
                           <Trash2 className="w-4 h-4 ml-2" />מחק
                         </Button>
@@ -1586,14 +1590,18 @@ const KnowTheArea = () => {
                       <Badge className="bg-orange-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
                       {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
                       {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
-                      {isAdmin && (
+                      {(canEdit || canDelete) && (
                         <div className="flex gap-2 mt-3">
-                          <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
-                            <Pencil className="w-4 h-4 ml-1" />עריכה
-                          </Button>
-                          <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
-                            <Trash2 className="w-4 h-4 ml-1" />מחק
-                          </Button>
+                          {canEdit && (
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
+                              <Pencil className="w-4 h-4 ml-1" />עריכה
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
+                              <Trash2 className="w-4 h-4 ml-1" />מחק
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1617,14 +1625,18 @@ const KnowTheArea = () => {
                       <Badge className="bg-red-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
                       {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
                       {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
-                      {isAdmin && (
+                      {(canEdit || canDelete) && (
                         <div className="flex gap-2 mt-3">
-                          <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
-                            <Pencil className="w-4 h-4 ml-1" />עריכה
-                          </Button>
-                          <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
-                            <Trash2 className="w-4 h-4 ml-1" />מחק
-                          </Button>
+                          {canEdit && (
+                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
+                              <Pencil className="w-4 h-4 ml-1" />עריכה
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
+                              <Trash2 className="w-4 h-4 ml-1" />מחק
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>

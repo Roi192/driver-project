@@ -51,8 +51,9 @@ interface Punishment {
 type PunishmentType = "משפט" | "שלילת ימי חופשה";
 
 export default function PunishmentsTracking() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isPlatoonCommander, canAccessPunishments, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasAccess = canAccessPunishments;
   const [punishments, setPunishments] = useState<Punishment[]>([]);
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,10 +78,10 @@ export default function PunishmentsTracking() {
   });
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) {
+    if (!authLoading && !hasAccess) {
       navigate("/");
     }
-  }, [isAdmin, authLoading, navigate]);
+  }, [hasAccess, authLoading, navigate]);
 
   useEffect(() => {
     fetchData();

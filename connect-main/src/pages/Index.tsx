@@ -5,7 +5,10 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { QuickActions } from "@/components/home/QuickActions";
 
 const Index = () => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isPlatoonCommander, loading } = useAuth();
+
+  // Check if user has any admin-level role that should see commander dashboard
+  const hasAdminAccess = isAdmin || isPlatoonCommander;
 
   // Show loading while checking role
   if (loading) {
@@ -21,8 +24,8 @@ const Index = () => {
     );
   }
 
-  // Show commander dashboard for admins
-  if (user && isAdmin) {
+  // Show commander dashboard for admins and platoon commanders
+  if (user && hasAdminAccess) {
     return (
       <AppLayout>
         <CommanderDashboard />

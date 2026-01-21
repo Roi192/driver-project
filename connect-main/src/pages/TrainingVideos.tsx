@@ -26,7 +26,7 @@ const videoFields: FieldConfig[] = [
 ];
 
 export default function TrainingVideos() {
-  const { isAdmin } = useAuth();
+  const { canEditTrainingVideos: canEdit, canDelete } = useAuth();
   const [videos, setVideos] = useState<TrainingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -156,7 +156,7 @@ export default function TrainingVideos() {
           badge="סרטוני הדרכה"
         />
 
-        {isAdmin && (
+        {canEdit && (
           <Button
             onClick={() => setAddDialogOpen(true)}
             className="w-full mb-6 h-14 text-base font-bold rounded-xl bg-gradient-to-r from-primary to-accent shadow-emblem hover:shadow-luxury transition-all duration-300 animate-slide-up"
@@ -176,7 +176,7 @@ export default function TrainingVideos() {
               </div>
             </div>
             <p className="text-muted-foreground text-lg font-medium">אין סרטונים להצגה</p>
-            {isAdmin && (
+            {canEdit && (
               <p className="text-sm text-muted-foreground mt-2">
                 לחץ על "הוסף סרטון הדרכה" להוספת סרטון חדש
               </p>
@@ -194,30 +194,34 @@ export default function TrainingVideos() {
                 {/* Hover gradient */}
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                 
-                {isAdmin && (
+                {(canEdit || canDelete) && (
                   <div className="absolute top-3 left-3 z-10 flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      className="w-9 h-9 rounded-xl backdrop-blur-sm bg-card/80 border border-border/30 hover:bg-primary/20 hover:border-primary/40 transition-all duration-300"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog(video);
-                      }}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="w-9 h-9 rounded-xl"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog(video);
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="w-9 h-9 rounded-xl backdrop-blur-sm bg-card/80 border border-border/30 hover:bg-primary/20 hover:border-primary/40 transition-all duration-300"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditDialog(video);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="w-9 h-9 rounded-xl"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog(video);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
                 

@@ -108,7 +108,7 @@ const INTERVIEW_GUIDELINES = [
 ];
 
 export default function DriverInterviews() {
-  const { userType, loading: authLoading, user, isAdmin } = useAuth();
+  const { userType, loading: authLoading, user, canAccessDriverInterviews } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
@@ -146,25 +146,25 @@ export default function DriverInterviews() {
   });
 
   useEffect(() => {
-    // Allow admin and battalion users
-    if (!authLoading && userType !== 'battalion' && !isAdmin) {
+    // Allow users with driver interview access and battalion users
+    if (!authLoading && userType !== 'battalion' && !canAccessDriverInterviews) {
       navigate("/");
     }
-  }, [userType, isAdmin, authLoading, navigate]);
+  }, [userType, canAccessDriverInterviews, authLoading, navigate]);
 
   useEffect(() => {
-    if (userType === 'battalion' || isAdmin) {
+    if (userType === 'battalion' || canAccessDriverInterviews) {
       fetchData();
     }
-  }, [userType, isAdmin]);
+  }, [userType, canAccessDriverInterviews]);
 
   // Handle edit mode from URL params
   useEffect(() => {
     const editId = searchParams.get('edit');
-    if (editId && !loading && (userType === 'battalion' || isAdmin)) {
+    if (editId && !loading && (userType === 'battalion' || canAccessDriverInterviews)) {
       loadInterviewForEdit(editId);
     }
-  }, [searchParams, loading, userType, isAdmin]);
+  }, [searchParams, loading, userType, canAccessDriverInterviews]);
 
   const loadInterviewForEdit = async (interviewId: string) => {
     try {
