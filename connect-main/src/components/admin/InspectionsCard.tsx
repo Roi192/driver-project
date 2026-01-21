@@ -13,6 +13,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 interface Inspection {
   id: string;
   inspection_date: string;
+  created_at?: string;
   platoon: string;
   commander_name: string;
   soldier_id: string;
@@ -83,6 +84,9 @@ export function InspectionsCard() {
   const avgScore = inspections.length > 0
     ? Math.round(inspections.reduce((sum, i) => sum + i.total_score, 0) / inspections.length)
     : 0;
+
+  const getInspectionPerformedAt = (inspection: Pick<Inspection, "created_at" | "inspection_date">) =>
+    parseISO(inspection.created_at ?? inspection.inspection_date);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "bg-emerald-500";
@@ -195,7 +199,7 @@ export function InspectionsCard() {
                         <div>
                           <p className="font-bold text-slate-800">{inspection.soldiers?.full_name}</p>
                           <p className="text-xs text-slate-500">
-                            {format(parseISO(inspection.inspection_date), "dd/MM/yyyy HH:mm")} | {inspection.platoon}
+                            {format(getInspectionPerformedAt(inspection), "dd/MM/yyyy HH:mm")} | {inspection.platoon}
                           </p>
                         </div>
                       </div>
@@ -322,7 +326,7 @@ export function InspectionsCard() {
               <div className="p-4 rounded-xl bg-slate-50">
                 <h4 className="font-bold text-slate-800 mb-2">{selectedInspection.soldiers?.full_name}</h4>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <p><span className="text-slate-500">תאריך:</span> {format(parseISO(selectedInspection.inspection_date), "dd/MM/yyyy HH:mm")}</p>
+                  <p><span className="text-slate-500">תאריך:</span> {format(getInspectionPerformedAt(selectedInspection), "dd/MM/yyyy HH:mm")}</p>
                   <p><span className="text-slate-500">פלוגה:</span> {selectedInspection.platoon}</p>
                   <p><span className="text-slate-500">מפקד:</span> {selectedInspection.commander_name}</p>
                   <p><span className="text-slate-500">מבצע הביקורת:</span> {selectedInspection.inspector_name}</p>

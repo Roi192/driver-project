@@ -52,6 +52,7 @@ interface Soldier {
 interface InspectionFull {
   id: string;
   inspection_date: string;
+  created_at?: string;
   platoon: string;
   commander_name: string;
   soldier_id: string;
@@ -227,7 +228,8 @@ export default function Inspections() {
       supabase
         .from("inspections")
         .select("*, soldiers(id, full_name, personal_number)")
-        .order("inspection_date", { ascending: false }),
+        .order("inspection_date", { ascending: false })
+        .order("created_at", { ascending: false }),
       supabase
         .from("soldiers")
         .select("id, full_name, personal_number")
@@ -499,6 +501,9 @@ export default function Inspections() {
     return "text-red-600";
   };
 
+  const getInspectionPerformedAt = (inspection: Pick<InspectionFull, "created_at" | "inspection_date">) =>
+    parseISO(inspection.created_at ?? inspection.inspection_date);
+
   // Check item renderer for view dialog
   const CheckItem = ({ label, checked }: { label: string; checked: boolean | null }) => (
     <div className="flex items-center gap-2 p-2 rounded-lg bg-white border">
@@ -681,7 +686,7 @@ export default function Inspections() {
                           <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-slate-800">{inspection.soldiers?.full_name}</h4>
                             <p className="text-sm text-slate-500">
-                              {format(parseISO(inspection.inspection_date), "dd/MM/yyyy")} | {inspection.platoon}
+                              {format(getInspectionPerformedAt(inspection), "dd/MM/yyyy HH:mm")} | {inspection.platoon}
                             </p>
                           </div>
                           <Badge className={`${inspection.total_score >= 80 ? 'bg-emerald-500' : inspection.total_score >= 60 ? 'bg-amber-500' : 'bg-red-500'} text-white text-lg px-3 flex-shrink-0`}>
@@ -1133,7 +1138,7 @@ export default function Inspections() {
                     <div>
                       <p className="text-base">{viewInspection.soldiers?.full_name}</p>
                       <p className="text-xs font-normal text-slate-500">
-                        {format(parseISO(viewInspection.inspection_date), "dd/MM/yyyy HH:mm:ss", { locale: he })} | {viewInspection.platoon}
+                        {format(getInspectionPerformedAt(viewInspection), "dd/MM/yyyy HH:mm", { locale: he })} | {viewInspection.platoon}
                       </p>
                     </div>
                   </DialogTitle>
