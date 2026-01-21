@@ -122,6 +122,7 @@ export default function DriverInterviews() {
   const signatureRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [editingInterviewId, setEditingInterviewId] = useState<string | null>(null);
+  const [existingSignature, setExistingSignature] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     interview_date: format(new Date(), "yyyy-MM-dd"),
@@ -205,6 +206,7 @@ export default function DriverInterviews() {
       });
 
       setEditingInterviewId(interviewId);
+      setExistingSignature(data.signature || null);
       setDialogOpen(true);
       setCurrentStep(1);
 
@@ -455,6 +457,7 @@ export default function DriverInterviews() {
     clearSignature();
     setSafetyScores([]);
     setEditingInterviewId(null);
+    setExistingSignature(null);
   };
 
   const canProceedToStep2 = formData.region && formData.battalion && formData.outpost && formData.driver_name;
@@ -787,27 +790,39 @@ export default function DriverInterviews() {
               />
             </div>
 
-            <div>
-              <Label>חתימה *</Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden mt-2">
-                <canvas
-                  ref={signatureRef}
-                  width={300}
-                  height={150}
-                  className="w-full bg-white touch-none"
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  onTouchStart={startDrawing}
-                  onTouchMove={draw}
-                  onTouchEnd={stopDrawing}
-                />
+            {editingInterviewId && existingSignature ? (
+              <div>
+                <Label>חתימת הסמ"פ (נשמרה מהראיון המקורי)</Label>
+                <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden mt-2 p-4 bg-slate-50">
+                  <img src={existingSignature} alt="חתימה" className="max-w-full h-auto" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  החתימה נשמרת ולא ניתן לשנות אותה בעריכה
+                </p>
               </div>
-              <Button variant="outline" size="sm" onClick={clearSignature} className="mt-2">
-                נקה חתימה
-              </Button>
-            </div>
+            ) : (
+              <div>
+                <Label>חתימה *</Label>
+                <div className="border-2 border-dashed border-slate-300 rounded-xl overflow-hidden mt-2">
+                  <canvas
+                    ref={signatureRef}
+                    width={300}
+                    height={150}
+                    className="w-full bg-white touch-none"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={clearSignature} className="mt-2">
+                  נקה חתימה
+                </Button>
+              </div>
+            )}
 
             <div className="p-4 rounded-xl bg-green-50 border border-green-200">
               <p className="text-sm text-green-700">
