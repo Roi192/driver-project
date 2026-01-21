@@ -175,23 +175,49 @@ export function GeneralDetails() {
             </p>
           </div>
 
-          {/* Improvement areas */}
-          {previousScore.safety_score < 90 && getImprovementAreas(previousScore).length > 0 && (
-            <div className="space-y-2">
+          {/* Detailed breakdown - always show if there are violations */}
+          {(previousScore.speed_violations || previousScore.harsh_braking || previousScore.harsh_turns || previousScore.harsh_accelerations || previousScore.illegal_overtakes) ? (
+            <div className="space-y-3">
               <div className="flex items-center gap-2 text-slate-700">
                 <TrendingDown className="w-4 h-4" />
-                <span className="font-bold text-sm">נקודות לשיפור במשמרת הזו:</span>
+                <span className="font-bold text-sm">פירוט הציון שלך:</span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {getImprovementAreas(previousScore).map((area, idx) => (
-                  <span 
-                    key={idx} 
-                    className="px-3 py-1.5 bg-white/80 rounded-full text-sm font-medium text-slate-700 border border-slate-200"
-                  >
-                    {area}
-                  </span>
-                ))}
+              <div className="grid grid-cols-2 gap-2">
+                {previousScore.speed_violations !== null && previousScore.speed_violations > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-100 rounded-xl border border-red-200">
+                    <span className="text-red-600 font-bold text-lg">{previousScore.speed_violations}</span>
+                    <span className="text-red-700 text-sm font-medium">חריגות מהירות</span>
+                  </div>
+                )}
+                {previousScore.harsh_braking !== null && previousScore.harsh_braking > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-orange-100 rounded-xl border border-orange-200">
+                    <span className="text-orange-600 font-bold text-lg">{previousScore.harsh_braking}</span>
+                    <span className="text-orange-700 text-sm font-medium">בלימות חדות</span>
+                  </div>
+                )}
+                {previousScore.harsh_turns !== null && previousScore.harsh_turns > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-amber-100 rounded-xl border border-amber-200">
+                    <span className="text-amber-600 font-bold text-lg">{previousScore.harsh_turns}</span>
+                    <span className="text-amber-700 text-sm font-medium">פניות חדות</span>
+                  </div>
+                )}
+                {previousScore.harsh_accelerations !== null && previousScore.harsh_accelerations > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-yellow-100 rounded-xl border border-yellow-200">
+                    <span className="text-yellow-600 font-bold text-lg">{previousScore.harsh_accelerations}</span>
+                    <span className="text-yellow-700 text-sm font-medium">האצות חדות</span>
+                  </div>
+                )}
+                {previousScore.illegal_overtakes !== null && previousScore.illegal_overtakes > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-purple-100 rounded-xl border border-purple-200">
+                    <span className="text-purple-600 font-bold text-lg">{previousScore.illegal_overtakes}</span>
+                    <span className="text-purple-700 text-sm font-medium">עקיפות אסורות</span>
+                  </div>
+                )}
               </div>
+            </div>
+          ) : previousScore.safety_score === 100 && (
+            <div className="text-center py-2">
+              <span className="text-emerald-600 font-bold">🎉 נהיגה מושלמת! אפס הפרות</span>
             </div>
           )}
 

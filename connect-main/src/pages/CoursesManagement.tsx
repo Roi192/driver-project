@@ -622,11 +622,17 @@ const CoursesManagement = () => {
                     <SelectValue placeholder="בחר קורס" />
                   </SelectTrigger>
                   <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.name}
-                      </SelectItem>
-                    ))}
+                    {/* Show only vehicle courses (MAIN_COURSES) and custom courses */}
+                    {courses
+                      .filter((course) => 
+                        MAIN_COURSES.includes(course.name) || 
+                        !["מכונאות בסיסית", "נהיגה מונעת", "נהיגה מתקדמת", "עזרה ראשונה", "רענון"].includes(course.name)
+                      )
+                      .map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

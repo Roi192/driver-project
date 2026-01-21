@@ -1118,7 +1118,7 @@ export default function SafetyScoresManagement() {
                         filteredSoldiers.map(soldier => (
                           <div
                             key={soldier.id}
-                            className={`p-4 rounded-2xl border transition-all ${
+                            className={`p-3 rounded-2xl border transition-all ${
                               soldier.needsTest && !soldier.hasTestDone
                                 ? "bg-red-50/80 border-red-200" 
                                 : soldier.needsClarificationTalk && !soldier.hasClarificationTalkDone
@@ -1126,104 +1126,108 @@ export default function SafetyScoresManagement() {
                                   : "bg-slate-50 border-slate-200 hover:bg-slate-100"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-bold text-slate-800">{soldier.full_name}</h4>
-                                  <span className="text-xs text-slate-500">({soldier.personal_number})</span>
+                            {/* Header row: name and enter score button */}
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <h4 className="font-bold text-slate-800 text-sm truncate">{soldier.full_name}</h4>
+                                  <span className="text-xs text-slate-500 shrink-0">({soldier.personal_number})</span>
                                 </div>
                                 {soldier.outpost && (
                                   <p className="text-xs text-slate-500">{soldier.outpost}</p>
                                 )}
-                                
-                                <div className="flex items-center gap-3 mt-2">
-                                  {/* Last month score */}
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-slate-500">{lastMonthLabel.split(' ')[0]}:</span>
-                                    {soldier.lastMonthScore !== null ? (
-                                      <Badge className={`${getScoreColor(soldier.lastMonthScore)} text-white text-xs`}>
-                                        {soldier.lastMonthScore}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-xs text-slate-400">אין ציון</span>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Km */}
-                                  {soldier.lastMonthKm !== null && (
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-xs text-slate-500">ק"מ:</span>
-                                      <Badge variant="outline" className="text-xs text-slate-700 border-slate-300">
-                                        {soldier.lastMonthKm}
-                                      </Badge>
-                                      {soldier.lastMonthKm < 100 && (
-                                        <span className="text-xs text-emerald-600">(פטור)</span>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Prev month score */}
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-slate-500">{prevMonthLabel.split(' ')[0]}:</span>
-                                    {soldier.prevMonthScore !== null ? (
-                                      <Badge className={`${getScoreColor(soldier.prevMonthScore)} text-white text-xs`}>
-                                        {soldier.prevMonthScore}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-xs text-slate-400">אין ציון</span>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Alert badges and actions */}
-                                <div className="flex gap-2 mt-2 flex-wrap">
-                                  {soldier.needsTest && (
-                                    soldier.hasTestDone ? (
-                                      <Badge className="bg-emerald-500 text-white text-xs">
-                                        <CheckCircle className="w-3 h-3 ml-1" />
-                                        מבחן בוצע
-                                      </Badge>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        className="bg-red-500 hover:bg-red-600 text-white text-xs h-7"
-                                        onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'test'); }}
-                                      >
-                                        <ClipboardCheck className="w-3 h-3 ml-1" />
-                                        סמן מבחן
-                                      </Button>
-                                    )
-                                  )}
-                                  {soldier.needsClarificationTalk && !soldier.needsTest && (
-                                    soldier.hasClarificationTalkDone ? (
-                                      <Badge className="bg-emerald-500 text-white text-xs">
-                                        <CheckCircle className="w-3 h-3 ml-1" />
-                                        שיחה בוצעה
-                                      </Badge>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-7"
-                                        onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'clarification_talk'); }}
-                                      >
-                                        <Phone className="w-3 h-3 ml-1" />
-                                        סמן שיחה
-                                      </Button>
-                                    )
-                                  )}
-                                </div>
                               </div>
                               
                               <Button
-                                variant="ghost"
+                                variant="default"
                                 size="sm"
                                 onClick={() => openScoreEntryForSoldier(soldier)}
-                                className="rounded-xl"
+                                className="rounded-xl shrink-0 h-8 px-3 bg-primary hover:bg-primary/90"
                               >
                                 <Plus className="w-4 h-4 ml-1" />
-                                הזן ציון
+                                הזן
                               </Button>
                             </div>
+                            
+                            {/* Scores row */}
+                            <div className="flex items-center gap-2 flex-wrap text-xs">
+                              {/* Last month score */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-500">{lastMonthLabel.split(' ')[0]}:</span>
+                                {soldier.lastMonthScore !== null ? (
+                                  <Badge className={`${getScoreColor(soldier.lastMonthScore)} text-white text-xs px-2 py-0`}>
+                                    {soldier.lastMonthScore}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </div>
+                              
+                              {/* Km */}
+                              {soldier.lastMonthKm !== null && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-500">ק"מ:</span>
+                                  <Badge variant="outline" className="text-xs text-slate-700 border-slate-300 px-2 py-0">
+                                    {soldier.lastMonthKm}
+                                  </Badge>
+                                  {soldier.lastMonthKm < 100 && (
+                                    <span className="text-emerald-600">(פטור)</span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Prev month score */}
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-500">{prevMonthLabel.split(' ')[0]}:</span>
+                                {soldier.prevMonthScore !== null ? (
+                                  <Badge className={`${getScoreColor(soldier.prevMonthScore)} text-white text-xs px-2 py-0`}>
+                                    {soldier.prevMonthScore}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Alert badges and actions */}
+                            {(soldier.needsTest || soldier.needsClarificationTalk) && (
+                              <div className="flex gap-2 mt-2 flex-wrap">
+                                {soldier.needsTest && (
+                                  soldier.hasTestDone ? (
+                                    <Badge className="bg-emerald-500 text-white text-xs">
+                                      <CheckCircle className="w-3 h-3 ml-1" />
+                                      מבחן בוצע
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="bg-red-500 hover:bg-red-600 text-white text-xs h-7"
+                                      onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'test'); }}
+                                    >
+                                      <ClipboardCheck className="w-3 h-3 ml-1" />
+                                      סמן מבחן
+                                    </Button>
+                                  )
+                                )}
+                                {soldier.needsClarificationTalk && !soldier.needsTest && (
+                                  soldier.hasClarificationTalkDone ? (
+                                    <Badge className="bg-emerald-500 text-white text-xs">
+                                      <CheckCircle className="w-3 h-3 ml-1" />
+                                      שיחה בוצעה
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="bg-amber-500 hover:bg-amber-600 text-white text-xs h-7"
+                                      onClick={(e) => { e.stopPropagation(); openFollowupDialog(soldier, 'clarification_talk'); }}
+                                    >
+                                      <Phone className="w-3 h-3 ml-1" />
+                                      סמן שיחה
+                                    </Button>
+                                  )
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))
                       )}

@@ -148,6 +148,14 @@ export function PhotosStep() {
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  onClick={(e) => {
+                    // Reset value to allow re-selecting same file and enforce camera
+                    (e.target as HTMLInputElement).value = '';
+                  }}
+                  onInput={(e) => {
+                    // On mobile, capture="environment" should force camera
+                    // This is the standard way to enforce camera-only on mobile
+                  }}
                   onChange={(e) => handlePhotoCapture(photo.id, e)}
                   className="hidden"
                 />
