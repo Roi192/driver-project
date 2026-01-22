@@ -11,11 +11,14 @@ import {
   Crown,
   Flame,
   Zap,
-  Star
+  Star,
+  Bell
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { PushNotificationSetup } from "@/components/push/PushNotificationSetup";
+import { MyCleaningParadesCard } from "@/components/home/MyCleaningParadesCard";
 
 interface ActionItem {
   to: string;
@@ -78,6 +81,14 @@ const actions: ActionItem[] = [
     label: "הדיווחים שלי",
     description: "היסטוריית הדיווחים שלך",
     iconGradient: "from-sand to-sand-dark",
+  },
+  {
+    to: "/cleaning-parades",
+    icon: Sparkles,
+    label: "מסדרי ניקיון",
+    description: "דווח על ביצוע מסדר ניקיון",
+    iconGradient: "from-purple-500 to-pink-500",
+    hideForBattalion: true,
   },
 ];
 
@@ -152,6 +163,16 @@ export function QuickActions() {
           </div>
         </div>
         
+        {/* Push Notification Setup for Drivers */}
+        {!isBattalionUser && (
+          <PushNotificationSetup className="mb-6" />
+        )}
+
+        {/* My Cleaning Parades Card for Drivers */}
+        {!isBattalionUser && (
+          <MyCleaningParadesCard />
+        )}
+
         {/* Action Cards Grid - Premium Light */}
         <div className="space-y-4">
           {filteredActions.map((action, i) => (

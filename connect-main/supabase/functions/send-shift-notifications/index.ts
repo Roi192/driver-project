@@ -29,6 +29,78 @@ serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Check if this is a test mode request
+    const body = await req.json().catch(() => ({}));
+    
+    if (body.testMode) {
+      // Manual test SMS - send immediately to specified soldier
+      const { soldierId, soldierName, phone, outpost, shiftType } = body;
+      
+      if (!phone) {
+        return new Response(
+          JSON.stringify({ error: "No phone number provided" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+
+      const message = `שלום ${soldierName}, זוהי הודעת בדיקה ממערכת סידור העבודה. המשמרת שלך ב${outpost} (${shiftType}).`;
+      
+      // Format phone number
+      let phoneNumber = phone.replace(/\D/g, "");
+      if (phoneNumber.startsWith("0")) {
+        phoneNumber = "+972" + phoneNumber.substring(1);
+      } else if (!phoneNumber.startsWith("+")) {
+        phoneNumber = "+972" + phoneNumber;
+      }
+
+      // Send SMS via Twilio
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+      const twilioAuth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
+
+      const formData = new URLSearchParams();
+      formData.append("To", phoneNumber);
+      formData.append("From", twilioPhoneNumber);
+      formData.append("Body", message);
+
+      const twilioResponse = await fetch(twilioUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${twilioAuth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+      });
+
+      const twilioResult = await twilioResponse.json();
+      
+      if (twilioResponse.ok) {
+        console.log(`Test SMS sent to ${soldierName} (${phoneNumber})`);
+        
+        // Log the test notification
+        await supabase.from("sms_notifications_log").insert({
+          soldier_id: soldierId,
+          soldier_name: soldierName,
+          phone: phoneNumber,
+          shift_type: "test",
+          outpost: outpost,
+          shift_date: new Date().toISOString().split("T")[0],
+          status: "sent",
+        });
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Test SMS sent successfully" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } else {
+        console.error(`Failed to send test SMS:`, twilioResult);
+        return new Response(
+          JSON.stringify({ error: twilioResult.message || "Failed to send SMS" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+
+    // Regular scheduled notification logic
     // Get current time in Israel timezone
     const now = new Date();
     const israelTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));

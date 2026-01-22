@@ -5,80 +5,102 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Camera, CheckCircle, AlertCircle, Sparkles, ListChecks, Image, Play, ArrowLeft, MapPin, Calendar } from "lucide-react";
+import { Camera, CheckCircle, AlertCircle, Sparkles, ListChecks, Image, ArrowLeft, MapPin, Calendar, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { format, startOfWeek } from "date-fns";
+import { format, startOfWeek, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OUTPOSTS } from "@/lib/constants";
+import { useSearchParams } from "react-router-dom";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 const DAY_OPTIONS = [
-  { value: "monday", label: "יום שני", deadline: "12:00" },
-  { value: "wednesday", label: "יום רביעי", deadline: "11:00" },
-  { value: "saturday_night", label: "מוצאי שבת", deadline: "22:00" },
+  { value: "monday", label: "יום שני", dayOfWeek: 1, sourceDay: 0, sourceShift: "afternoon" },
+  { value: "wednesday", label: "יום רביעי", dayOfWeek: 3, sourceDay: 2, sourceShift: "afternoon" },
+  { value: "saturday_night", label: "מוצאי שבת", dayOfWeek: 6, sourceDay: 6, sourceShift: "morning" },
 ];
 
-interface Highlight {
+interface ChecklistItem {
   id: string;
-  title: string;
-  display_order: number;
-  area_id: string | null;
+  item_name: string;
+  item_order: number;
 }
 
-interface ResponsibilityArea {
+interface ReferencePhoto {
   id: string;
+  checklist_item_id: string | null;
   outpost: string;
-  area_name: string;
   description: string | null;
-  display_order: number | null;
-}
-
-interface ExamplePhoto {
-  id: string;
-  outpost: string | null;
-  description: string;
   image_url: string;
-  area_id: string | null;
 }
 
-interface MyAssignment {
-  day_of_week: string;
-  area: ResponsibilityArea;
-  is_completed?: boolean;
+interface ChecklistCompletion {
+  id: string;
+  checklist_item_id: string;
+  photo_url: string;
 }
 
-type Step = "my-tasks" | "parade" | "completed";
+type Step = "weekly-view" | "checklist" | "completed";
 
 export default function CleaningParades() {
   const { user } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [examples, setExamples] = useState<ExamplePhoto[]>([]);
-  const [myArea, setMyArea] = useState<ResponsibilityArea | null>(null);
-  const [loadingArea, setLoadingArea] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [myWeeklyAssignments, setMyWeeklyAssignments] = useState<MyAssignment[]>([]);
-  const [loadingAssignments, setLoadingAssignments] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Link current auth user -> soldiers table (by personal_number)
+  const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(true);
   const [soldierId, setSoldierId] = useState<string | null>(null);
-
-  // User selection state
-  const [selectedDay, setSelectedDay] = useState<string>("");
-  const [currentStep, setCurrentStep] = useState<Step>("my-tasks");
+  const [currentStep, setCurrentStep] = useState<Step>("weekly-view");
+  
+  // Selection
+  const [selectedOutpost, setSelectedOutpost] = useState<string>("");
+  const [selectedDay, setSelectedDay] = useState<typeof DAY_OPTIONS[number] | null>(null);
+  
+  // Weekly assignments
+  const [weeklyAssignments, setWeeklyAssignments] = useState<Map<string, { outpost: string; isCompleted: boolean }>>(new Map());
+  
+  // Checklist data
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [referencePhotos, setReferencePhotos] = useState<ReferencePhoto[]>([]);
+  const [completions, setCompletions] = useState<Map<string, { id: string; url: string }[]>>(new Map());
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
+  
+  // UI state
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [compareItem, setCompareItem] = useState<{ item: ChecklistItem; userPhotos: { id: string; url: string }[] } | null>(null);
+  const [currentRefPhotoIndex, setCurrentRefPhotoIndex] = useState(0);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentUploadItemRef = useRef<string | null>(null);
 
   const currentDate = format(new Date(), "yyyy-MM-dd");
-  const currentWeekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+  const weekStartStr = format(currentWeekStart, 'yyyy-MM-dd');
 
   useEffect(() => {
-    fetchUserContextAndAssignments();
+    initializeUser();
   }, [user]);
 
-  const fetchUserContextAndAssignments = async () => {
-    if (!user) return;
+  useEffect(() => {
+    // Handle URL params for direct navigation
+    const dayParam = searchParams.get('day');
+    const outpostParam = searchParams.get('outpost');
+    if (dayParam && outpostParam && soldierId) {
+      const day = DAY_OPTIONS.find(d => d.value === dayParam);
+      if (day) {
+        setSelectedDay(day);
+        setSelectedOutpost(outpostParam);
+        startParade(day, outpostParam);
+      }
+    }
+  }, [searchParams, soldierId]);
 
-    setLoadingAssignments(true);
+  const initializeUser = async () => {
+    if (!user) return;
+    setLoading(true);
+    
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -90,7 +112,7 @@ export default function CleaningParades() {
 
       if (!personalNumber) {
         setSoldierId(null);
-        setLoadingAssignments(false);
+        setLoading(false);
         return;
       }
 
@@ -100,202 +122,273 @@ export default function CleaningParades() {
         .eq('personal_number', personalNumber)
         .maybeSingle();
 
-      if (!soldier?.id) {
-        setSoldierId(null);
-        setLoadingAssignments(false);
-        return;
+      if (soldier) {
+        setSoldierId(soldier.id);
+        await loadWeeklyAssignments(soldier.id);
       }
-
-      setSoldierId(soldier.id);
-
-      // Fetch weekly assignments
-      const { data: assignments } = await supabase
-        .from('cleaning_weekly_assignments')
-        .select('*, cleaning_responsibility_areas(*)')
-        .eq('soldier_id', soldier.id)
-        .eq('week_start_date', currentWeekStart);
-
-      if (assignments && assignments.length > 0) {
-        // Check which are completed
-        const { data: completedParades } = await supabase
-          .from('cleaning_parade_assignments')
-          .select('day_of_week')
-          .eq('soldier_id', soldier.id)
-          .eq('parade_date', currentDate)
-          .eq('is_completed', true);
-
-        const completedDays = new Set(completedParades?.map(p => p.day_of_week) || []);
-
-        const myAssignments: MyAssignment[] = assignments
-          .filter(a => a.cleaning_responsibility_areas)
-          .map(a => ({
-            day_of_week: a.day_of_week,
-            area: a.cleaning_responsibility_areas as ResponsibilityArea,
-            is_completed: completedDays.has(a.day_of_week),
-          }));
-
-        setMyWeeklyAssignments(myAssignments);
-      } else {
-        setMyWeeklyAssignments([]);
-      }
-
-      // Set default day based on current day
-      const day = new Date().getDay();
-      if (day === 1) setSelectedDay("monday");
-      else if (day === 3) setSelectedDay("wednesday");
-      else if (day === 6 || day === 0) setSelectedDay("saturday_night");
-      else if (day <= 2) setSelectedDay("monday");
-      else if (day <= 4) setSelectedDay("wednesday");
-      else setSelectedDay("saturday_night");
-
     } catch (error) {
-      console.error('Error fetching user context:', error);
+      console.error('Error initializing user:', error);
     } finally {
-      setLoadingAssignments(false);
+      setLoading(false);
     }
   };
 
-  const startParadeForDay = async (dayOfWeek: string, area: ResponsibilityArea) => {
-    if (!soldierId) {
-      toast.error("המשתמש לא מקושר לחייל בטבלת השליטה");
+  const loadWeeklyAssignments = async (sid: string) => {
+    try {
+      // Get work schedule
+      const { data: workSchedule } = await supabase
+        .from('work_schedule')
+        .select('outpost, day_of_week, afternoon_soldier_id, morning_soldier_id')
+        .eq('week_start_date', weekStartStr);
+
+      // Get manual assignments
+      const { data: manualAssignments } = await supabase
+        .from('cleaning_manual_assignments')
+        .select('outpost, day_of_week')
+        .eq('soldier_id', sid)
+        .eq('week_start_date', weekStartStr);
+
+      // Get submissions
+      const { data: submissions } = await supabase
+        .from('cleaning_parade_submissions')
+        .select('day_of_week, outpost, is_completed')
+        .eq('soldier_id', sid)
+        .gte('parade_date', weekStartStr);
+
+      const assignments = new Map<string, { outpost: string; isCompleted: boolean }>();
+
+      for (const dayConfig of DAY_OPTIONS) {
+        let outpost: string | null = null;
+
+        // Check manual first
+        const manual = manualAssignments?.find(m => m.day_of_week === dayConfig.value);
+        if (manual) {
+          outpost = manual.outpost;
+        } else {
+          // Check work schedule
+          const scheduleEntries = workSchedule?.filter(ws => ws.day_of_week === dayConfig.sourceDay) || [];
+          for (const entry of scheduleEntries) {
+            const assignedSoldierId = dayConfig.sourceShift === "afternoon" 
+              ? entry.afternoon_soldier_id 
+              : entry.morning_soldier_id;
+            if (assignedSoldierId === sid) {
+              outpost = entry.outpost;
+              break;
+            }
+          }
+        }
+
+        if (outpost) {
+          const submission = submissions?.find(s => 
+            s.day_of_week === dayConfig.value && s.outpost === outpost
+          );
+          assignments.set(dayConfig.value, {
+            outpost,
+            isCompleted: submission?.is_completed || false
+          });
+        }
+      }
+
+      setWeeklyAssignments(assignments);
+    } catch (error) {
+      console.error('Error loading weekly assignments:', error);
+    }
+  };
+
+  const startParade = async (day?: typeof DAY_OPTIONS[number], outpost?: string) => {
+    const useDay = day || selectedDay;
+    const useOutpost = outpost || selectedOutpost;
+    
+    if (!useOutpost || !soldierId || !useDay) {
+      toast.error("יש לבחור יום ומוצב");
       return;
     }
 
-    setSelectedDay(dayOfWeek);
-    setMyArea(area);
-    setLoadingArea(true);
-
+    setSelectedDay(useDay);
+    setSelectedOutpost(useOutpost);
+    setLoading(true);
+    
     try {
-      // Check if already completed today
-      const { data: existingParade } = await supabase
-        .from('cleaning_parade_assignments')
-        .select('*')
+      // Check existing submission
+      const paradeDate = format(addDays(currentWeekStart, useDay.dayOfWeek), 'yyyy-MM-dd');
+      
+      const { data: existingSubmission } = await supabase
+        .from('cleaning_parade_submissions')
+        .select('id, is_completed')
         .eq('soldier_id', soldierId)
-        .eq('parade_date', currentDate)
-        .eq('day_of_week', dayOfWeek)
-        .eq('is_completed', true)
+        .eq('outpost', useOutpost)
+        .eq('day_of_week', useDay.value)
+        .eq('parade_date', paradeDate)
         .maybeSingle();
 
-      if (existingParade) {
-        setPhotoUrl(existingParade.photo_url);
+      if (existingSubmission?.is_completed) {
+        const { data: existingCompletions } = await supabase
+          .from('cleaning_checklist_completions')
+          .select('id, checklist_item_id, photo_url')
+          .eq('submission_id', existingSubmission.id);
+        
+        const completionsMap = new Map<string, { id: string; url: string }[]>();
+        existingCompletions?.forEach(c => {
+          const existing = completionsMap.get(c.checklist_item_id) || [];
+          existing.push({ id: c.id, url: c.photo_url });
+          completionsMap.set(c.checklist_item_id, existing);
+        });
+        setCompletions(completionsMap);
+        setSubmissionId(existingSubmission.id);
+        setIsCompleted(true);
         setCurrentStep("completed");
-        setLoadingArea(false);
+        await fetchOutpostData(useOutpost);
         return;
       }
 
-      // Fetch highlights and examples for this area
-      await fetchHighlightsAndExamples(area.id);
-      setCurrentStep("parade");
+      // Create or use existing submission
+      let subId = existingSubmission?.id;
+      if (!subId) {
+        const { data: newSubmission, error } = await supabase
+          .from('cleaning_parade_submissions')
+          .insert({
+            soldier_id: soldierId,
+            outpost: useOutpost,
+            day_of_week: useDay.value,
+            parade_date: paradeDate,
+          })
+          .select('id')
+          .single();
+        
+        if (error) throw error;
+        subId = newSubmission.id;
+      }
+      
+      setSubmissionId(subId);
+
+      // Load existing completions
+      const { data: existingCompletions } = await supabase
+        .from('cleaning_checklist_completions')
+        .select('id, checklist_item_id, photo_url')
+        .eq('submission_id', subId);
+      
+      const completionsMap = new Map<string, { id: string; url: string }[]>();
+      existingCompletions?.forEach(c => {
+        const existing = completionsMap.get(c.checklist_item_id) || [];
+        existing.push({ id: c.id, url: c.photo_url });
+        completionsMap.set(c.checklist_item_id, existing);
+      });
+      setCompletions(completionsMap);
+
+      await fetchOutpostData(useOutpost);
+      setCurrentStep("checklist");
     } catch (error) {
       console.error('Error starting parade:', error);
-      toast.error("שגיאה בטעינת נתונים");
+      toast.error("שגיאה בהתחלת המסדר");
     } finally {
-      setLoadingArea(false);
+      setLoading(false);
     }
   };
 
-  const fetchHighlightsAndExamples = async (areaId: string) => {
-    const [highlightsRes, examplesRes] = await Promise.all([
+  const fetchOutpostData = async (outpost: string) => {
+    const [itemsRes, photosRes] = await Promise.all([
       supabase
-        .from('cleaning_parade_highlights')
-        .select('*')
-        .eq('area_id', areaId)
+        .from('cleaning_checklist_items')
+        .select('id, item_name, item_order')
+        .eq('outpost', outpost)
         .eq('is_active', true)
-        .order('display_order'),
+        .order('item_order'),
       supabase
-        .from('cleaning_parade_examples')
-        .select('*')
-        .eq('area_id', areaId)
+        .from('cleaning_reference_photos')
+        .select('id, checklist_item_id, outpost, description, image_url')
+        .eq('outpost', outpost)
         .order('display_order'),
     ]);
-    
-    setHighlights(highlightsRes.data || []);
-    setExamples(examplesRes.data || []);
+
+    setChecklistItems(itemsRes.data || []);
+    setReferencePhotos(photosRes.data || []);
   };
 
-  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleItemClick = (itemId: string) => {
+    if (isCompleted) return;
+    currentUploadItemRef.current = itemId;
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !myArea) return;
+    const itemId = currentUploadItemRef.current;
+    
+    if (!file || !itemId || !submissionId || !user) return;
 
     if (!file.type.startsWith("image/")) {
       toast.error("אנא צלם תמונה");
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("גודל התמונה חייב להיות עד 10MB");
-      return;
-    }
-
-    setUploading(true);
+    setUploadingItemId(itemId);
     try {
       const mimeToExt: Record<string, string> = {
         'image/jpeg': 'jpg',
         'image/jpg': 'jpg',
         'image/png': 'png',
-        'image/gif': 'gif',
         'image/webp': 'webp',
         'image/heic': 'jpg',
-        'image/heif': 'jpg',
       };
       const fileExt = mimeToExt[file.type] || 'jpg';
-      const fileName = `${user.id}/${currentDate}/${myArea.id}_${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${currentDate}/${itemId}_${Date.now()}.${fileExt}`;
       
       await supabase.storage.from('cleaning-parades').upload(fileName, file, { contentType: file.type || 'image/jpeg' });
 
-      // 7 days validity for operational cleaning parade photos
       const { data: signedUrlData } = await supabase.storage
         .from('cleaning-parades')
         .createSignedUrl(fileName, 60 * 60 * 24 * 7);
 
-      setPhotoUrl(signedUrlData?.signedUrl || null);
-      toast.success("התמונה הועלתה בהצלחה");
-    } catch (error: any) {
+      const photoUrl = signedUrlData?.signedUrl || '';
+
+      // Insert new photo (not upsert - allow multiple)
+      const { data: inserted } = await supabase.from('cleaning_checklist_completions').insert({
+        submission_id: submissionId,
+        checklist_item_id: itemId,
+        photo_url: photoUrl,
+      }).select('id').single();
+
+      setCompletions(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(itemId) || [];
+        existing.push({ id: inserted?.id || '', url: photoUrl });
+        newMap.set(itemId, existing);
+        return newMap;
+      });
+      toast.success("התמונה נשמרה");
+    } catch (error) {
       console.error('Error uploading photo:', error);
       toast.error("שגיאה בהעלאת התמונה");
     } finally {
-      setUploading(false);
+      setUploadingItemId(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleSubmit = async () => {
-    if (!user || !myArea || !photoUrl || !soldierId) {
-      toast.error("נא להעלות תמונה של תחום האחריות שלך");
+    if (!submissionId) return;
+    
+    const missingItems = checklistItems.filter(item => {
+      const photos = completions.get(item.id);
+      return !photos || photos.length === 0;
+    });
+    if (missingItems.length > 0) {
+      toast.error(`יש להשלים ${missingItems.length} פריטים נוספים`);
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { data: paradeData, error: paradeError } = await supabase
-        .from('cleaning_parades')
-        .insert({
-          user_id: user.id,
-          outpost: myArea.outpost,
-          day_of_week: selectedDay,
-          responsible_driver: user.user_metadata?.full_name || "לא ידוע",
-          photos: [photoUrl],
-          parade_date: currentDate,
-        })
-        .select()
-        .single();
+      await supabase
+        .from('cleaning_parade_submissions')
+        .update({ is_completed: true, completed_at: new Date().toISOString() })
+        .eq('id', submissionId);
 
-      if (paradeError) throw paradeError;
-
-      await supabase.from('cleaning_parade_assignments').insert({
-        parade_id: paradeData.id,
-        soldier_id: soldierId,
-        area_id: myArea.id,
-        parade_date: currentDate,
-        day_of_week: selectedDay,
-        outpost: myArea.outpost,
-        is_completed: true,
-        photo_url: photoUrl,
-      });
-
-      toast.success("המסדר נשמר בהצלחה!");
+      setIsCompleted(true);
       setCurrentStep("completed");
-    } catch (error: any) {
-      console.error('Error submitting parade:', error);
+      toast.success("המסדר הושלם בהצלחה!");
+    } catch (error) {
+      console.error('Error submitting:', error);
       toast.error("שגיאה בשמירת המסדר");
     } finally {
       setIsSubmitting(false);
@@ -303,26 +396,74 @@ export default function CleaningParades() {
   };
 
   const goBack = () => {
-    setCurrentStep("my-tasks");
-    setMyArea(null);
-    setPhotoUrl(null);
-    setHighlights([]);
-    setExamples([]);
+    setCurrentStep("weekly-view");
+    setCompletions(new Map());
+    setChecklistItems([]);
+    setReferencePhotos([]);
+    setSubmissionId(null);
+    setIsCompleted(false);
+    setSelectedDay(null);
+    setSelectedOutpost("");
   };
 
-  const goToStart = () => {
-    setCurrentStep("my-tasks");
-    setMyArea(null);
-    setPhotoUrl(null);
-    setHighlights([]);
-    setExamples([]);
-    fetchUserContextAndAssignments();
+  const openCompareDialog = (item: ChecklistItem) => {
+    const userPhotos = completions.get(item.id);
+    if (userPhotos && userPhotos.length > 0) {
+      setCompareItem({ item, userPhotos });
+      setCurrentRefPhotoIndex(0);
+      setCompareDialogOpen(true);
+    }
   };
 
-  const currentDayInfo = DAY_OPTIONS.find(d => d.value === selectedDay);
+  const handleDeletePhoto = async (itemId: string, photoId: string) => {
+    if (!submissionId) return;
+    
+    try {
+      // Delete specific photo from database
+      await supabase
+        .from('cleaning_checklist_completions')
+        .delete()
+        .eq('id', photoId);
 
-  // Get unique outposts from assignments
-  const assignedOutposts = [...new Set(myWeeklyAssignments.map(a => a.area.outpost))];
+      // Update local state
+      setCompletions(prev => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(itemId) || [];
+        const filtered = existing.filter(p => p.id !== photoId);
+        if (filtered.length === 0) {
+          newMap.delete(itemId);
+        } else {
+          newMap.set(itemId, filtered);
+        }
+        return newMap;
+      });
+      
+      toast.success("התמונה נמחקה");
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      toast.error("שגיאה במחיקת התמונה");
+    }
+  };
+
+  const getItemReferencePhotos = (itemId: string) => {
+    // Get photos linked to this specific item, or general outpost photos
+    return referencePhotos.filter(p => 
+      p.checklist_item_id === itemId || 
+      (p.checklist_item_id === null && p.outpost === selectedOutpost)
+    );
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const todayDayOfWeek = new Date().getDay();
 
   return (
     <AppLayout>
@@ -331,365 +472,487 @@ export default function CleaningParades() {
           <PageHeader
             icon={Sparkles}
             title="מסדר ניקיון"
-            subtitle={currentStep === "my-tasks" ? "המשימות שלי לשבוע הנוכחי" : currentStep === "parade" ? "צלם את תחום האחריות" : "המסדר הושלם"}
-            badge={format(new Date(), "dd/MM", { locale: he })}
+            subtitle={
+              currentStep === "weekly-view" ? "המסדרים שלי השבוע" : 
+              currentStep === "checklist" ? `${selectedOutpost} - ${selectedDay?.label}` : 
+              "המסדר הושלם"
+            }
+            badge={format(currentWeekStart, 'd/M', { locale: he }) + " - " + format(addDays(currentWeekStart, 6), 'd/M', { locale: he })}
           />
 
-          {/* Step: My Weekly Tasks */}
-          {currentStep === "my-tasks" && (
+          {/* Hidden file input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoCapture}
+          />
+
+          {/* Not linked to soldier */}
+          {!soldierId && (
+            <Card className="border-amber-200 shadow-lg bg-amber-50">
+              <CardContent className="p-6 text-center">
+                <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <p className="text-amber-800 font-medium">המשתמש לא מקושר לחייל</p>
+                <p className="text-sm text-amber-600 mt-1">פנה למפקד לעדכון המספר האישי בפרופיל</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step: Weekly View */}
+          {currentStep === "weekly-view" && soldierId && (
             <div className="space-y-4">
-              {/* Date Info */}
-              <Card className="border-slate-200/60 shadow-lg bg-gradient-to-r from-primary/5 to-accent/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-slate-500">שבוע החל מ-</p>
-                      <p className="font-bold text-lg text-slate-800">{format(new Date(currentWeekStart), "dd/MM/yyyy", { locale: he })}</p>
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm text-slate-500">היום</p>
-                      <p className="font-bold text-lg text-primary">{format(new Date(), "EEEE", { locale: he })}</p>
-                    </div>
+              {/* Weekly Schedule Card */}
+              <Card className="border-purple-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Calendar className="w-5 h-5 text-purple-500" />
+                    לוח מסדרים שבועי
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="grid grid-cols-3 gap-3">
+                    {DAY_OPTIONS.map((day) => {
+                      const assignment = weeklyAssignments.get(day.value);
+                      const isToday = day.dayOfWeek === todayDayOfWeek;
+                      const isPast = day.dayOfWeek < todayDayOfWeek;
+                      const date = addDays(currentWeekStart, day.dayOfWeek);
+
+                      return (
+                        <button
+                          key={day.value}
+                          onClick={() => {
+                            if (assignment) {
+                              setSelectedDay(day);
+                              setSelectedOutpost(assignment.outpost);
+                              startParade(day, assignment.outpost);
+                            }
+                          }}
+                          disabled={!assignment}
+                          className={cn(
+                            "relative p-4 rounded-2xl border-2 transition-all duration-300 text-center",
+                            assignment?.isCompleted 
+                              ? "bg-emerald-50 border-emerald-300"
+                              : assignment && isToday
+                                ? "bg-purple-50 border-purple-400 shadow-lg ring-2 ring-purple-200"
+                                : assignment && isPast
+                                  ? "bg-red-50 border-red-200"
+                                  : assignment
+                                    ? "bg-white border-slate-200 hover:border-purple-300 hover:shadow-md"
+                                    : "bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          {/* Status Icon */}
+                          {assignment && (
+                            <div className="absolute -top-2 -left-2">
+                              {assignment.isCompleted ? (
+                                <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+                                  <CheckCircle className="w-4 h-4 text-white" />
+                                </div>
+                              ) : isToday ? (
+                                <div className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center shadow-lg animate-pulse">
+                                  <Sparkles className="w-4 h-4 text-white" />
+                                </div>
+                              ) : isPast ? (
+                                <div className="w-7 h-7 rounded-full bg-red-400 flex items-center justify-center shadow-lg">
+                                  <AlertCircle className="w-4 h-4 text-white" />
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+
+                          <p className={cn(
+                            "text-lg font-bold",
+                            assignment?.isCompleted ? "text-emerald-700" :
+                            isToday ? "text-purple-700" :
+                            isPast && assignment ? "text-red-600" : "text-slate-700"
+                          )}>
+                            {day.label.replace('יום ', '')}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {format(date, 'd/M', { locale: he })}
+                          </p>
+
+                          {assignment ? (
+                            <div className={cn(
+                              "mt-3 px-2 py-1.5 rounded-lg",
+                              assignment.isCompleted ? "bg-emerald-100" : "bg-slate-100"
+                            )}>
+                              <div className="flex items-center justify-center gap-1">
+                                <MapPin className="w-3 h-3 text-slate-400" />
+                                <span className="text-xs font-medium text-slate-600 truncate">
+                                  {assignment.outpost}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-3 px-2 py-1.5 rounded-lg bg-slate-100">
+                              <span className="text-xs text-slate-400">לא משובץ</span>
+                            </div>
+                          )}
+
+                          {isToday && assignment && !assignment.isCompleted && (
+                            <Badge className="mt-2 bg-purple-500 text-white text-[10px]">
+                              היום!
+                            </Badge>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Loading State */}
-              {loadingAssignments ? (
-                <Card className="border-slate-200/60 shadow-lg">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-slate-600">טוען את המשימות שלך...</p>
-                  </CardContent>
-                </Card>
-              ) : !soldierId ? (
-                <Card className="border-amber-200 shadow-lg bg-amber-50">
-                  <CardContent className="p-6 text-center">
-                    <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-                    <p className="text-amber-800 font-medium">המשתמש לא מקושר לחייל</p>
-                    <p className="text-sm text-amber-600 mt-1">פנה למפקד לעדכון המספר האישי בפרופיל</p>
-                  </CardContent>
-                </Card>
-              ) : myWeeklyAssignments.length === 0 ? (
-                <Card className="border-slate-200/60 shadow-lg">
-                  <CardContent className="p-8 text-center">
-                    <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                    <p className="text-slate-600 font-medium">אין לך שיבוצים לשבוע זה</p>
-                    <p className="text-sm text-slate-400 mt-1">פנה למפקד לשיבוץ במסדרי ניקיון</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {/* Assigned Outposts Badge */}
-                  {assignedOutposts.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <MapPin className="w-4 h-4 text-primary" />
-                      <span className="text-sm text-slate-600">משובץ ב:</span>
-                      {assignedOutposts.map(outpost => (
-                        <Badge key={outpost} variant="secondary" className="bg-primary/10 text-primary">
-                          {outpost}
-                        </Badge>
+              {/* Manual Selection for unassigned */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
+                    <MapPin className="w-4 h-4" />
+                    או בחר ידנית
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
+                  <Select value={selectedOutpost} onValueChange={setSelectedOutpost}>
+                    <SelectTrigger className="bg-white text-slate-800">
+                      <SelectValue placeholder="בחר מוצב..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OUTPOSTS.map(outpost => (
+                        <SelectItem key={outpost} value={outpost}>{outpost}</SelectItem>
                       ))}
-                    </div>
-                  )}
+                    </SelectContent>
+                  </Select>
 
-                  {/* Tasks List */}
-                  <Card className="border-slate-200/60 shadow-lg">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-primary" />
-                        המשימות שלי
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-3">
-                      {DAY_OPTIONS.map((day) => {
-                        const assignment = myWeeklyAssignments.find(a => a.day_of_week === day.value);
-                        return (
-                          <div 
-                            key={day.value} 
-                            className={`p-4 rounded-xl border transition-all ${
-                              assignment 
-                                ? 'bg-white border-slate-200 hover:border-primary/30 hover:shadow-md' 
-                                : 'bg-slate-50/50 border-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-semibold text-slate-800">{day.label}</p>
-                                  <Badge variant="outline" className="text-xs text-slate-400">
-                                    עד {day.deadline}
-                                  </Badge>
-                                </div>
-                                {assignment ? (
-                                  <div className="space-y-1">
-                                    <p className="text-sm text-primary font-medium">{assignment.area.area_name}</p>
-                                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                                      <MapPin className="w-3 h-3" />
-                                      {assignment.area.outpost}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-slate-400">לא משובץ</p>
-                                )}
-                              </div>
-                              {assignment && (
-                                assignment.is_completed ? (
-                                  <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1.5">
-                                    <CheckCircle className="w-4 h-4 ml-1" />
-                                    בוצע
-                                  </Badge>
-                                ) : (
-                                  <Button 
-                                    size="sm"
-                                    onClick={() => startParadeForDay(day.value, assignment.area)}
-                                    disabled={loadingArea}
-                                    className="bg-gradient-to-r from-primary to-accent"
-                                  >
-                                    <Play className="w-4 h-4 ml-1" />
-                                    התחל מסדר
-                                  </Button>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                </>
-              )}
+                  <Select 
+                    value={selectedDay?.value || ""} 
+                    onValueChange={(v) => setSelectedDay(DAY_OPTIONS.find(d => d.value === v) || null)}
+                  >
+                    <SelectTrigger className="bg-white text-slate-800">
+                      <SelectValue placeholder="בחר יום..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAY_OPTIONS.map(day => (
+                        <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button 
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500"
+                    onClick={() => startParade()}
+                    disabled={!selectedOutpost || !selectedDay}
+                  >
+                    התחל מסדר
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* Step: Parade */}
-          {currentStep === "parade" && (
+          {/* Step: Checklist */}
+          {currentStep === "checklist" && (
             <div className="space-y-4">
-              <Button variant="ghost" onClick={goBack} className="text-slate-500">
-                <ArrowLeft className="w-4 h-4 ml-2" />
-                חזרה לרשימת המשימות
+              <Button variant="ghost" onClick={goBack} className="gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                חזור
               </Button>
 
-              {/* My Responsibility Area */}
+              {/* Progress */}
               <Card className="border-slate-200/60 shadow-lg">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    תחום האחריות שלי
-                  </CardTitle>
-                </CardHeader>
                 <CardContent className="p-4">
-                  <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge className="bg-primary/20 text-primary">{myArea?.outpost}</Badge>
-                      <Badge variant="outline" className="text-slate-500">
-                        {DAY_OPTIONS.find(d => d.value === selectedDay)?.label}
-                      </Badge>
-                    </div>
-                    <p className="text-xl font-bold text-slate-800">{myArea?.area_name}</p>
-                    {myArea?.description && (
-                      <p className="text-sm text-slate-600 mt-1">{myArea.description}</p>
-                    )}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-600">התקדמות</span>
+                    <span className="text-sm font-bold text-primary">
+                      {completions.size}/{checklistItems.length}
+                    </span>
+                  </div>
+                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                      style={{ width: `${(completions.size / checklistItems.length) * 100}%` }}
+                    />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Highlights Section */}
-              {highlights.length > 0 && (
-                <Card className="border-slate-200/60 shadow-lg">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ListChecks className="w-5 h-5 text-amber-500" />
-                      דגשים לתחום זה
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <ul className="space-y-2">
-                      {highlights.map((highlight, index) => (
-                        <li key={highlight.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
-                          <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          <span className="text-sm text-amber-800 font-medium">{highlight.title}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Photo Comparison Section - Example + User Photo Side by Side */}
+              {/* Checklist with side-by-side comparison */}
               <Card className="border-slate-200/60 shadow-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Camera className="w-5 h-5 text-emerald-500" />
-                    צילום תחום האחריות
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ListChecks className="w-5 h-5 text-purple-500" />
+                    צ'קליסט - צלם והשווה
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                  {/* Side by Side Photos */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Example Photo */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-                        <Image className="w-3 h-3" />
-                        תמונה לדוגמא
-                      </div>
-                      {examples.length > 0 ? (
-                        <div className="rounded-xl overflow-hidden border-2 border-blue-200 bg-blue-50">
-                          <img 
-                            src={examples[0].image_url} 
-                            alt={examples[0].description} 
-                            className="w-full h-40 object-cover"
-                          />
-                          <p className="text-xs text-blue-700 p-2 text-center font-medium">{examples[0].description}</p>
-                        </div>
-                      ) : (
-                        <div className="h-40 bg-slate-100 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-300">
-                          <p className="text-xs text-slate-400 text-center px-2">אין תמונה לדוגמא</p>
-                        </div>
-                      )}
-                    </div>
+                <CardContent className="p-4 pt-0 space-y-3">
+                  {checklistItems.map((item, index) => {
+                    const userPhotos = completions.get(item.id) || [];
+                    const hasPhotos = userPhotos.length > 0;
+                    const isUploading = uploadingItemId === item.id;
+                    const itemRefPhotos = getItemReferencePhotos(item.id);
 
-                    {/* User Photo */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                        <Camera className="w-3 h-3" />
-                        התמונה שלך
-                      </div>
-                      {photoUrl ? (
-                        <div className="rounded-xl overflow-hidden border-2 border-emerald-200 bg-emerald-50">
-                          <img 
-                            src={photoUrl} 
-                            alt="תמונה שהועלתה" 
-                            className="w-full h-40 object-cover"
-                          />
-                          <button 
-                            onClick={() => {
-                              setPhotoUrl(null);
-                              if (fileInputRef.current) fileInputRef.current.value = "";
-                            }}
-                            className="w-full text-xs text-emerald-700 p-2 text-center font-medium hover:bg-emerald-100 transition-colors"
-                          >
-                            לחץ לצילום מחדש
-                          </button>
-                        </div>
-                      ) : (
-                        <div 
-                          onClick={() => fileInputRef.current?.click()}
-                          className="h-40 bg-slate-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-emerald-300 cursor-pointer hover:bg-emerald-50 hover:border-emerald-400 transition-colors"
-                        >
-                          {uploading ? (
-                            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    return (
+                      <div 
+                        key={item.id}
+                        className={cn(
+                          "rounded-2xl border-2 transition-all overflow-hidden",
+                          hasPhotos 
+                            ? "bg-emerald-50 border-emerald-200" 
+                            : "bg-white border-slate-200"
+                        )}
+                      >
+                        {/* Item Header */}
+                        <div className="flex items-center gap-3 p-4 border-b border-slate-100">
+                          {isUploading ? (
+                            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                              <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          ) : hasPhotos ? (
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
+                              <CheckCircle className="w-5 h-5 text-white" />
+                            </div>
                           ) : (
-                            <>
-                              <Camera className="w-8 h-8 text-emerald-400 mb-2" />
-                              <p className="text-xs text-emerald-600 text-center font-medium">לחץ לצילום</p>
-                            </>
+                            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                              <Camera className="w-5 h-5 text-purple-500" />
+                            </div>
+                          )}
+                          
+                          <div className="flex-1">
+                            <p className={cn(
+                              "font-bold",
+                              hasPhotos ? "text-emerald-700" : "text-slate-800"
+                            )}>
+                              {index + 1}. {item.item_name}
+                            </p>
+                          </div>
+
+                          {hasPhotos && (
+                            <Badge className="bg-emerald-500 text-white">
+                              {userPhotos.length} תמונות
+                            </Badge>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Additional Example Photos */}
-                  {examples.length > 1 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-500 font-medium">תמונות נוספות לדוגמא:</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {examples.slice(1).map((example) => (
-                          <div key={example.id} className="rounded-lg overflow-hidden border border-slate-200">
-                            <img 
-                              src={example.image_url} 
-                              alt={example.description} 
-                              className="w-full h-20 object-cover"
-                            />
+                        {/* Two columns: Reference (right) | User photos (left) */}
+                        <div className="grid grid-cols-2 gap-3 p-4">
+                          {/* Right side - Reference photos */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold text-purple-600 text-center">תמונות דוגמה</p>
+                            {itemRefPhotos.length > 0 ? (
+                              <div className="space-y-2">
+                                {itemRefPhotos.map((refPhoto, refIndex) => (
+                                  <img 
+                                    key={refPhoto.id}
+                                    src={refPhoto.image_url}
+                                    alt={`דוגמה ${refIndex + 1}`}
+                                    className="w-full aspect-square object-cover rounded-lg border-2 border-purple-200"
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="w-full aspect-square bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center">
+                                <div className="text-center">
+                                  <Image className="w-8 h-8 text-slate-300 mx-auto" />
+                                  <p className="text-xs text-slate-400 mt-1">אין דוגמה</p>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
+
+                          {/* Left side - User photos */}
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold text-emerald-600 text-center">התמונות שלך</p>
+                            
+                            {/* User uploaded photos */}
+                            {userPhotos.map((photo, photoIndex) => (
+                              <div key={photo.id} className="relative">
+                                <img 
+                                  src={photo.url}
+                                  alt={`תמונה ${photoIndex + 1}`}
+                                  className="w-full aspect-square object-cover rounded-lg border-2 border-emerald-200"
+                                />
+                                <button
+                                  onClick={() => handleDeletePhoto(item.id, photo.id)}
+                                  className="absolute top-1 left-1 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
+                                >
+                                  <X className="w-4 h-4 text-white" />
+                                </button>
+                              </div>
+                            ))}
+                            
+                            {/* Add photo button */}
+                            <button
+                              onClick={() => handleItemClick(item.id)}
+                              disabled={isUploading}
+                              className={cn(
+                                "w-full aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all",
+                                hasPhotos 
+                                  ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+                                  : "border-purple-300 bg-purple-50 hover:bg-purple-100"
+                              )}
+                            >
+                              {isUploading ? (
+                                <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Camera className={cn(
+                                    "w-8 h-8",
+                                    hasPhotos ? "text-emerald-500" : "text-purple-500"
+                                  )} />
+                                  <span className={cn(
+                                    "text-xs font-medium",
+                                    hasPhotos ? "text-emerald-600" : "text-purple-600"
+                                  )}>
+                                    {hasPhotos ? "הוסף תמונה" : "צלם תמונה"}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Camera Input */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleCameraCapture}
-                    className="hidden"
-                  />
-
-                  {/* Capture Button - Only show if no photo yet */}
-                  {!photoUrl && (
-                    <Button 
-                      className="w-full h-12 bg-gradient-to-r from-emerald-500 to-emerald-600"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      {uploading ? (
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Camera className="w-5 h-5 ml-2" />
-                          פתח מצלמה וצלם
-                        </>
-                      )}
-                    </Button>
-                  )}
+                    );
+                  })}
                 </CardContent>
               </Card>
 
               {/* Submit Button */}
-              <Button 
-                onClick={handleSubmit} 
-                disabled={!photoUrl || isSubmitting}
-                className="w-full h-14 bg-gradient-to-r from-primary to-accent text-lg font-bold"
-              >
-                {isSubmitting ? (
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 ml-2" />
-                    שמור מסדר
-                  </>
-                )}
-              </Button>
+              {checklistItems.every(item => {
+                const photos = completions.get(item.id);
+                return photos && photos.length > 0;
+              }) && !isCompleted && (
+                <Button 
+                  className="w-full h-14 text-lg bg-gradient-to-r from-emerald-500 to-teal-500"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "שומר..." : "סיים ושלח מסדר ✓"}
+                </Button>
+              )}
             </div>
           )}
 
           {/* Step: Completed */}
           {currentStep === "completed" && (
             <div className="space-y-4">
-              <Card className="border-emerald-200 shadow-lg bg-gradient-to-br from-emerald-50 to-white">
-                <CardContent className="p-6 text-center">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="w-10 h-10 text-emerald-600" />
+              <Card className="border-emerald-200 shadow-lg bg-gradient-to-br from-emerald-50 to-teal-50">
+                <CardContent className="p-8 text-center">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <CheckCircle className="w-10 h-10 text-white" />
                   </div>
-                  <h2 className="text-xl font-bold text-emerald-800 mb-2">המסדר הושלם בהצלחה!</h2>
-                  <div className="flex items-center justify-center gap-2 text-emerald-600 mb-4">
-                    <Badge className="bg-emerald-100 text-emerald-700">{myArea?.outpost}</Badge>
-                    <span>•</span>
-                    <span>{myArea?.area_name}</span>
-                    <span>•</span>
-                    <span>{DAY_OPTIONS.find(d => d.value === selectedDay)?.label}</span>
-                  </div>
-                  {photoUrl && (
-                    <img src={photoUrl} alt="תמונה שהועלתה" className="w-full h-48 object-cover rounded-xl mb-4" />
-                  )}
-                  <Button 
-                    onClick={goToStart}
-                    variant="outline"
-                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                  >
-                    חזור לרשימת המשימות
-                  </Button>
+                  <h2 className="text-2xl font-black text-emerald-800 mb-2">מסדר הושלם!</h2>
+                  <p className="text-emerald-600">
+                    {selectedOutpost} • {selectedDay?.label}
+                  </p>
                 </CardContent>
               </Card>
+
+              <Button 
+                variant="outline"
+                className="w-full"
+                onClick={goBack}
+              >
+                חזור ללוח השבועי
+              </Button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Full-screen comparison dialog */}
+      <Dialog open={compareDialogOpen} onOpenChange={setCompareDialogOpen}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
+          {compareItem && (
+            <div className="h-full flex flex-col bg-slate-900">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 bg-slate-800 border-b border-slate-700">
+                <h3 className="text-white font-bold text-lg">{compareItem.item.item_name}</h3>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setCompareDialogOpen(false)}
+                  className="text-white hover:bg-slate-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {/* Side by side */}
+              <div className="flex-1 grid grid-cols-2 gap-1 p-2">
+                {/* Reference */}
+                <div className="relative bg-slate-800 rounded-lg overflow-hidden">
+                  <div className="absolute top-2 right-2 z-10">
+                    <Badge className="bg-purple-500 text-white">דוגמה</Badge>
+                  </div>
+                  {(() => {
+                    const itemRefPhotos = getItemReferencePhotos(compareItem.item.id);
+                    if (itemRefPhotos.length > 0) {
+                      return (
+                        <>
+                          <img 
+                            src={itemRefPhotos[currentRefPhotoIndex]?.image_url}
+                            alt="Reference"
+                            className="w-full h-full object-contain"
+                          />
+                          {itemRefPhotos.length > 1 && (
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                              <Button
+                                size="icon"
+                                variant="secondary"
+                                className="w-8 h-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCurrentRefPhotoIndex(prev => Math.max(0, prev - 1));
+                                }}
+                                disabled={currentRefPhotoIndex === 0}
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </Button>
+                              <span className="text-white text-sm bg-black/50 px-2 py-1 rounded">
+                                {currentRefPhotoIndex + 1}/{itemRefPhotos.length}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="secondary"
+                                className="w-8 h-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCurrentRefPhotoIndex(prev => Math.min(itemRefPhotos.length - 1, prev + 1));
+                                }}
+                                disabled={currentRefPhotoIndex === itemRefPhotos.length - 1}
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+                    return (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <p className="text-slate-400">אין תמונת דוגמה</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* User photos */}
+                <div className="relative bg-slate-800 rounded-lg overflow-hidden">
+                  <div className="absolute top-2 right-2 z-10">
+                    <Badge className="bg-emerald-500 text-white">שלך ({compareItem.userPhotos.length})</Badge>
+                  </div>
+                  <img 
+                    src={compareItem.userPhotos[0]?.url || ''}
+                    alt="Your photo"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

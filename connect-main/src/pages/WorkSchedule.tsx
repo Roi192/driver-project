@@ -24,7 +24,8 @@ import {
   Phone,
   MessageSquare,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  Bell
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 
@@ -88,6 +89,7 @@ export default function WorkSchedule() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [sendingSms, setSendingSms] = useState<string | null>(null);
 
   const canEdit = role === 'admin' || role === 'platoon_commander';
   const canView = canEdit || role === 'battalion_admin';
@@ -233,6 +235,34 @@ export default function WorkSchedule() {
   const getWeekLabel = () => {
     const end = addDays(weekStart, 6);
     return `${format(weekStart, 'd.M', { locale: he })} - ${format(end, 'd.M.yyyy', { locale: he })}`;
+  };
+
+  const sendTestNotification = async (soldierId: string, soldierName: string, outpost: string, shiftLabel: string) => {
+    setSendingSms(soldierId);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: { 
+          testMode: true,
+          soldierId,
+          soldierName,
+          outpost,
+          shiftType: shiftLabel
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success(`התראה נשלחה ל${soldierName}`);
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      toast.error('שגיאה בשליחת התראה');
+    } finally {
+      setSendingSms(null);
+    }
   };
 
   if (authLoading || loading) {
@@ -396,6 +426,23 @@ export default function WorkSchedule() {
                               )}
                             </div>
                           )}
+                          
+                          {/* Send Test Notification Button */}
+                          {canEdit && selectedSoldierId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-primary hover:bg-primary/10"
+                              onClick={() => sendTestNotification(selectedSoldierId, selectedSoldier?.full_name || '', selectedOutpost, shift.label)}
+                              disabled={sendingSms === selectedSoldierId}
+                            >
+                              {sendingSms === selectedSoldierId ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Bell className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -424,27 +471,22 @@ export default function WorkSchedule() {
           </div>
         )}
 
-        {/* SMS Info Card */}
+        {/* Push Notifications Info Card */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <MessageSquare className="w-5 h-5 text-primary" />
+                <Bell className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-foreground mb-1">הודעות SMS אוטומטיות</h3>
+                <h3 className="font-bold text-foreground mb-1">התראות Push אוטומטיות</h3>
                 <p className="text-sm text-muted-foreground">
-                  המערכת שולחת הודעה לחייל 15 דקות לפני תחילת המשמרת עם תזכורת למילוי טופס לפני משמרת.
-                  וודא שלכל חייל יש מספר טלפון בטבלת השליטה.
+                  המערכת שולחת התראה לחייל 15 דקות לפני תחילת המשמרת.
+                  החיילים צריכים להפעיל התראות באפליקציה דרך העמוד הראשי.
                 </p>
-                <Button
-                  variant="link"
-                  className="p-0 h-auto mt-2 text-primary"
-                  onClick={() => navigate('/soldiers-control')}
-                >
-                  עבור לטבלת שליטה להוספת טלפונים
-                  <ArrowRight className="w-4 h-4 mr-1" />
-                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  💡 לחץ על כפתור הפעמון ליד חייל כדי לשלוח התראת בדיקה
+                </p>
               </div>
             </div>
           </CardContent>

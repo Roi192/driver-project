@@ -4,42 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { OUTPOSTS } from "@/lib/constants";
-import { CheckCircle, XCircle, Sparkles, ChevronLeft, ImageIcon, History, Clock, User, MapPin, Camera, Calendar } from "lucide-react";
-import { format, startOfWeek, parseISO } from "date-fns";
+import { 
+  CheckCircle, XCircle, Sparkles, ImageIcon, History, Clock, User, Calendar, 
+  Download, ChevronLeft, ChevronRight, Trash2, Eye
+} from "lucide-react";
+import { format, startOfWeek, parseISO, subDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-interface CleaningAssignment {
-  id: string;
-  soldier_id: string;
-  area_id: string;
-  parade_date: string;
-  day_of_week: string;
-  outpost: string;
-  is_completed: boolean;
-  photo_url: string | null;
-  created_at: string;
-  notes: string | null;
-  soldiers?: {
-    full_name: string;
-    personal_number: string;
-  };
-  cleaning_responsibility_areas?: {
-    area_name: string;
-    description: string | null;
-  };
-}
+import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CompletedParade {
+  id: string;
   outpost: string;
   day_of_week: string;
-  area_name: string;
   soldier_name: string;
-  photo_url: string | null;
-  created_at: string;
+  completed_at: string;
   parade_date: string;
+  items_completed: number;
+}
+
+interface ParadePhoto {
+  id: string;
+  item_name: string;
+  photo_url: string;
 }
 
 const DAY_OPTIONS = [
@@ -51,44 +41,90 @@ const DAY_OPTIONS = [
 export function CleaningParadeCards() {
   const [completedParades, setCompletedParades] = useState<CompletedParade[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<CompletedParade | null>(null);
   const [showAllParades, setShowAllParades] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // History range
+  const [historyDays, setHistoryDays] = useState<number>(7); // 7 = this week, 30 = 30 days
+  
+  // Photo viewer
+  const [selectedParade, setSelectedParade] = useState<CompletedParade | null>(null);
+  const [paradePhotos, setParadePhotos] = useState<ParadePhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  
+  // Cleanup
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
 
   const currentWeekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
   useEffect(() => {
     fetchCompletedParades();
+  }, [historyDays]);
+
+  useEffect(() => {
+    // Trigger cleanup on mount
+    cleanupOldData();
   }, []);
+
+  const cleanupOldData = async () => {
+    try {
+      await supabase.functions.invoke('cleanup-old-cleaning-parades');
+    } catch (error) {
+      console.error('Cleanup function error:', error);
+    }
+  };
 
   const fetchCompletedParades = async () => {
     setLoading(true);
     try {
-      // Fetch completed assignments for this week with soldier and area info
+      const startDate = historyDays === 7 
+        ? currentWeekStart 
+        : format(subDays(new Date(), 30), 'yyyy-MM-dd');
+
+      // Fetch completed submissions with soldier info
       const { data, error } = await supabase
-        .from("cleaning_parade_assignments")
+        .from("cleaning_parade_submissions")
         .select(`
-          *,
-          soldiers(full_name, personal_number),
-          cleaning_responsibility_areas(area_name, description)
+          id,
+          outpost,
+          day_of_week,
+          parade_date,
+          completed_at,
+          soldiers(full_name, personal_number)
         `)
         .eq("is_completed", true)
-        .gte("parade_date", currentWeekStart)
-        .order("created_at", { ascending: false });
+        .gte("parade_date", startDate)
+        .order("completed_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching assignments:", error);
+        console.error("Error fetching submissions:", error);
         return;
       }
 
-      const parades: CompletedParade[] = (data || []).map((a: CleaningAssignment) => ({
-        outpost: a.outpost,
-        day_of_week: a.day_of_week,
-        area_name: a.cleaning_responsibility_areas?.area_name || "לא ידוע",
-        soldier_name: a.soldiers?.full_name || "לא ידוע",
-        photo_url: a.photo_url,
-        created_at: a.created_at,
-        parade_date: a.parade_date,
+      // Get completion counts for each submission
+      const submissionIds = (data || []).map(d => d.id);
+      let completionCounts: Record<string, number> = {};
+      
+      if (submissionIds.length > 0) {
+        const { data: completions } = await supabase
+          .from("cleaning_checklist_completions")
+          .select("submission_id")
+          .in("submission_id", submissionIds);
+        
+        (completions || []).forEach(c => {
+          completionCounts[c.submission_id] = (completionCounts[c.submission_id] || 0) + 1;
+        });
+      }
+
+      const parades: CompletedParade[] = (data || []).map((s: any) => ({
+        id: s.id,
+        outpost: s.outpost,
+        day_of_week: s.day_of_week,
+        soldier_name: s.soldiers?.full_name || "לא ידוע",
+        completed_at: s.completed_at,
+        parade_date: s.parade_date,
+        items_completed: completionCounts[s.id] || 0,
       }));
 
       setCompletedParades(parades);
@@ -99,12 +135,74 @@ export function CleaningParadeCards() {
     }
   };
 
+  const fetchParadePhotos = async (paradeId: string) => {
+    setLoadingPhotos(true);
+    try {
+      const { data: completions, error } = await supabase
+        .from("cleaning_checklist_completions")
+        .select(`
+          id,
+          photo_url,
+          checklist_item_id,
+          cleaning_checklist_items(item_name)
+        `)
+        .eq("submission_id", paradeId);
+
+      if (error) {
+        console.error("Error fetching photos:", error);
+        return;
+      }
+
+      const photos: ParadePhoto[] = (completions || []).map((c: any) => ({
+        id: c.id,
+        item_name: c.cleaning_checklist_items?.item_name || "פריט",
+        photo_url: c.photo_url,
+      }));
+
+      setParadePhotos(photos);
+      setCurrentPhotoIndex(0);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
+  const handleViewPhotos = async (parade: CompletedParade) => {
+    setSelectedParade(parade);
+    await fetchParadePhotos(parade.id);
+  };
+
+  const handleDownloadPhoto = async (photoUrl: string, itemName: string) => {
+    try {
+      const response = await fetch(photoUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${itemName}_${Date.now()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("התמונה הורדה");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("שגיאה בהורדת התמונה");
+    }
+  };
+
   const getParadesForDay = (day: string) => {
-    return completedParades.filter(p => p.day_of_week === day);
+    // Only get current week parades for day view
+    return completedParades.filter(p => 
+      p.day_of_week === day && p.parade_date >= currentWeekStart
+    );
   };
 
   const getParadesForOutpost = (outpost: string, day: string) => {
-    return completedParades.filter(p => p.outpost === outpost && p.day_of_week === day);
+    return completedParades.filter(p => 
+      p.outpost === outpost && p.day_of_week === day && p.parade_date >= currentWeekStart
+    );
   };
 
   const getDayStats = (day: string) => {
@@ -190,32 +288,14 @@ export function CleaningParadeCards() {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="space-y-2">
-              {recentParades.slice(0, 4).map((parade, idx) => (
+              {recentParades.slice(0, 4).map((parade) => (
                 <div 
-                  key={idx}
-                  onClick={() => parade.photo_url && setSelectedPhoto(parade)}
-                  className={cn(
-                    "flex items-center gap-3 p-2.5 rounded-xl border transition-all",
-                    parade.photo_url 
-                      ? "bg-white border-slate-200 cursor-pointer hover:border-primary/30 hover:shadow-sm" 
-                      : "bg-slate-50 border-slate-100"
-                  )}
+                  key={parade.id}
+                  className="flex items-center gap-3 p-2.5 rounded-xl border transition-all bg-white border-slate-200"
                 >
-                  {/* Photo Thumbnail */}
-                  <div className="flex-shrink-0">
-                    {parade.photo_url ? (
-                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200">
-                        <img 
-                          src={parade.photo_url} 
-                          alt="מסדר" 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center">
-                        <Camera className="w-5 h-5 text-slate-400" />
-                      </div>
-                    )}
+                  {/* Icon */}
+                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-5 h-5 text-emerald-600" />
                   </div>
 
                   {/* Info */}
@@ -228,19 +308,22 @@ export function CleaningParadeCards() {
                         {getDayInfo(parade.day_of_week)?.label}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-slate-800 truncate">{parade.area_name}</p>
-                    <div className="flex items-center gap-1 text-xs text-slate-500">
+                    <div className="flex items-center gap-1 text-sm text-slate-600">
                       <User className="w-3 h-3" />
                       {parade.soldier_name}
                     </div>
+                    <p className="text-xs text-slate-400">{parade.items_completed} פריטים</p>
                   </div>
 
-                  {/* Time */}
-                  <div className="flex-shrink-0 text-left">
-                    <p className="text-xs text-slate-400">
-                      {format(parseISO(parade.created_at), "HH:mm")}
-                    </p>
-                  </div>
+                  {/* Actions */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-8 h-8"
+                    onClick={() => handleViewPhotos(parade)}
+                  >
+                    <Eye className="w-4 h-4 text-primary" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -285,7 +368,7 @@ export function CleaningParadeCards() {
                       <div className="flex-1">
                         <p className="font-bold text-slate-800">{outpost}</p>
                         <p className="text-xs text-slate-500">
-                          {isCompleted ? `${outpostParades.length} תחומי אחריות בוצעו` : "טרם בוצע"}
+                          {isCompleted ? "בוצע" : "טרם בוצע"}
                         </p>
                       </div>
                     </div>
@@ -293,45 +376,30 @@ export function CleaningParadeCards() {
                     {/* Parades List */}
                     {outpostParades.length > 0 && (
                       <div className="divide-y divide-slate-100">
-                        {outpostParades.map((parade, idx) => (
-                          <div 
-                            key={idx}
-                            onClick={() => parade.photo_url && setSelectedPhoto(parade)}
-                            className={cn(
-                              "p-3 flex items-center gap-3",
-                              parade.photo_url && "cursor-pointer hover:bg-slate-50"
-                            )}
-                          >
-                            {/* Photo */}
-                            {parade.photo_url ? (
-                              <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
-                                <img 
-                                  src={parade.photo_url} 
-                                  alt="מסדר" 
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                <Camera className="w-6 h-6 text-slate-400" />
-                              </div>
-                            )}
-
-                            {/* Details */}
+                        {outpostParades.map((parade) => (
+                          <div key={parade.id} className="p-3 flex items-center gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-slate-800">{parade.area_name}</p>
-                              <div className="flex items-center gap-1 text-sm text-slate-500">
+                              <div className="flex items-center gap-1 text-sm text-slate-600">
                                 <User className="w-3.5 h-3.5" />
                                 {parade.soldier_name}
                               </div>
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {format(parseISO(parade.created_at), "dd/MM HH:mm")}
+                              <p className="text-xs text-slate-400">
+                                {parade.items_completed} פריטים
                               </p>
+                              {parade.completed_at && (
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  {format(parseISO(parade.completed_at), "dd/MM HH:mm")}
+                                </p>
+                              )}
                             </div>
-
-                            {parade.photo_url && (
-                              <ChevronLeft className="w-5 h-5 text-slate-400 flex-shrink-0" />
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="w-8 h-8"
+                              onClick={() => handleViewPhotos(parade)}
+                            >
+                              <Eye className="w-4 h-4 text-primary" />
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -344,109 +412,50 @@ export function CleaningParadeCards() {
         </DialogContent>
       </Dialog>
 
-      {/* Photo Detail Dialog */}
-      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-        <DialogContent className="max-w-lg p-0 bg-white overflow-hidden">
-          <DialogHeader className="p-4 pb-2 border-b border-slate-100">
-            <DialogTitle className="flex items-center gap-2 text-slate-900">
-              <ImageIcon className="w-5 h-5 text-primary" />
-              תמונת מסדר
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedPhoto && (
-            <div className="space-y-0">
-              {/* Info Bar */}
-              <div className="p-4 bg-slate-50 border-b border-slate-100">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-slate-500">מוצב</p>
-                    <p className="font-bold text-slate-800">{selectedPhoto.outpost}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">תחום אחריות</p>
-                    <p className="font-bold text-slate-800">{selectedPhoto.area_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">ביצע</p>
-                    <p className="font-bold text-slate-800">{selectedPhoto.soldier_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">תאריך ושעה</p>
-                    <p className="font-bold text-slate-800">
-                      {format(parseISO(selectedPhoto.created_at), "dd/MM/yyyy HH:mm", { locale: he })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Photo */}
-              {selectedPhoto.photo_url && (
-                <a 
-                  href={selectedPhoto.photo_url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block"
-                >
-                  <img 
-                    src={selectedPhoto.photo_url} 
-                    alt="תמונת מסדר" 
-                    className="w-full max-h-[50vh] object-contain bg-slate-900"
-                  />
-                </a>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* All Parades Dialog */}
+      {/* All Parades History Dialog */}
       <Dialog open={showAllParades} onOpenChange={setShowAllParades}>
         <DialogContent className="max-w-lg max-h-[85vh] p-0 bg-white">
           <DialogHeader className="p-4 pb-2 border-b border-slate-100">
-            <DialogTitle className="flex items-center gap-2 text-slate-900">
-              <History className="w-5 h-5 text-primary" />
-              כל המסדרים השבוע
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2 text-slate-900">
+                <History className="w-5 h-5 text-primary" />
+                היסטוריית מסדרים
+              </DialogTitle>
+              <Select
+                value={historyDays.toString()}
+                onValueChange={(v) => setHistoryDays(parseInt(v))}
+              >
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">השבוע</SelectItem>
+                  <SelectItem value="30">30 ימים</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </DialogHeader>
           
           <ScrollArea className="max-h-[70vh]">
             <div className="p-4 space-y-2">
-              {completedParades.length === 0 ? (
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : completedParades.length === 0 ? (
                 <div className="text-center py-8 text-slate-500">
-                  אין מסדרים שבוצעו השבוע
+                  אין מסדרים בתקופה זו
                 </div>
               ) : (
-                completedParades.map((parade, idx) => (
+                completedParades.map((parade) => (
                   <div
-                    key={idx}
-                    onClick={() => {
-                      if (parade.photo_url) {
-                        setSelectedPhoto(parade);
-                        setShowAllParades(false);
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl border transition-all",
-                      parade.photo_url 
-                        ? "bg-white border-slate-200 cursor-pointer hover:border-primary/30 hover:shadow-sm" 
-                        : "bg-slate-50 border-slate-100"
-                    )}
+                    key={parade.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border transition-all bg-white border-slate-200"
                   >
-                    {/* Photo */}
-                    {parade.photo_url ? (
-                      <div className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 flex-shrink-0">
-                        <img 
-                          src={parade.photo_url} 
-                          alt="מסדר" 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                        <Camera className="w-6 h-6 text-slate-400" />
-                      </div>
-                    )}
+                    {/* Icon */}
+                    <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-6 h-6 text-emerald-600" />
+                    </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -458,27 +467,138 @@ export function CleaningParadeCards() {
                           {getDayInfo(parade.day_of_week)?.label}
                         </span>
                       </div>
-                      <p className="font-medium text-slate-800 truncate">{parade.area_name}</p>
-                      <div className="flex items-center gap-1 text-sm text-slate-500">
-                        <User className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1 text-sm text-slate-600">
+                        <User className="w-3 h-3" />
                         {parade.soldier_name}
                       </div>
+                      <p className="text-xs text-slate-400">{parade.items_completed} פריטים</p>
                     </div>
 
-                    {/* Time */}
-                    <div className="flex-shrink-0 text-left">
-                      <p className="text-sm font-medium text-slate-700">
-                        {format(parseISO(parade.parade_date), "dd/MM")}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {format(parseISO(parade.created_at), "HH:mm")}
-                      </p>
+                    {/* Date & Actions */}
+                    <div className="flex flex-col items-end gap-1">
+                      {parade.completed_at && (
+                        <>
+                          <p className="text-sm font-medium text-slate-600">
+                            {format(parseISO(parade.completed_at), "HH:mm")}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {format(parseISO(parade.completed_at), "dd/MM")}
+                          </p>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-7 h-7"
+                        onClick={() => handleViewPhotos(parade)}
+                      >
+                        <Eye className="w-4 h-4 text-primary" />
+                      </Button>
                     </div>
                   </div>
                 ))
               )}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Viewer Dialog */}
+      <Dialog open={!!selectedParade} onOpenChange={() => setSelectedParade(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] p-0 bg-black/95">
+          <DialogHeader className="p-4 pb-2 border-b border-slate-700">
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <ImageIcon className="w-5 h-5 text-primary" />
+              {selectedParade?.outpost} - {selectedParade?.soldier_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {loadingPhotos ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : paradePhotos.length === 0 ? (
+            <div className="flex justify-center items-center h-64 text-slate-400">
+              אין תמונות
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Current Photo */}
+              <div className="relative aspect-square bg-black">
+                <img
+                  src={paradePhotos[currentPhotoIndex]?.photo_url}
+                  alt={paradePhotos[currentPhotoIndex]?.item_name}
+                  className="w-full h-full object-contain"
+                />
+                
+                {/* Navigation arrows */}
+                {paradePhotos.length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
+                      onClick={() => setCurrentPhotoIndex(prev => prev < paradePhotos.length - 1 ? prev + 1 : 0)}
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
+                      onClick={() => setCurrentPhotoIndex(prev => prev > 0 ? prev - 1 : paradePhotos.length - 1)}
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Photo info & download */}
+              <div className="p-4 bg-slate-900 flex items-center justify-between">
+                <div>
+                  <p className="text-white font-medium">{paradePhotos[currentPhotoIndex]?.item_name}</p>
+                  <p className="text-xs text-slate-400">
+                    {currentPhotoIndex + 1} / {paradePhotos.length}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-primary text-primary hover:bg-primary hover:text-white"
+                  onClick={() => handleDownloadPhoto(
+                    paradePhotos[currentPhotoIndex]?.photo_url,
+                    paradePhotos[currentPhotoIndex]?.item_name
+                  )}
+                >
+                  <Download className="w-4 h-4 ml-1" />
+                  הורד
+                </Button>
+              </div>
+
+              {/* Thumbnails */}
+              {paradePhotos.length > 1 && (
+                <div className="p-3 bg-slate-800 flex gap-2 overflow-x-auto">
+                  {paradePhotos.map((photo, idx) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => setCurrentPhotoIndex(idx)}
+                      className={cn(
+                        "w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all",
+                        idx === currentPhotoIndex ? "border-primary" : "border-transparent opacity-60"
+                      )}
+                    >
+                      <img
+                        src={photo.photo_url}
+                        alt={photo.item_name}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -161,73 +161,107 @@ export type Database = {
         }
         Relationships: []
       }
-      cleaning_parade_assignments: {
+      cleaning_checklist_completions: {
         Row: {
-          area_id: string
-          created_at: string
-          day_of_week: string
+          checklist_item_id: string
+          completed_at: string
           id: string
-          is_completed: boolean | null
-          notes: string | null
-          outpost: string
-          parade_date: string
-          parade_id: string | null
-          photo_url: string | null
-          soldier_id: string
-          updated_at: string
+          photo_url: string
+          submission_id: string
         }
         Insert: {
-          area_id: string
-          created_at?: string
-          day_of_week: string
+          checklist_item_id: string
+          completed_at?: string
           id?: string
-          is_completed?: boolean | null
-          notes?: string | null
-          outpost: string
-          parade_date: string
-          parade_id?: string | null
-          photo_url?: string | null
-          soldier_id: string
-          updated_at?: string
+          photo_url: string
+          submission_id: string
         }
         Update: {
-          area_id?: string
-          created_at?: string
-          day_of_week?: string
+          checklist_item_id?: string
+          completed_at?: string
           id?: string
-          is_completed?: boolean | null
-          notes?: string | null
-          outpost?: string
-          parade_date?: string
-          parade_id?: string | null
-          photo_url?: string | null
-          soldier_id?: string
-          updated_at?: string
+          photo_url?: string
+          submission_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "cleaning_parade_assignments_area_id_fkey"
-            columns: ["area_id"]
+            foreignKeyName: "cleaning_checklist_completions_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_responsibility_areas"
+            referencedRelation: "cleaning_checklist_items"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cleaning_parade_assignments_parade_id_fkey"
-            columns: ["parade_id"]
+            foreignKeyName: "cleaning_checklist_completions_submission_id_fkey"
+            columns: ["submission_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_parades"
+            referencedRelation: "cleaning_parade_submissions"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      cleaning_checklist_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          item_name: string
+          item_order: number
+          outpost: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_name: string
+          item_order?: number
+          outpost: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_name?: string
+          item_order?: number
+          outpost?: string
+        }
+        Relationships: []
+      }
+      cleaning_manual_assignments: {
+        Row: {
+          created_at: string
+          day_of_week: string
+          id: string
+          outpost: string
+          soldier_id: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: string
+          id?: string
+          outpost: string
+          soldier_id: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: string
+          id?: string
+          outpost?: string
+          soldier_id?: string
+          week_start_date?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "cleaning_parade_assignments_soldier_id_fkey"
+            foreignKeyName: "cleaning_manual_assignments_soldier_id_fkey"
             columns: ["soldier_id"]
             isOneToOne: false
             referencedRelation: "soldiers"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cleaning_parade_assignments_soldier_id_fkey"
+            foreignKeyName: "cleaning_manual_assignments_soldier_id_fkey"
             columns: ["soldier_id"]
             isOneToOne: false
             referencedRelation: "soldiers_basic"
@@ -235,81 +269,95 @@ export type Database = {
           },
         ]
       }
-      cleaning_parade_examples: {
+      cleaning_notifications_log: {
         Row: {
-          area_id: string | null
-          created_at: string
-          description: string
-          display_order: number
+          day_of_week: string
           id: string
-          image_url: string
-          outpost: string | null
-          updated_at: string
+          notification_type: string
+          outpost: string
+          sent_at: string
+          soldier_id: string | null
+          week_start_date: string
         }
         Insert: {
-          area_id?: string | null
-          created_at?: string
-          description: string
-          display_order?: number
+          day_of_week: string
           id?: string
-          image_url: string
-          outpost?: string | null
-          updated_at?: string
+          notification_type?: string
+          outpost: string
+          sent_at?: string
+          soldier_id?: string | null
+          week_start_date: string
         }
         Update: {
-          area_id?: string | null
-          created_at?: string
-          description?: string
-          display_order?: number
+          day_of_week?: string
           id?: string
-          image_url?: string
-          outpost?: string | null
-          updated_at?: string
+          notification_type?: string
+          outpost?: string
+          sent_at?: string
+          soldier_id?: string | null
+          week_start_date?: string
         }
         Relationships: [
           {
-            foreignKeyName: "cleaning_parade_examples_area_id_fkey"
-            columns: ["area_id"]
+            foreignKeyName: "cleaning_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_responsibility_areas"
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
             referencedColumns: ["id"]
           },
         ]
       }
-      cleaning_parade_highlights: {
+      cleaning_parade_submissions: {
         Row: {
-          area_id: string | null
+          completed_at: string | null
           created_at: string
-          display_order: number
+          day_of_week: string
           id: string
-          is_active: boolean
-          title: string
-          updated_at: string
+          is_completed: boolean
+          outpost: string
+          parade_date: string
+          soldier_id: string
         }
         Insert: {
-          area_id?: string | null
+          completed_at?: string | null
           created_at?: string
-          display_order?: number
+          day_of_week: string
           id?: string
-          is_active?: boolean
-          title: string
-          updated_at?: string
+          is_completed?: boolean
+          outpost: string
+          parade_date: string
+          soldier_id: string
         }
         Update: {
-          area_id?: string | null
+          completed_at?: string | null
           created_at?: string
-          display_order?: number
+          day_of_week?: string
           id?: string
-          is_active?: boolean
-          title?: string
-          updated_at?: string
+          is_completed?: boolean
+          outpost?: string
+          parade_date?: string
+          soldier_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "cleaning_parade_highlights_area_id_fkey"
-            columns: ["area_id"]
+            foreignKeyName: "cleaning_parade_submissions_soldier_id_fkey"
+            columns: ["soldier_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_responsibility_areas"
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_parade_submissions_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
             referencedColumns: ["id"]
           },
         ]
@@ -353,87 +401,40 @@ export type Database = {
         }
         Relationships: []
       }
-      cleaning_responsibility_areas: {
+      cleaning_reference_photos: {
         Row: {
-          area_name: string
+          checklist_item_id: string | null
           created_at: string
           description: string | null
-          display_order: number | null
+          display_order: number
           id: string
-          is_active: boolean | null
+          image_url: string
           outpost: string
-          updated_at: string
         }
         Insert: {
-          area_name: string
+          checklist_item_id?: string | null
           created_at?: string
           description?: string | null
-          display_order?: number | null
+          display_order?: number
           id?: string
-          is_active?: boolean | null
+          image_url: string
           outpost: string
-          updated_at?: string
         }
         Update: {
-          area_name?: string
+          checklist_item_id?: string | null
           created_at?: string
           description?: string | null
-          display_order?: number | null
+          display_order?: number
           id?: string
-          is_active?: boolean | null
+          image_url?: string
           outpost?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      cleaning_weekly_assignments: {
-        Row: {
-          area_id: string
-          created_at: string
-          day_of_week: string
-          id: string
-          soldier_id: string
-          updated_at: string
-          week_start_date: string
-        }
-        Insert: {
-          area_id: string
-          created_at?: string
-          day_of_week?: string
-          id?: string
-          soldier_id: string
-          updated_at?: string
-          week_start_date: string
-        }
-        Update: {
-          area_id?: string
-          created_at?: string
-          day_of_week?: string
-          id?: string
-          soldier_id?: string
-          updated_at?: string
-          week_start_date?: string
         }
         Relationships: [
           {
-            foreignKeyName: "cleaning_weekly_assignments_area_id_fkey"
-            columns: ["area_id"]
+            foreignKeyName: "cleaning_reference_photos_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
             isOneToOne: false
-            referencedRelation: "cleaning_responsibility_areas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cleaning_weekly_assignments_soldier_id_fkey"
-            columns: ["soldier_id"]
-            isOneToOne: false
-            referencedRelation: "soldiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cleaning_weekly_assignments_soldier_id_fkey"
-            columns: ["soldier_id"]
-            isOneToOne: false
-            referencedRelation: "soldiers_basic"
+            referencedRelation: "cleaning_checklist_items"
             referencedColumns: ["id"]
           },
         ]
@@ -1170,6 +1171,105 @@ export type Database = {
           },
           {
             foreignKeyName: "punishments_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_notifications_log: {
+        Row: {
+          error_message: string | null
+          id: string
+          outpost: string
+          sent_at: string
+          shift_date: string
+          shift_type: string
+          soldier_id: string | null
+          soldier_name: string
+          status: string
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          outpost: string
+          sent_at?: string
+          shift_date: string
+          shift_type: string
+          soldier_id?: string | null
+          soldier_name: string
+          status?: string
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          outpost?: string
+          sent_at?: string
+          shift_date?: string
+          shift_type?: string
+          soldier_id?: string | null
+          soldier_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_notifications_log_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          soldier_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          soldier_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          soldier_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_soldier_id_fkey"
             columns: ["soldier_id"]
             isOneToOne: false
             referencedRelation: "soldiers_basic"

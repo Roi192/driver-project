@@ -5,15 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { OUTPOSTS } from "@/lib/constants";
 import { useNavigate } from "react-router-dom";
-import { format, startOfWeek, addWeeks } from "date-fns";
+import { format, startOfWeek, addWeeks, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { 
   Plus, 
@@ -26,33 +26,29 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  Calendar
+  Calendar,
+  Camera,
+  Bell,
+  Layers
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-interface ResponsibilityArea {
+interface ChecklistItem {
   id: string;
   outpost: string;
-  area_name: string;
+  item_name: string;
+  item_order: number;
+  is_active: boolean;
+}
+
+interface ReferencePhoto {
+  id: string;
+  checklist_item_id: string | null;
+  outpost: string;
   description: string | null;
-  display_order: number;
-  is_active: boolean;
-}
-
-interface Highlight {
-  id: string;
-  title: string;
-  display_order: number;
-  is_active: boolean;
-  area_id: string | null;
-}
-
-interface ExamplePhoto {
-  id: string;
-  outpost: string | null;
-  description: string;
   image_url: string;
   display_order: number;
-  area_id: string | null;
 }
 
 interface Soldier {
@@ -62,18 +58,25 @@ interface Soldier {
   outpost: string | null;
 }
 
-interface DayAssignment {
+interface ManualAssignment {
   id: string;
-  area_id: string;
   soldier_id: string;
-  week_start_date: string;
+  outpost: string;
   day_of_week: string;
+  week_start_date: string;
+}
+
+interface WorkScheduleEntry {
+  outpost: string;
+  day_of_week: number;
+  afternoon_soldier_id: string | null;
+  morning_soldier_id: string | null;
 }
 
 const DAY_OPTIONS = [
-  { value: "monday", label: "יום שני" },
-  { value: "wednesday", label: "יום רביעי" },
-  { value: "saturday_night", label: "מוצאי שבת" },
+  { value: "monday", label: "יום שני", sourceDay: 0, sourceShift: "afternoon" },
+  { value: "wednesday", label: "יום רביעי", sourceDay: 2, sourceShift: "afternoon" },
+  { value: "saturday_night", label: "מוצאי שבת", sourceDay: 6, sourceShift: "morning" },
 ];
 
 export default function CleaningParadesAdmin() {
@@ -81,33 +84,30 @@ export default function CleaningParadesAdmin() {
   const navigate = useNavigate();
   
   // Data state
-  const [areas, setAreas] = useState<ResponsibilityArea[]>([]);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [examples, setExamples] = useState<ExamplePhoto[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [referencePhotos, setReferencePhotos] = useState<ReferencePhoto[]>([]);
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
-  const [dayAssignments, setDayAssignments] = useState<DayAssignment[]>([]);
+  const [manualAssignments, setManualAssignments] = useState<ManualAssignment[]>([]);
+  const [workSchedule, setWorkSchedule] = useState<WorkScheduleEntry[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Selection state
   const [selectedOutpost, setSelectedOutpost] = useState<string>(OUTPOSTS[0]);
-  const [expandedAreaId, setExpandedAreaId] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
-  const [selectedDayForAssignment, setSelectedDayForAssignment] = useState<string>("monday");
+  const [activeTab, setActiveTab] = useState("checklist");
   
   // Dialog states
-  const [areaDialogOpen, setAreaDialogOpen] = useState(false);
-  const [highlightDialogOpen, setHighlightDialogOpen] = useState(false);
-  const [exampleDialogOpen, setExampleDialogOpen] = useState(false);
+  const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   
-  const [editingArea, setEditingArea] = useState<ResponsibilityArea | null>(null);
-  const [editingHighlight, setEditingHighlight] = useState<Highlight | null>(null);
-  const [currentAreaIdForDialog, setCurrentAreaIdForDialog] = useState<string>("");
+  const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
+  const [selectedItemForPhoto, setSelectedItemForPhoto] = useState<ChecklistItem | null>(null);
+  const [selectedDayForAssignment, setSelectedDayForAssignment] = useState<string>("monday");
   
   // Form states
-  const [areaForm, setAreaForm] = useState({ area_name: "", description: "", display_order: 0 });
-  const [highlightForm, setHighlightForm] = useState({ title: "" });
-  const [exampleForm, setExampleForm] = useState({ description: "" });
+  const [itemForm, setItemForm] = useState({ item_name: "" });
+  const [photoForm, setPhotoForm] = useState({ description: "" });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -129,43 +129,35 @@ export default function CleaningParadesAdmin() {
 
   useEffect(() => {
     if (canAccessCleaningManagement && selectedOutpost) {
-      fetchDayAssignments();
+      fetchAssignmentData();
     }
   }, [canAccessCleaningManagement, selectedOutpost, currentWeekStart]);
 
   const fetchAllData = async () => {
     setLoading(true);
-    await Promise.all([fetchAreas(), fetchHighlights(), fetchExamples(), fetchSoldiers()]);
+    await Promise.all([fetchChecklistItems(), fetchReferencePhotos(), fetchSoldiers()]);
     setLoading(false);
   };
 
-  const fetchAreas = async () => {
+  const fetchChecklistItems = async () => {
     const { data } = await supabase
-      .from("cleaning_responsibility_areas")
+      .from("cleaning_checklist_items")
+      .select("*")
+      .eq("outpost", selectedOutpost)
+      .order("item_order");
+    setChecklistItems(data || []);
+  };
+
+  const fetchReferencePhotos = async () => {
+    const { data } = await supabase
+      .from("cleaning_reference_photos")
       .select("*")
       .eq("outpost", selectedOutpost)
       .order("display_order");
-    setAreas(data || []);
-  };
-
-  const fetchHighlights = async () => {
-    const { data } = await supabase
-      .from("cleaning_parade_highlights")
-      .select("*")
-      .order("display_order");
-    setHighlights(data || []);
-  };
-
-  const fetchExamples = async () => {
-    const { data } = await supabase
-      .from("cleaning_parade_examples")
-      .select("*")
-      .order("display_order");
-    setExamples(data || []);
+    setReferencePhotos(data || []);
   };
 
   const fetchSoldiers = async () => {
-    // Fetch all active soldiers, not just from selected outpost
     const { data } = await supabase
       .from("soldiers")
       .select("id, full_name, personal_number, outpost")
@@ -174,120 +166,84 @@ export default function CleaningParadesAdmin() {
     setSoldiers(data || []);
   };
 
-  const fetchDayAssignments = async () => {
+  const fetchAssignmentData = async () => {
     const weekStartDate = format(currentWeekStart, 'yyyy-MM-dd');
-    const { data } = await supabase
-      .from("cleaning_weekly_assignments")
-      .select("*")
-      .eq("week_start_date", weekStartDate);
-    setDayAssignments(data || []);
+    
+    const { data: manualData } = await supabase
+      .from('cleaning_manual_assignments')
+      .select('*')
+      .eq('outpost', selectedOutpost)
+      .eq('week_start_date', weekStartDate);
+    setManualAssignments(manualData || []);
+    
+    const { data: scheduleData } = await supabase
+      .from('work_schedule')
+      .select('outpost, day_of_week, afternoon_soldier_id, morning_soldier_id')
+      .eq('outpost', selectedOutpost)
+      .eq('week_start_date', weekStartDate);
+    setWorkSchedule(scheduleData || []);
   };
 
-  const getAssignmentForAreaAndDay = (areaId: string, dayOfWeek: string) => {
-    const assignment = dayAssignments.find(a => a.area_id === areaId && a.day_of_week === dayOfWeek);
-    if (!assignment) return null;
-    const soldier = soldiers.find(s => s.id === assignment.soldier_id);
-    return { ...assignment, soldier };
+  const getResponsibleSoldier = (dayValue: string): Soldier | null => {
+    const manualAssign = manualAssignments.find(a => a.day_of_week === dayValue);
+    if (manualAssign) {
+      return soldiers.find(s => s.id === manualAssign.soldier_id) || null;
+    }
+    
+    const dayConfig = DAY_OPTIONS.find(d => d.value === dayValue);
+    if (!dayConfig) return null;
+    
+    const scheduleEntry = workSchedule.find(ws => ws.day_of_week === dayConfig.sourceDay);
+    if (!scheduleEntry) return null;
+    
+    const soldierId = dayConfig.sourceShift === "afternoon" 
+      ? scheduleEntry.afternoon_soldier_id 
+      : scheduleEntry.morning_soldier_id;
+    
+    if (!soldierId) return null;
+    return soldiers.find(s => s.id === soldierId) || null;
   };
 
-  // Soldier list for assignment (show all soldiers from the control table)
-  const getSoldiersForOutpost = () => {
-    return soldiers;
-  };
-
-  const getHighlightsForArea = (areaId: string) => highlights.filter(h => h.area_id === areaId);
-  const getExamplesForArea = (areaId: string) => examples.filter(e => e.area_id === areaId);
-
-  // Area handlers
-  const handleSaveArea = async () => {
-    if (!areaForm.area_name.trim()) {
-      toast.error("יש להזין שם תחום אחריות");
+  // Checklist item handlers
+  const handleSaveItem = async () => {
+    if (!itemForm.item_name.trim()) {
+      toast.error("יש להזין שם פריט");
       return;
     }
 
     try {
-      if (editingArea) {
+      if (editingItem) {
         await supabase
-          .from("cleaning_responsibility_areas")
-          .update({
-            area_name: areaForm.area_name,
-            description: areaForm.description || null,
-            display_order: areaForm.display_order,
-          })
-          .eq("id", editingArea.id);
-        toast.success("תחום האחריות עודכן בהצלחה");
+          .from("cleaning_checklist_items")
+          .update({ item_name: itemForm.item_name })
+          .eq("id", editingItem.id);
+        toast.success("הפריט עודכן בהצלחה");
       } else {
-        await supabase.from("cleaning_responsibility_areas").insert({
+        await supabase.from("cleaning_checklist_items").insert({
           outpost: selectedOutpost,
-          area_name: areaForm.area_name,
-          description: areaForm.description || null,
-          display_order: areas.length,
+          item_name: itemForm.item_name,
+          item_order: checklistItems.length,
         });
-        toast.success("תחום האחריות נוסף בהצלחה");
+        toast.success("הפריט נוסף בהצלחה");
       }
 
-      setAreaDialogOpen(false);
-      setEditingArea(null);
-      setAreaForm({ area_name: "", description: "", display_order: 0 });
-      fetchAreas();
+      setItemDialogOpen(false);
+      setEditingItem(null);
+      setItemForm({ item_name: "" });
+      fetchChecklistItems();
     } catch (error) {
-      toast.error("שגיאה בשמירת תחום האחריות");
+      toast.error("שגיאה בשמירת הפריט");
     }
   };
 
-  const handleDeleteArea = async (areaId: string) => {
-    if (!confirm("האם למחוק את תחום האחריות? כל הדגשים והתמונות יימחקו גם כן.")) return;
-    await supabase.from("cleaning_responsibility_areas").delete().eq("id", areaId);
-    toast.success("תחום האחריות נמחק");
-    setExpandedAreaId("");
-    fetchAreas();
-    fetchHighlights();
-    fetchExamples();
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm("האם למחוק את הפריט?")) return;
+    await supabase.from("cleaning_checklist_items").delete().eq("id", id);
+    toast.success("הפריט נמחק");
+    fetchChecklistItems();
   };
 
-  // Highlight handlers
-  const handleSaveHighlight = async () => {
-    if (!highlightForm.title.trim()) {
-      toast.error("יש להזין כותרת");
-      return;
-    }
-
-    try {
-      if (editingHighlight) {
-        await supabase
-          .from("cleaning_parade_highlights")
-          .update({ title: highlightForm.title })
-          .eq("id", editingHighlight.id);
-        toast.success("הדגש עודכן בהצלחה");
-      } else {
-        const areaHighlights = getHighlightsForArea(currentAreaIdForDialog);
-        const maxOrder = areaHighlights.length > 0 ? Math.max(...areaHighlights.map(h => h.display_order)) : -1;
-        await supabase.from("cleaning_parade_highlights").insert({
-          title: highlightForm.title,
-          area_id: currentAreaIdForDialog,
-          display_order: maxOrder + 1,
-          is_active: true,
-        });
-        toast.success("הדגש נוסף בהצלחה");
-      }
-
-      setHighlightDialogOpen(false);
-      setEditingHighlight(null);
-      setHighlightForm({ title: "" });
-      fetchHighlights();
-    } catch (error) {
-      toast.error("שגיאה בשמירת הדגש");
-    }
-  };
-
-  const handleDeleteHighlight = async (id: string) => {
-    if (!confirm("האם למחוק את הדגש?")) return;
-    await supabase.from("cleaning_parade_highlights").delete().eq("id", id);
-    toast.success("הדגש נמחק");
-    fetchHighlights();
-  };
-
-  // Example photo handlers
+  // Reference photo handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -298,42 +254,58 @@ export default function CleaningParadesAdmin() {
     }
   };
 
-  const handleAddExample = async () => {
-    if (!exampleForm.description || !imageFile) {
-      toast.error("נא למלא תיאור ולבחור תמונה");
+  const handleAddPhoto = async () => {
+    if (!imageFile) {
+      toast.error("נא לבחור תמונה");
       return;
     }
 
     setIsUploading(true);
     try {
       const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${selectedOutpost}/${currentAreaIdForDialog}/${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `${selectedOutpost}/${crypto.randomUUID()}.${fileExt}`;
       
-      await supabase.storage.from('cleaning-examples').upload(fileName, imageFile);
+      const { error: uploadError } = await supabase.storage.from('cleaning-examples').upload(fileName, imageFile);
       
-      // 48 hours validity for example photos (reference content)
-      const { data: signedUrlData } = await supabase.storage
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Use signed URL with 1 year expiry for reference photos
+      const { data: signedUrlData, error: urlError } = await supabase.storage
         .from('cleaning-examples')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
 
-      const areaExamples = getExamplesForArea(currentAreaIdForDialog);
-      const maxOrder = areaExamples.length > 0 ? Math.max(...areaExamples.map(e => e.display_order)) : -1;
+      if (urlError || !signedUrlData?.signedUrl) {
+        console.error('URL error:', urlError);
+        throw urlError || new Error('Failed to get signed URL');
+      }
 
-      await supabase.from('cleaning_parade_examples').insert({
+      // Get count for display_order
+      const itemPhotos = referencePhotos.filter(p => p.checklist_item_id === selectedItemForPhoto?.id);
+
+      const { error: insertError } = await supabase.from('cleaning_reference_photos').insert({
         outpost: selectedOutpost,
-        area_id: currentAreaIdForDialog,
-        description: exampleForm.description,
-        image_url: signedUrlData?.signedUrl || '',
-        display_order: maxOrder + 1,
+        checklist_item_id: selectedItemForPhoto?.id || null,
+        description: photoForm.description || null,
+        image_url: signedUrlData.signedUrl,
+        display_order: itemPhotos.length,
       });
 
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw insertError;
+      }
+
       toast.success("התמונה נוספה בהצלחה");
-      setExampleDialogOpen(false);
-      setExampleForm({ description: "" });
+      setPhotoDialogOpen(false);
+      setPhotoForm({ description: "" });
       setImageFile(null);
       setImagePreview(null);
+      setSelectedItemForPhoto(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      fetchExamples();
+      fetchReferencePhotos();
     } catch (error) {
       toast.error("שגיאה בהוספת התמונה");
     } finally {
@@ -341,34 +313,32 @@ export default function CleaningParadesAdmin() {
     }
   };
 
-  const handleDeleteExample = async (id: string) => {
+  const handleDeletePhoto = async (id: string) => {
     if (!confirm("האם למחוק את התמונה?")) return;
-    await supabase.from('cleaning_parade_examples').delete().eq('id', id);
+    await supabase.from('cleaning_reference_photos').delete().eq('id', id);
     toast.success("התמונה נמחקה");
-    fetchExamples();
+    fetchReferencePhotos();
   };
 
-  // Day assignment handlers
-  const handleAssignSoldierToDay = async () => {
-    if (!selectedSoldierId || !currentAreaIdForDialog || !selectedDayForAssignment) {
-      toast.error("יש לבחור חייל ויום");
+  // Manual assignment handlers
+  const handleAssignSoldier = async () => {
+    if (!selectedSoldierId) {
+      toast.error("יש לבחור חייל");
       return;
     }
 
     try {
       const weekStartDate = format(currentWeekStart, 'yyyy-MM-dd');
       
-      // Delete existing assignment for this area+day
       await supabase
-        .from('cleaning_weekly_assignments')
+        .from('cleaning_manual_assignments')
         .delete()
-        .eq('area_id', currentAreaIdForDialog)
+        .eq('outpost', selectedOutpost)
         .eq('day_of_week', selectedDayForAssignment)
         .eq('week_start_date', weekStartDate);
       
-      // Insert new assignment
-      await supabase.from('cleaning_weekly_assignments').insert({
-        area_id: currentAreaIdForDialog,
+      await supabase.from('cleaning_manual_assignments').insert({
+        outpost: selectedOutpost,
         soldier_id: selectedSoldierId,
         week_start_date: weekStartDate,
         day_of_week: selectedDayForAssignment,
@@ -377,10 +347,30 @@ export default function CleaningParadesAdmin() {
       toast.success("החייל שובץ בהצלחה");
       setAssignmentDialogOpen(false);
       setSelectedSoldierId("");
-      fetchDayAssignments();
+      fetchAssignmentData();
     } catch (error) {
       toast.error("שגיאה בשיבוץ החייל");
     }
+  };
+
+  const handleClearAssignment = async (dayValue: string) => {
+    const weekStartDate = format(currentWeekStart, 'yyyy-MM-dd');
+    await supabase
+      .from('cleaning_manual_assignments')
+      .delete()
+      .eq('outpost', selectedOutpost)
+      .eq('day_of_week', dayValue)
+      .eq('week_start_date', weekStartDate);
+    toast.success("השיבוץ הידני נמחק");
+    fetchAssignmentData();
+  };
+
+  const getItemPhotoCount = (itemId: string) => {
+    return referencePhotos.filter(p => p.checklist_item_id === itemId).length;
+  };
+
+  const getGeneralPhotos = () => {
+    return referencePhotos.filter(p => !p.checklist_item_id);
   };
 
   if (roleLoading || loading) {
@@ -402,7 +392,7 @@ export default function CleaningParadesAdmin() {
           <PageHeader
             icon={Settings}
             title="ניהול מסדרי ניקיון"
-            subtitle="ניהול תחומי אחריות, דגשים, תמונות ושיבוץ חיילים"
+            subtitle="צ'קליסט, תמונות ושיבוצים"
             badge="ניהול"
           />
 
@@ -411,12 +401,9 @@ export default function CleaningParadesAdmin() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <MapPin className="w-5 h-5 text-primary" />
-                <Label className="font-bold">בחר מוצב:</Label>
-                <Select value={selectedOutpost} onValueChange={(value) => {
-                  setSelectedOutpost(value);
-                  setExpandedAreaId("");
-                }}>
-                  <SelectTrigger className="flex-1">
+                <Label className="font-bold">מוצב:</Label>
+                <Select value={selectedOutpost} onValueChange={setSelectedOutpost}>
+                  <SelectTrigger className="flex-1 bg-white text-slate-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -429,412 +416,418 @@ export default function CleaningParadesAdmin() {
             </CardContent>
           </Card>
 
-          {/* Week Navigation */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  שבוע שיבוץ
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, -1))}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm font-medium min-w-[120px] text-center">
-                    {format(currentWeekStart, 'dd/MM/yyyy', { locale: he })}
-                  </span>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="checklist" className="gap-1">
+                <ListChecks className="w-4 h-4" />
+                צ'קליסט
+              </TabsTrigger>
+              <TabsTrigger value="photos" className="gap-1">
+                <Image className="w-4 h-4" />
+                תמונות
+              </TabsTrigger>
+              <TabsTrigger value="assignments" className="gap-1">
+                <Users className="w-4 h-4" />
+                שיבוצים
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Day-based Assignments */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="w-5 h-5 text-primary" />
-                שיבוץ חיילים לפי יום ותחום אחריות
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {areas.length === 0 ? (
-                <p className="text-center text-slate-500 py-4">אין תחומי אחריות - הוסף תחום חדש למטה</p>
-              ) : (
-                <div className="space-y-4">
-                  {areas.map((area) => (
-                    <div key={area.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <h4 className="font-bold text-slate-800 mb-3">{area.area_name}</h4>
-                      <div className="grid grid-cols-1 gap-2">
-                        {DAY_OPTIONS.map((day) => {
-                          const assignment = getAssignmentForAreaAndDay(area.id, day.value);
-                          return (
-                            <div key={day.value} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100">
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-slate-600 min-w-[80px]">{day.label}</span>
-                                {assignment?.soldier ? (
-                                  <span className="text-sm text-emerald-600 font-medium">{assignment.soldier.full_name}</span>
-                                ) : (
-                                  <span className="text-sm text-slate-400">לא שובץ</span>
-                                )}
+            {/* Checklist Tab */}
+            <TabsContent value="checklist" className="space-y-4">
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ListChecks className="w-5 h-5 text-primary" />
+                      פריטי צ'קליסט ({checklistItems.length})
+                    </CardTitle>
+                    <Button size="sm" onClick={() => {
+                      setEditingItem(null);
+                      setItemForm({ item_name: "" });
+                      setItemDialogOpen(true);
+                    }}>
+                      <Plus className="w-4 h-4 ml-1" />
+                      הוסף
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {checklistItems.length === 0 ? (
+                    <p className="text-center text-slate-500 py-4">אין פריטים - הוסף פריט חדש</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {checklistItems.map((item, index) => {
+                        const photoCount = getItemPhotoCount(item.id);
+                        return (
+                          <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="w-7 h-7 flex items-center justify-center bg-primary/10 text-primary text-sm font-bold rounded-lg shrink-0">
+                                {index + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-slate-800 block truncate">{item.item_name}</span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Camera className="w-3 h-3 text-slate-400" />
+                                  <span className="text-xs text-slate-500">{photoCount} תמונות</span>
+                                </div>
                               </div>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
                               <Button 
-                                variant="outline" 
+                                variant="ghost" 
                                 size="sm"
+                                className="h-8 px-2"
                                 onClick={() => {
-                                  setCurrentAreaIdForDialog(area.id);
-                                  setSelectedDayForAssignment(day.value);
-                                  setSelectedSoldierId(assignment?.soldier_id || "");
-                                  setAssignmentDialogOpen(true);
+                                  setSelectedItemForPhoto(item);
+                                  setPhotoForm({ description: "" });
+                                  setImageFile(null);
+                                  setImagePreview(null);
+                                  setPhotoDialogOpen(true);
                                 }}
                               >
-                                <Users className="w-4 h-4 ml-1" />
-                                שבץ
+                                <Camera className="w-4 h-4 text-purple-500" />
                               </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Responsibility Areas with nested Highlights & Images */}
-          <Card className="border-slate-200/60 shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ListChecks className="w-5 h-5 text-primary" />
-                  תחומי אחריות - דגשים ותמונות
-                </CardTitle>
-                <Button 
-                  size="sm"
-                  onClick={() => {
-                    setEditingArea(null);
-                    setAreaForm({ area_name: "", description: "", display_order: 0 });
-                    setAreaDialogOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 ml-1" />
-                  הוסף תחום
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {areas.length === 0 ? (
-                <p className="text-center text-slate-500 py-4">אין תחומי אחריות למוצב זה</p>
-              ) : (
-                <Accordion type="single" collapsible value={expandedAreaId} onValueChange={setExpandedAreaId}>
-                  {areas.map((area) => {
-                    const areaHighlights = getHighlightsForArea(area.id);
-                    const areaExamples = getExamplesForArea(area.id);
-                    
-                    return (
-                      <AccordionItem key={area.id} value={area.id} className="border rounded-xl mb-3 overflow-hidden">
-                        <AccordionTrigger className="px-4 py-3 hover:no-underline bg-slate-50">
-                          <div className="flex items-center justify-between flex-1 ml-2">
-                            <span className="font-bold text-slate-800">{area.area_name}</span>
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full">{areaHighlights.length} דגשים</span>
-                              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{areaExamples.length} תמונות</span>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                setEditingItem(item);
+                                setItemForm({ item_name: item.item_name });
+                                setItemDialogOpen(true);
+                              }}>
+                                <Edit className="w-4 h-4 text-slate-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteItem(item.id)}>
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
                             </div>
                           </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-4">
-                          <div className="space-y-4">
-                            {/* Area Actions */}
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingArea(area);
-                                  setAreaForm({ 
-                                    area_name: area.area_name, 
-                                    description: area.description || "", 
-                                    display_order: area.display_order 
-                                  });
-                                  setAreaDialogOpen(true);
-                                }}
-                              >
-                                <Edit className="w-4 h-4 ml-1" />
-                                ערוך
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 border-red-200 hover:bg-red-50"
-                                onClick={() => handleDeleteArea(area.id)}
-                              >
-                                <Trash2 className="w-4 h-4 ml-1" />
-                                מחק
-                              </Button>
-                            </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                            {area.description && (
-                              <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">{area.description}</p>
-                            )}
-
-                            {/* Highlights Section */}
-                            <div className="border-t pt-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <h5 className="font-medium text-slate-700 flex items-center gap-2">
-                                  <ListChecks className="w-4 h-4 text-amber-500" />
-                                  דגשים
-                                </h5>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setCurrentAreaIdForDialog(area.id);
-                                    setEditingHighlight(null);
-                                    setHighlightForm({ title: "" });
-                                    setHighlightDialogOpen(true);
-                                  }}
-                                >
-                                  <Plus className="w-4 h-4 ml-1" />
-                                  הוסף דגש
-                                </Button>
-                              </div>
-                              {areaHighlights.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-2">אין דגשים לתחום זה</p>
-                              ) : (
-                                <ul className="space-y-2">
-                                  {areaHighlights.map((highlight, index) => (
-                                    <li key={highlight.id} className="flex items-center justify-between p-2 bg-amber-50 rounded-lg border border-amber-200">
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs flex items-center justify-center font-bold">
-                                          {index + 1}
-                                        </span>
-                                        <span className="text-sm text-amber-800">{highlight.title}</span>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 text-slate-500 hover:text-blue-600"
-                                          onClick={() => {
-                                            setCurrentAreaIdForDialog(area.id);
-                                            setEditingHighlight(highlight);
-                                            setHighlightForm({ title: highlight.title });
-                                            setHighlightDialogOpen(true);
-                                          }}
-                                        >
-                                          <Edit className="w-3 h-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 text-slate-500 hover:text-red-600"
-                                          onClick={() => handleDeleteHighlight(highlight.id)}
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </div>
-
-                            {/* Example Images Section */}
-                            <div className="border-t pt-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <h5 className="font-medium text-slate-700 flex items-center gap-2">
-                                  <Image className="w-4 h-4 text-blue-500" />
-                                  תמונות להמחשה
-                                </h5>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setCurrentAreaIdForDialog(area.id);
-                                    setExampleForm({ description: "" });
-                                    setImageFile(null);
-                                    setImagePreview(null);
-                                    setExampleDialogOpen(true);
-                                  }}
-                                >
-                                  <Plus className="w-4 h-4 ml-1" />
-                                  הוסף תמונה
-                                </Button>
-                              </div>
-                              {areaExamples.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-2">אין תמונות לתחום זה</p>
-                              ) : (
-                                <div className="grid grid-cols-2 gap-3">
-                                  {areaExamples.map((example) => (
-                                    <div key={example.id} className="relative group rounded-xl overflow-hidden border border-slate-200">
-                                      <img src={example.image_url} alt={example.description} className="w-full h-24 object-cover" />
-                                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-white hover:text-red-400 hover:bg-transparent"
-                                          onClick={() => handleDeleteExample(example.id)}
-                                        >
-                                          <Trash2 className="w-5 h-5" />
-                                        </Button>
-                                      </div>
-                                      <p className="text-xs text-slate-600 p-2 bg-slate-50 truncate">{example.description}</p>
-                                    </div>
-                                  ))}
+            {/* Photos Tab */}
+            <TabsContent value="photos" className="space-y-4">
+              {/* Photos grouped by item */}
+              {checklistItems.map((item) => {
+                const itemPhotos = referencePhotos.filter(p => p.checklist_item_id === item.id);
+                
+                return (
+                  <Card key={item.id} className="border-slate-200/60 shadow-lg">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Layers className="w-4 h-4 text-purple-500" />
+                          {item.item_name}
+                          <Badge variant="outline" className="text-xs">{itemPhotos.length}</Badge>
+                        </CardTitle>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setSelectedItemForPhoto(item);
+                          setPhotoForm({ description: "" });
+                          setImageFile(null);
+                          setImagePreview(null);
+                          setPhotoDialogOpen(true);
+                        }}>
+                          <Plus className="w-3 h-3 ml-1" />
+                          תמונה
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      {itemPhotos.length === 0 ? (
+                        <p className="text-center text-slate-400 text-sm py-2">אין תמונות</p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2">
+                          {itemPhotos.map((photo) => (
+                            <div key={photo.id} className="relative group">
+                              <img 
+                                src={photo.image_url} 
+                                alt={photo.description || ''}
+                                className="w-full aspect-square object-cover rounded-lg border border-slate-200"
+                              />
+                              {photo.description && (
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 rounded-b-lg">
+                                  <p className="text-white text-[10px] truncate">{photo.description}</p>
                                 </div>
                               )}
+                              <Button 
+                                variant="destructive" 
+                                size="icon"
+                                className="absolute top-1 left-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleDeletePhoto(photo.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
                             </div>
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    );
-                  })}
-                </Accordion>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Area Dialog */}
-          <Dialog open={areaDialogOpen} onOpenChange={setAreaDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingArea ? "עריכת תחום אחריות" : "הוספת תחום אחריות"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>שם התחום</Label>
-                  <Input 
-                    value={areaForm.area_name} 
-                    onChange={(e) => setAreaForm(prev => ({ ...prev, area_name: e.target.value }))} 
-                    placeholder="לדוגמא: פינה ימנית" 
-                  />
-                </div>
-                <div>
-                  <Label>תיאור (אופציונלי)</Label>
-                  <Input 
-                    value={areaForm.description} 
-                    onChange={(e) => setAreaForm(prev => ({ ...prev, description: e.target.value }))} 
-                    placeholder="תיאור מפורט של התחום" 
-                  />
-                </div>
-                <Button className="w-full" onClick={handleSaveArea} disabled={!areaForm.area_name}>
-                  {editingArea ? "עדכן" : "הוסף"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Highlight Dialog */}
-          <Dialog open={highlightDialogOpen} onOpenChange={setHighlightDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingHighlight ? "עריכת דגש" : "הוספת דגש"}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>כותרת הדגש</Label>
-                  <Input 
-                    value={highlightForm.title} 
-                    onChange={(e) => setHighlightForm({ title: e.target.value })} 
-                    placeholder="לדוגמא: ניקיון המקרר" 
-                  />
-                </div>
-                <Button className="w-full" onClick={handleSaveHighlight} disabled={!highlightForm.title}>
-                  {editingHighlight ? "עדכן" : "הוסף"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Example Image Dialog */}
-          <Dialog open={exampleDialogOpen} onOpenChange={setExampleDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>הוספת תמונה להמחשה</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>תיאור התמונה</Label>
-                  <Input 
-                    value={exampleForm.description} 
-                    onChange={(e) => setExampleForm({ description: e.target.value })} 
-                    placeholder="לדוגמא: מקרר נקי ומסודר" 
-                  />
-                </div>
-                <div>
-                  <Label>בחר תמונה</Label>
-                  <Input 
-                    ref={fileInputRef}
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleFileChange}
-                  />
-                  {imagePreview && (
-                    <img src={imagePreview} alt="Preview" className="mt-2 w-full h-32 object-cover rounded-lg" />
-                  )}
-                </div>
-                <Button 
-                  className="w-full" 
-                  onClick={handleAddExample}
-                  disabled={!exampleForm.description || !imageFile || isUploading}
-                >
-                  {isUploading ? "מעלה..." : "העלה תמונה"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Assignment Dialog - Day-based */}
-          <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>שיבוץ חייל ליום</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="p-3 bg-slate-50 rounded-lg text-center">
-                  <p className="text-sm text-slate-600">
-                    שבוע: <strong>{format(currentWeekStart, 'dd/MM/yyyy', { locale: he })}</strong>
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    יום: <strong>{DAY_OPTIONS.find(d => d.value === selectedDayForAssignment)?.label}</strong>
-                  </p>
-                </div>
-                <div>
-                  <Label>בחר חייל</Label>
-                  <Select value={selectedSoldierId} onValueChange={setSelectedSoldierId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר חייל" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getSoldiersForOutpost().map((soldier) => (
-                        <SelectItem key={soldier.id} value={soldier.id}>
-                          {soldier.full_name} ({soldier.personal_number})
-                        </SelectItem>
-                      ))}
-                      {getSoldiersForOutpost().length === 0 && (
-                        <div className="p-2 text-sm text-slate-500 text-center">
-                          אין חיילים במוצב זה - הוסף חיילים דרך ניהול חיילים
+                          ))}
                         </div>
                       )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button 
-                  className="w-full" 
-                  onClick={handleAssignSoldierToDay}
-                  disabled={!selectedSoldierId}
-                >
-                  שבץ חייל
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {/* General photos (not linked to item) */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Image className="w-4 h-4 text-primary" />
+                      תמונות כלליות למוצב
+                      <Badge variant="outline" className="text-xs">{getGeneralPhotos().length}</Badge>
+                    </CardTitle>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setSelectedItemForPhoto(null);
+                      setPhotoForm({ description: "" });
+                      setImageFile(null);
+                      setImagePreview(null);
+                      setPhotoDialogOpen(true);
+                    }}>
+                      <Plus className="w-3 h-3 ml-1" />
+                      תמונה
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {getGeneralPhotos().length === 0 ? (
+                    <p className="text-center text-slate-400 text-sm py-2">אין תמונות כלליות</p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {getGeneralPhotos().map((photo) => (
+                        <div key={photo.id} className="relative group">
+                          <img 
+                            src={photo.image_url} 
+                            alt={photo.description || ''}
+                            className="w-full aspect-square object-cover rounded-lg border border-slate-200"
+                          />
+                          {photo.description && (
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 rounded-b-lg">
+                              <p className="text-white text-[10px] truncate">{photo.description}</p>
+                            </div>
+                          )}
+                          <Button 
+                            variant="destructive" 
+                            size="icon"
+                            className="absolute top-1 left-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleDeletePhoto(photo.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Assignments Tab */}
+            <TabsContent value="assignments" className="space-y-4">
+              {/* Week Navigation */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, -1))}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                    <div className="text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Calendar className="w-4 h-4 text-primary" />
+                        <span className="font-bold">
+                          {format(currentWeekStart, 'd/M', { locale: he })} - {format(addDays(currentWeekStart, 6), 'd/M', { locale: he })}
+                        </span>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Assignments Grid */}
+              <Card className="border-slate-200/60 shadow-lg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Users className="w-5 h-5 text-primary" />
+                    שיבוצים שבועיים
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
+                  {DAY_OPTIONS.map((day) => {
+                    const soldier = getResponsibleSoldier(day.value);
+                    const isManual = manualAssignments.some(a => a.day_of_week === day.value);
+                    
+                    return (
+                      <div 
+                        key={day.value}
+                        className={cn(
+                          "p-4 rounded-xl border-2 transition-all",
+                          soldier ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800">{day.label}</p>
+                            {soldier ? (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-sm text-emerald-700">{soldier.full_name}</span>
+                                {isManual && (
+                                  <Badge variant="outline" className="text-[10px] border-purple-200 text-purple-600">
+                                    ידני
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-slate-500">לא משובץ</span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedDayForAssignment(day.value);
+                                setSelectedSoldierId(soldier?.id || "");
+                                setAssignmentDialogOpen(true);
+                              }}
+                            >
+                              {soldier ? "שנה" : "שבץ"}
+                            </Button>
+                            {isManual && (
+                              <Button 
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleClearAssignment(day.value)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
+      {/* Item Dialog */}
+      <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "עריכת פריט" : "הוספת פריט"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>שם הפריט</Label>
+              <Input
+                value={itemForm.item_name}
+                onChange={(e) => setItemForm({ item_name: e.target.value })}
+                placeholder="לדוגמה: ניקיון רצפה"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemDialogOpen(false)}>ביטול</Button>
+            <Button onClick={handleSaveItem}>שמור</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Dialog */}
+      <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              הוספת תמונה {selectedItemForPhoto ? `ל"${selectedItemForPhoto.item_name}"` : "כללית"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>תמונה</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button 
+                variant="outline" 
+                className="w-full mt-1 h-32 border-dashed"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Preview" className="h-full object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-500">
+                    <Camera className="w-8 h-8" />
+                    <span>בחר תמונה</span>
+                  </div>
+                )}
+              </Button>
+            </div>
+            <div>
+              <Label>תיאור (אופציונלי)</Label>
+              <Input
+                value={photoForm.description}
+                onChange={(e) => setPhotoForm({ description: e.target.value })}
+                placeholder="לדוגמה: כך צריך להיראות הרצפה"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPhotoDialogOpen(false)}>ביטול</Button>
+            <Button onClick={handleAddPhoto} disabled={isUploading}>
+              {isUploading ? "מעלה..." : "הוסף"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignment Dialog */}
+      <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>שיבוץ חייל - {DAY_OPTIONS.find(d => d.value === selectedDayForAssignment)?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>בחר חייל</Label>
+              <Select value={selectedSoldierId} onValueChange={setSelectedSoldierId}>
+                <SelectTrigger className="mt-1 bg-white text-slate-800">
+                  <SelectValue placeholder="בחר חייל..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {soldiers.map(soldier => (
+                    <SelectItem key={soldier.id} value={soldier.id}>{soldier.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignmentDialogOpen(false)}>ביטול</Button>
+            <Button onClick={handleAssignSoldier}>שבץ</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
