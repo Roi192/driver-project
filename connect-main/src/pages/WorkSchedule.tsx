@@ -176,15 +176,15 @@ export default function WorkSchedule() {
     setSaving(true);
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
     
-    const entries = Object.values(schedule).filter(entry => 
-      entry.morning_soldier_id || entry.afternoon_soldier_id || entry.evening_soldier_id
-    );
+    // Include ALL entries - even those with all null values (to allow clearing assignments)
+    const entries = Object.values(schedule);
 
     try {
       for (const entry of entries) {
         const { id, ...data } = entry;
         
         if (id) {
+          // Existing record - update it (even if all values are null)
           const { error } = await supabase
             .from('work_schedule')
             .update({
@@ -195,7 +195,8 @@ export default function WorkSchedule() {
             .eq('id', id);
           
           if (error) throw error;
-        } else {
+        } else if (data.morning_soldier_id || data.afternoon_soldier_id || data.evening_soldier_id) {
+          // Only insert new records if they have at least one assignment
           const { error } = await supabase
             .from('work_schedule')
             .upsert({
