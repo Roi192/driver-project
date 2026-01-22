@@ -71,10 +71,11 @@ export function MediaUpload({
         throw uploadError;
       }
 
-      // Use signed URL for private bucket access
+      // Use signed URL for private bucket access (48 hours validity for security)
+      // Shorter validity reduces risk if URL is shared/leaked
       const { data: signedUrlData, error: signedError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year validity
+        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
 
       if (signedError || !signedUrlData?.signedUrl) {
         throw signedError || new Error('Failed to generate signed URL');

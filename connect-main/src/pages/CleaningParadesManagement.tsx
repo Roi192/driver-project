@@ -100,10 +100,11 @@ export default function CleaningParadesManagement() {
 
       if (uploadError) throw uploadError;
 
-      // Get signed URL for secure access (1 year validity)
+      // Get signed URL for secure access (48 hours validity for security)
+      // Shorter validity reduces risk if URL is shared/leaked
       const { data: signedUrlData, error: signedError } = await supabase.storage
         .from('cleaning-examples')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
 
       if (signedError || !signedUrlData?.signedUrl) {
         throw signedError || new Error('Failed to generate signed URL');

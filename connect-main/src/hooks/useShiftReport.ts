@@ -82,10 +82,11 @@ export function useShiftReport() {
         return null;
       }
 
-      // Create a signed URL valid for 1 year (31536000 seconds) for private bucket access
+      // Create a signed URL valid for 7 days (604800 seconds) for private bucket access
+      // Shorter validity reduces risk if URL is shared/leaked
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("shift-photos")
-        .createSignedUrl(fileName, 31536000);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 7);
 
       if (signedUrlError || !signedUrlData?.signedUrl) {
         console.error("Signed URL error:", signedUrlError);

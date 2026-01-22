@@ -243,9 +243,10 @@ export default function CleaningParades() {
       
       await supabase.storage.from('cleaning-parades').upload(fileName, file, { contentType: file.type || 'image/jpeg' });
 
+      // 7 days validity for operational cleaning parade photos
       const { data: signedUrlData } = await supabase.storage
         .from('cleaning-parades')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 7);
 
       setPhotoUrl(signedUrlData?.signedUrl || null);
       toast.success("התמונה הועלתה בהצלחה");

@@ -311,9 +311,10 @@ export default function CleaningParadesAdmin() {
       
       await supabase.storage.from('cleaning-examples').upload(fileName, imageFile);
       
+      // 48 hours validity for example photos (reference content)
       const { data: signedUrlData } = await supabase.storage
         .from('cleaning-examples')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 365);
+        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
 
       const areaExamples = getExamplesForArea(currentAreaIdForDialog);
       const maxOrder = areaExamples.length > 0 ? Math.max(...areaExamples.map(e => e.display_order)) : -1;
