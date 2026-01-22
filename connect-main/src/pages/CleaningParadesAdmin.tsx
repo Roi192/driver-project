@@ -262,8 +262,10 @@ export default function CleaningParadesAdmin() {
 
     setIsUploading(true);
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${selectedOutpost}/${crypto.randomUUID()}.${fileExt}`;
+      const fileExt = imageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+      // Use only alphanumeric characters for folder name to avoid Supabase storage issues
+      const sanitizedOutpost = selectedOutpost.replace(/[^a-zA-Z0-9]/g, '') || 'outpost';
+      const fileName = `${sanitizedOutpost}/${crypto.randomUUID()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage.from('cleaning-examples').upload(fileName, imageFile);
       
