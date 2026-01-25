@@ -21,6 +21,7 @@ import { ProcedureSignaturesCard } from '@/components/admin/ProcedureSignaturesC
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
 import { CleaningParadeCards } from '@/components/commander/CleaningParadeCards';
 import { TripFormsCard } from '@/components/commander/TripFormsCard';
+import { CleaningParadeSummary } from '@/components/commander/CleaningParadeSummary';
 
 import unitLogo from '@/assets/unit-logo.png';
 import { toast } from 'sonner';
@@ -347,6 +348,11 @@ export default function AdminDashboard() {
           {/* Cleaning Parade Cards */}
           <div className="animate-slide-up" style={{ animationDelay: '0.15s' }}>
             <CleaningParadeCards />
+          </div>
+
+          {/* Cleaning Parade Summary */}
+          <div className="animate-slide-up" style={{ animationDelay: '0.16s' }}>
+            <CleaningParadeSummary />
           </div>
 
           {/* Trip Forms Card */}

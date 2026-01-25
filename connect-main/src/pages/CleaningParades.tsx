@@ -10,17 +10,27 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { format, startOfWeek, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { OUTPOSTS } from "@/lib/constants";
 import { useSearchParams } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const DAY_OPTIONS = [
-  { value: "monday", label: "יום שני", dayOfWeek: 1, sourceDay: 0, sourceShift: "afternoon" },
-  { value: "wednesday", label: "יום רביעי", dayOfWeek: 3, sourceDay: 2, sourceShift: "afternoon" },
-  { value: "saturday_night", label: "מוצאי שבת", dayOfWeek: 6, sourceDay: 6, sourceShift: "morning" },
-];
+// Day labels for display
+const DAY_LABELS: Record<number, string> = {
+  0: "ראשון",
+  1: "שני",
+  2: "שלישי",
+  3: "רביעי",
+  4: "חמישי",
+  5: "שישי",
+  6: "שבת"
+};
+
+// Dynamic day config interface
+interface DayConfig {
+  paradeDay: number;
+  label: string;
+  outpost: string;
+}
 
 interface ChecklistItem {
   id: string;
@@ -44,6 +54,14 @@ interface ChecklistCompletion {
 
 type Step = "weekly-view" | "checklist" | "completed";
 
+// Assignment for weekly view
+interface WeeklyAssignment {
+  paradeDay: number;
+  outpost: string;
+  isCompleted: boolean;
+  date: Date;
+}
+
 export default function CleaningParades() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -53,10 +71,10 @@ export default function CleaningParades() {
   
   // Selection
   const [selectedOutpost, setSelectedOutpost] = useState<string>("");
-  const [selectedDay, setSelectedDay] = useState<typeof DAY_OPTIONS[number] | null>(null);
+  const [selectedParadeDay, setSelectedParadeDay] = useState<number | null>(null);
   
-  // Weekly assignments
-  const [weeklyAssignments, setWeeklyAssignments] = useState<Map<string, { outpost: string; isCompleted: boolean }>>(new Map());
+  // Weekly assignments - dynamic based on actual assignments
+  const [weeklyAssignments, setWeeklyAssignments] = useState<WeeklyAssignment[]>([]);
   
   // Checklist data
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
@@ -85,14 +103,15 @@ export default function CleaningParades() {
 
   useEffect(() => {
     // Handle URL params for direct navigation
-    const dayParam = searchParams.get('day');
+    const paradeDayParam = searchParams.get('paradeDay');
     const outpostParam = searchParams.get('outpost');
-    if (dayParam && outpostParam && soldierId) {
-      const day = DAY_OPTIONS.find(d => d.value === dayParam);
-      if (day) {
-        setSelectedDay(day);
+    
+    if (outpostParam && soldierId && paradeDayParam) {
+      const paradeDayNum = parseInt(paradeDayParam);
+      if (!isNaN(paradeDayNum)) {
+        setSelectedParadeDay(paradeDayNum);
         setSelectedOutpost(outpostParam);
-        startParade(day, outpostParam);
+        startParade(paradeDayNum, outpostParam);
       }
     }
   }, [searchParams, soldierId]);
@@ -138,15 +157,13 @@ export default function CleaningParades() {
       // Get work schedule
       const { data: workSchedule } = await supabase
         .from('work_schedule')
-        .select('outpost, day_of_week, afternoon_soldier_id, morning_soldier_id')
+        .select('outpost, day_of_week, morning_soldier_id, afternoon_soldier_id, evening_soldier_id')
         .eq('week_start_date', weekStartStr);
 
-      // Get manual assignments
-      const { data: manualAssignments } = await supabase
-        .from('cleaning_manual_assignments')
-        .select('outpost, day_of_week')
-        .eq('soldier_id', sid)
-        .eq('week_start_date', weekStartStr);
+      // Get item assignments - this tells us which parade days have items assigned to this soldier
+      const { data: itemAssignments } = await supabase
+        .from('cleaning_item_assignments')
+        .select('parade_day, outpost, shift_type, manual_soldier_id');
 
       // Get submissions
       const { data: submissions } = await supabase
@@ -155,69 +172,111 @@ export default function CleaningParades() {
         .eq('soldier_id', sid)
         .gte('parade_date', weekStartStr);
 
-      const assignments = new Map<string, { outpost: string; isCompleted: boolean }>();
-
-      for (const dayConfig of DAY_OPTIONS) {
-        let outpost: string | null = null;
-
-        // Check manual first
-        const manual = manualAssignments?.find(m => m.day_of_week === dayConfig.value);
-        if (manual) {
-          outpost = manual.outpost;
-        } else {
-          // Check work schedule
-          const scheduleEntries = workSchedule?.filter(ws => ws.day_of_week === dayConfig.sourceDay) || [];
-          for (const entry of scheduleEntries) {
-            const assignedSoldierId = dayConfig.sourceShift === "afternoon" 
-              ? entry.afternoon_soldier_id 
-              : entry.morning_soldier_id;
-            if (assignedSoldierId === sid) {
-              outpost = entry.outpost;
-              break;
+      // Build a map of parade days where this soldier has assignments
+      const assignmentMap = new Map<string, { paradeDay: number; outpost: string }>();
+      
+      if (itemAssignments) {
+        for (const assignment of itemAssignments) {
+          let isMyTask = false;
+          
+          // Check if manual assignment
+          if (assignment.shift_type?.startsWith("manual-")) {
+            const manualSoldierId = assignment.shift_type.replace("manual-", "");
+            if (manualSoldierId === sid) isMyTask = true;
+          } else if (assignment.shift_type) {
+            // Schedule-based: parse "day-shift" format
+            const [sourceDayStr, sourceShift] = assignment.shift_type.split("-");
+            const sourceDay = parseInt(sourceDayStr);
+            
+            if (!isNaN(sourceDay) && sourceShift) {
+              const scheduleEntry = workSchedule?.find(s => 
+                s.day_of_week === sourceDay && s.outpost === assignment.outpost
+              );
+              if (scheduleEntry) {
+                let shiftSoldierId: string | null = null;
+                if (sourceShift === "morning") shiftSoldierId = scheduleEntry.morning_soldier_id;
+                else if (sourceShift === "afternoon") shiftSoldierId = scheduleEntry.afternoon_soldier_id;
+                else if (sourceShift === "evening") shiftSoldierId = scheduleEntry.evening_soldier_id;
+                
+                if (shiftSoldierId === sid) isMyTask = true;
+              }
+            }
+          }
+          
+          // Also check additional soldier
+          if (assignment.manual_soldier_id === sid) isMyTask = true;
+          
+          if (isMyTask) {
+            const key = `${assignment.parade_day}-${assignment.outpost}`;
+            if (!assignmentMap.has(key)) {
+              assignmentMap.set(key, {
+                paradeDay: assignment.parade_day,
+                outpost: assignment.outpost
+              });
             }
           }
         }
-
-        if (outpost) {
-          const submission = submissions?.find(s => 
-            s.day_of_week === dayConfig.value && s.outpost === outpost
-          );
-          assignments.set(dayConfig.value, {
-            outpost,
-            isCompleted: submission?.is_completed || false
-          });
-        }
       }
 
-      setWeeklyAssignments(assignments);
+      // Convert to array with completion status
+      const assignmentsList: WeeklyAssignment[] = [];
+      for (const [key, assignment] of assignmentMap) {
+        const submission = submissions?.find(s => 
+          s.outpost === assignment.outpost
+        );
+        
+        // Calculate date for this parade day
+        const date = addDays(currentWeekStart, assignment.paradeDay);
+        
+        assignmentsList.push({
+          paradeDay: assignment.paradeDay,
+          outpost: assignment.outpost,
+          isCompleted: submission?.is_completed || false,
+          date
+        });
+      }
+
+      // Sort by parade day
+      assignmentsList.sort((a, b) => a.paradeDay - b.paradeDay);
+      
+      setWeeklyAssignments(assignmentsList);
     } catch (error) {
       console.error('Error loading weekly assignments:', error);
     }
   };
 
-  const startParade = async (day?: typeof DAY_OPTIONS[number], outpost?: string) => {
-    const useDay = day || selectedDay;
+  const startParade = async (paradeDay?: number, outpost?: string) => {
+    const useParadeDay = paradeDay ?? selectedParadeDay;
     const useOutpost = outpost || selectedOutpost;
     
-    if (!useOutpost || !soldierId || !useDay) {
+    if (!useOutpost || !soldierId || useParadeDay === null || useParadeDay === undefined) {
       toast.error("יש לבחור יום ומוצב");
       return;
     }
 
-    setSelectedDay(useDay);
+    // Validate that today is the parade day
+    const todayDayOfWeek = new Date().getDay();
+    const isFutureParade = useParadeDay > todayDayOfWeek;
+    
+    if (isFutureParade) {
+      toast.error(`ניתן למלא מסדר זה רק ביום ${DAY_LABELS[useParadeDay]}`);
+      return;
+    }
+
+    setSelectedParadeDay(useParadeDay);
     setSelectedOutpost(useOutpost);
     setLoading(true);
     
     try {
       // Check existing submission
-      const paradeDate = format(addDays(currentWeekStart, useDay.dayOfWeek), 'yyyy-MM-dd');
+      const paradeDate = format(addDays(currentWeekStart, useParadeDay), 'yyyy-MM-dd');
+      const dayValue = DAY_LABELS[useParadeDay]; // for storage
       
       const { data: existingSubmission } = await supabase
         .from('cleaning_parade_submissions')
         .select('id, is_completed')
         .eq('soldier_id', soldierId)
         .eq('outpost', useOutpost)
-        .eq('day_of_week', useDay.value)
         .eq('parade_date', paradeDate)
         .maybeSingle();
 
@@ -237,7 +296,7 @@ export default function CleaningParades() {
         setSubmissionId(existingSubmission.id);
         setIsCompleted(true);
         setCurrentStep("completed");
-        await fetchOutpostData(useOutpost);
+        await fetchOutpostData(useOutpost, useParadeDay);
         return;
       }
 
@@ -249,7 +308,7 @@ export default function CleaningParades() {
           .insert({
             soldier_id: soldierId,
             outpost: useOutpost,
-            day_of_week: useDay.value,
+            day_of_week: dayValue,
             parade_date: paradeDate,
           })
           .select('id')
@@ -275,7 +334,7 @@ export default function CleaningParades() {
       });
       setCompletions(completionsMap);
 
-      await fetchOutpostData(useOutpost);
+      await fetchOutpostData(useOutpost, useParadeDay);
       setCurrentStep("checklist");
     } catch (error) {
       console.error('Error starting parade:', error);
@@ -285,8 +344,9 @@ export default function CleaningParades() {
     }
   };
 
-  const fetchOutpostData = async (outpost: string) => {
-    const [itemsRes, photosRes] = await Promise.all([
+  const fetchOutpostData = async (outpost: string, paradeDay?: number) => {
+    // First, get all checklist items for the outpost
+    const [itemsRes, photosRes, assignmentsRes] = await Promise.all([
       supabase
         .from('cleaning_checklist_items')
         .select('id, item_name, item_order')
@@ -298,9 +358,70 @@ export default function CleaningParades() {
         .select('id, checklist_item_id, outpost, description, image_url')
         .eq('outpost', outpost)
         .order('display_order'),
+      // Get assignments for this soldier on this parade day
+      paradeDay !== undefined ? (supabase as any)
+        .from('cleaning_item_assignments')
+        .select('item_id, shift_type, manual_soldier_id')
+        .eq('outpost', outpost)
+        .eq('parade_day', paradeDay) : Promise.resolve({ data: null })
     ]);
 
-    setChecklistItems(itemsRes.data || []);
+    let filteredItems = itemsRes.data || [];
+    
+    // If we have assignments, filter to show only assigned items
+    if (assignmentsRes.data && assignmentsRes.data.length > 0 && soldierId) {
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      
+      // Get current work schedule
+      const { data: schedule } = await supabase
+        .from("work_schedule")
+        .select("outpost, day_of_week, morning_soldier_id, afternoon_soldier_id, evening_soldier_id")
+        .eq("week_start_date", weekStartStr)
+        .eq("outpost", outpost);
+
+      const myItemIds = new Set<string>();
+      
+      for (const assignment of assignmentsRes.data) {
+        let isMyTask = false;
+        
+        // Check if manual assignment
+        if (assignment.shift_type?.startsWith("manual-")) {
+          const manualSoldierId = assignment.shift_type.replace("manual-", "");
+          if (manualSoldierId === soldierId) isMyTask = true;
+        } else if (assignment.shift_type) {
+          // Schedule-based: parse "day-shift" format
+          const [sourceDayStr, sourceShift] = assignment.shift_type.split("-");
+          const sourceDay = parseInt(sourceDayStr);
+          
+          if (!isNaN(sourceDay) && sourceShift) {
+            const scheduleEntry = schedule?.find(s => s.day_of_week === sourceDay);
+            if (scheduleEntry) {
+              let shiftSoldierId: string | null = null;
+              if (sourceShift === "morning") shiftSoldierId = scheduleEntry.morning_soldier_id;
+              else if (sourceShift === "afternoon") shiftSoldierId = scheduleEntry.afternoon_soldier_id;
+              else if (sourceShift === "evening") shiftSoldierId = scheduleEntry.evening_soldier_id;
+              
+              if (shiftSoldierId === soldierId) isMyTask = true;
+            }
+          }
+        }
+        
+        // Also check additional soldier
+        if (assignment.manual_soldier_id === soldierId) isMyTask = true;
+        
+        if (isMyTask) {
+          myItemIds.add(assignment.item_id);
+        }
+      }
+      
+      // Filter to only my assigned items (or show all if no specific assignments)
+      if (myItemIds.size > 0) {
+        filteredItems = filteredItems.filter(item => myItemIds.has(item.id));
+      }
+    }
+
+    setChecklistItems(filteredItems);
     setReferencePhotos(photosRes.data || []);
   };
 
@@ -402,7 +523,7 @@ export default function CleaningParades() {
     setReferencePhotos([]);
     setSubmissionId(null);
     setIsCompleted(false);
-    setSelectedDay(null);
+    setSelectedParadeDay(null);
     setSelectedOutpost("");
   };
 
@@ -474,7 +595,7 @@ export default function CleaningParades() {
             title="מסדר ניקיון"
             subtitle={
               currentStep === "weekly-view" ? "המסדרים שלי השבוע" : 
-              currentStep === "checklist" ? `${selectedOutpost} - ${selectedDay?.label}` : 
+              currentStep === "checklist" ? `${selectedOutpost} - יום ${selectedParadeDay !== null ? DAY_LABELS[selectedParadeDay] : ''}` : 
               "המסדר הושלם"
             }
             badge={format(currentWeekStart, 'd/M', { locale: he }) + " - " + format(addDays(currentWeekStart, 6), 'd/M', { locale: he })}
@@ -513,39 +634,36 @@ export default function CleaningParades() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <div className="grid grid-cols-3 gap-3">
-                    {DAY_OPTIONS.map((day) => {
-                      const assignment = weeklyAssignments.get(day.value);
-                      const isToday = day.dayOfWeek === todayDayOfWeek;
-                      const isPast = day.dayOfWeek < todayDayOfWeek;
-                      const date = addDays(currentWeekStart, day.dayOfWeek);
+                  {weeklyAssignments.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {weeklyAssignments.map((assignment) => {
+                        const isToday = assignment.paradeDay === todayDayOfWeek;
+                        const isPast = assignment.paradeDay < todayDayOfWeek;
+                        const canFill = isToday || isPast;
 
-                      return (
-                        <button
-                          key={day.value}
-                          onClick={() => {
-                            if (assignment) {
-                              setSelectedDay(day);
-                              setSelectedOutpost(assignment.outpost);
-                              startParade(day, assignment.outpost);
-                            }
-                          }}
-                          disabled={!assignment}
-                          className={cn(
-                            "relative p-4 rounded-2xl border-2 transition-all duration-300 text-center",
-                            assignment?.isCompleted 
-                              ? "bg-emerald-50 border-emerald-300"
-                              : assignment && isToday
-                                ? "bg-purple-50 border-purple-400 shadow-lg ring-2 ring-purple-200"
-                                : assignment && isPast
-                                  ? "bg-red-50 border-red-200"
-                                  : assignment
-                                    ? "bg-white border-slate-200 hover:border-purple-300 hover:shadow-md"
-                                    : "bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed"
-                          )}
-                        >
-                          {/* Status Icon */}
-                          {assignment && (
+                        return (
+                          <button
+                            key={`${assignment.paradeDay}-${assignment.outpost}`}
+                            onClick={() => {
+                              if (canFill && !assignment.isCompleted) {
+                                setSelectedParadeDay(assignment.paradeDay);
+                                setSelectedOutpost(assignment.outpost);
+                                startParade(assignment.paradeDay, assignment.outpost);
+                              }
+                            }}
+                            disabled={!canFill || assignment.isCompleted}
+                            className={cn(
+                              "relative p-4 rounded-2xl border-2 transition-all duration-300 text-center",
+                              assignment.isCompleted 
+                                ? "bg-emerald-50 border-emerald-300"
+                                : isToday
+                                  ? "bg-purple-50 border-purple-400 shadow-lg ring-2 ring-purple-200"
+                                  : isPast
+                                    ? "bg-red-50 border-red-200"
+                                    : "bg-white border-slate-200 opacity-70"
+                            )}
+                          >
+                            {/* Status Icon */}
                             <div className="absolute -top-2 -left-2">
                               {assignment.isCompleted ? (
                                 <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
@@ -561,21 +679,19 @@ export default function CleaningParades() {
                                 </div>
                               ) : null}
                             </div>
-                          )}
 
-                          <p className={cn(
-                            "text-lg font-bold",
-                            assignment?.isCompleted ? "text-emerald-700" :
-                            isToday ? "text-purple-700" :
-                            isPast && assignment ? "text-red-600" : "text-slate-700"
-                          )}>
-                            {day.label.replace('יום ', '')}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {format(date, 'd/M', { locale: he })}
-                          </p>
+                            <p className={cn(
+                              "text-lg font-bold",
+                              assignment.isCompleted ? "text-emerald-700" :
+                              isToday ? "text-purple-700" :
+                              isPast ? "text-red-600" : "text-slate-700"
+                            )}>
+                              יום {DAY_LABELS[assignment.paradeDay]}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {format(assignment.date, 'd/M', { locale: he })}
+                            </p>
 
-                          {assignment ? (
                             <div className={cn(
                               "mt-3 px-2 py-1.5 rounded-lg",
                               assignment.isCompleted ? "bg-emerald-100" : "bg-slate-100"
@@ -587,67 +703,32 @@ export default function CleaningParades() {
                                 </span>
                               </div>
                             </div>
-                          ) : (
-                            <div className="mt-3 px-2 py-1.5 rounded-lg bg-slate-100">
-                              <span className="text-xs text-slate-400">לא משובץ</span>
-                            </div>
-                          )}
 
-                          {isToday && assignment && !assignment.isCompleted && (
-                            <Badge className="mt-2 bg-purple-500 text-white text-[10px]">
-                              היום!
-                            </Badge>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                            {isToday && !assignment.isCompleted && (
+                              <Badge className="mt-2 bg-purple-500 text-white text-[10px]">
+                                היום!
+                              </Badge>
+                            )}
+                            
+                            {!canFill && !assignment.isCompleted && (
+                              <p className="text-[10px] text-slate-400 mt-2">
+                                ניתן למלא ב{DAY_LABELS[assignment.paradeDay]}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500">אין מסדרים משובצים השבוע</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Manual Selection for unassigned */}
-              <Card className="border-slate-200/60 shadow-lg">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm text-slate-600">
-                    <MapPin className="w-4 h-4" />
-                    או בחר ידנית
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 space-y-3">
-                  <Select value={selectedOutpost} onValueChange={setSelectedOutpost}>
-                    <SelectTrigger className="bg-white text-slate-800">
-                      <SelectValue placeholder="בחר מוצב..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OUTPOSTS.map(outpost => (
-                        <SelectItem key={outpost} value={outpost}>{outpost}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select 
-                    value={selectedDay?.value || ""} 
-                    onValueChange={(v) => setSelectedDay(DAY_OPTIONS.find(d => d.value === v) || null)}
-                  >
-                    <SelectTrigger className="bg-white text-slate-800">
-                      <SelectValue placeholder="בחר יום..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAY_OPTIONS.map(day => (
-                        <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Button 
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500"
-                    onClick={() => startParade()}
-                    disabled={!selectedOutpost || !selectedDay}
-                  >
-                    התחל מסדר
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* Empty state already handled in the card above */}
             </div>
           )}
 
@@ -843,7 +924,7 @@ export default function CleaningParades() {
                   </div>
                   <h2 className="text-2xl font-black text-emerald-800 mb-2">מסדר הושלם!</h2>
                   <p className="text-emerald-600">
-                    {selectedOutpost} • {selectedDay?.label}
+                    {selectedOutpost} • יום {selectedParadeDay !== null ? DAY_LABELS[selectedParadeDay] : ''}
                   </p>
                 </CardContent>
               </Card>

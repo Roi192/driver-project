@@ -18,7 +18,6 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { PushNotificationSetup } from "@/components/push/PushNotificationSetup";
-import { MyCleaningParadesCard } from "@/components/home/MyCleaningParadesCard";
 
 interface ActionItem {
   to: string;
@@ -82,14 +81,15 @@ const actions: ActionItem[] = [
     description: "היסטוריית הדיווחים שלך",
     iconGradient: "from-sand to-sand-dark",
   },
-  {
-    to: "/cleaning-parades",
-    icon: Sparkles,
-    label: "מסדרי ניקיון",
-    description: "דווח על ביצוע מסדר ניקיון",
-    iconGradient: "from-purple-500 to-pink-500",
-    hideForBattalion: true,
-  },
+  // Cleaning parades removed - shown in DriverHomeContent
+  // {
+  //   to: "/cleaning-parades",
+  //   icon: Sparkles,
+  //   label: "מסדרי ניקיון",
+  //   description: "דווח על ביצוע מסדר ניקיון",
+  //   iconGradient: "from-purple-500 to-pink-500",
+  //   hideForBattalion: true,
+  // },
 ];
 
 export function QuickActions() {
@@ -168,10 +168,7 @@ export function QuickActions() {
           <PushNotificationSetup className="mb-6" />
         )}
 
-        {/* My Cleaning Parades Card for Drivers */}
-        {!isBattalionUser && (
-          <MyCleaningParadesCard />
-        )}
+        {/* Note: Cleaning parade info removed - shown in DriverHomeContent */}
 
         {/* Action Cards Grid - Premium Light */}
         <div className="space-y-4">

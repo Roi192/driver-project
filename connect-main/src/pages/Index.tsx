@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { CommanderDashboard } from "@/components/commander/CommanderDashboard";
 import { HeroSection } from "@/components/home/HeroSection";
 import { QuickActions } from "@/components/home/QuickActions";
+import { DriverHomeContent } from "@/components/home/DriverHomeContent";
 
 const Index = () => {
   const { user, isAdmin, isPlatoonCommander, loading } = useAuth();
@@ -33,10 +34,11 @@ const Index = () => {
     );
   }
 
-  // Show regular hero section for non-admins
+  // Show driver home page with organized tasks
   return (
     <AppLayout>
       <HeroSection />
+      {user && <DriverHomeContent />}
       <QuickActions />
     </AppLayout>
   );

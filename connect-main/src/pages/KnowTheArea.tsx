@@ -12,9 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { REGIONS, REGION_OUTPOSTS, getRegionFromOutpost } from "@/lib/constants";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { 
   Map, 
   Flame, 
@@ -38,7 +43,10 @@ import {
   Eye,
   EyeOff,
   LocateFixed,
-  Maximize2
+  Maximize2,
+  Filter,
+  ChevronLeft,
+  List
 } from "lucide-react";
 
 // Fix for default marker icons in Leaflet with React
@@ -275,6 +283,7 @@ interface SafetyFile {
   outpost: string;
   latitude: number | null;
   longitude: number | null;
+  region: string | null;
 }
 
 interface ClickPosition {
@@ -470,7 +479,14 @@ const KnowTheArea = () => {
   const [showVardim, setShowVardim] = useState(true);
   const [showVulnerability, setShowVulnerability] = useState(true);
   const [showParsa, setShowParsa] = useState(true);
-  const [expandedSection, setExpandedSection] = useState<"outposts" | "routes" | "events" | "safetyFiles" | null>(null);
+  
+  // Expanded list panel state
+  const [expandedListPanel, setExpandedListPanel] = useState<"outposts" | "routes" | "events" | "safetyPoints" | null>(null);
+  
+  // Region filter states
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  const [selectedOutpostFilter, setSelectedOutpostFilter] = useState<string>("all");
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   
   // Map click context menu
   const [showMapClickMenu, setShowMapClickMenu] = useState(false);
@@ -581,12 +597,30 @@ const KnowTheArea = () => {
     }
   };
 
+  // Get outposts available for the selected region
+  const availableOutposts = useMemo(() => {
+    if (selectedRegion === "all") return [];
+    return REGION_OUTPOSTS[selectedRegion] || [];
+  }, [selectedRegion]);
+
+  // Helper to check if an outpost belongs to the selected region
+  const matchesRegionFilter = (outpostName: string | null | undefined): boolean => {
+    if (selectedRegion === "all") return true;
+    if (!outpostName) return false;
+    const regionOutposts = REGION_OUTPOSTS[selectedRegion] || [];
+    if (selectedOutpostFilter !== "all") {
+      return outpostName === selectedOutpostFilter;
+    }
+    return regionOutposts.includes(outpostName);
+  };
+
   // Filtered data
   const filteredOutposts = useMemo(() => {
     return mapPoints
       .filter(p => p.point_type === "outpost" || p.point_type === "checkpoint")
-      .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [mapPoints, searchQuery]);
+      .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(p => matchesRegionFilter(p.name));
+  }, [mapPoints, searchQuery, selectedRegion, selectedOutpostFilter]);
 
   const filteredEvents = useMemo(() => {
     return safetyEvents.filter(e => 
@@ -606,24 +640,27 @@ const KnowTheArea = () => {
     return filteredEvents.filter(e => e.latitude && e.longitude);
   }, [filteredEvents]);
 
-  // Filtered safety files by category
+  // Filtered safety files by category and region
   const filteredVardim = useMemo(() => {
     return safetyFiles
       .filter(f => f.category === "vardim" && f.latitude && f.longitude)
-      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [safetyFiles, searchQuery]);
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(f => matchesRegionFilter(f.outpost));
+  }, [safetyFiles, searchQuery, selectedRegion, selectedOutpostFilter]);
 
   const filteredVulnerability = useMemo(() => {
     return safetyFiles
       .filter(f => f.category === "vulnerability" && f.latitude && f.longitude)
-      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [safetyFiles, searchQuery]);
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(f => matchesRegionFilter(f.outpost));
+  }, [safetyFiles, searchQuery, selectedRegion, selectedOutpostFilter]);
 
   const filteredParsa = useMemo(() => {
     return safetyFiles
       .filter(f => f.category === "parsa" && f.latitude && f.longitude)
-      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [safetyFiles, searchQuery]);
+      .filter(f => f.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter(f => matchesRegionFilter(f.outpost));
+  }, [safetyFiles, searchQuery, selectedRegion, selectedOutpostFilter]);
 
   // Calculate center
   const outposts = mapPoints.filter(p => p.point_type === "outpost");
@@ -1004,244 +1041,576 @@ const KnowTheArea = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background" dir="rtl">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border shadow-lg">
-        <div className="flex items-center justify-between h-16 px-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-xl bg-muted hover:bg-muted/80"
-          >
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-          
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <Map className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <h1 className="text-lg font-bold text-foreground">הכר את הגזרה</h1>
-          </div>
-          
-          <div className="w-10" />
-        </div>
-      </header>
+    <AppLayout>
+      <div className="min-h-screen bg-background" dir="rtl">
+        <PageHeader 
+          icon={Map}
+          title="הכר את הגזרה"
+          subtitle="מפה מבצעית - מוצבים, צירים ואירועים"
+          badge="מודיעין גזרה"
+        />
 
-      <main className="pb-8">
-      {/* Stats Cards */}
+        <main className="pb-8">
+      {/* Hero Stats Banner */}
         <div className="p-4">
-          <div className="grid grid-cols-3 gap-3">
-            {/* Outposts Card */}
-            <button 
-              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-amber-500/50 transition-all"
-              onClick={() => setExpandedSection(expandedSection === 'outposts' ? null : 'outposts')}
-            >
-              <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
-                <Building2 className="w-6 h-6 text-white" />
+          <div className="glass-card p-5 mb-4 bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+                  <Target className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">סקירת גזרה</h2>
+                  <p className="text-sm text-muted-foreground">מידע מבצעי בזמן אמת</p>
+                </div>
               </div>
-              <div className="text-2xl font-bold text-foreground">{filteredOutposts.length}</div>
-              <div className="text-xs text-muted-foreground font-medium">מוצבים</div>
-            </button>
+              {userLocation && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGoToUserLocation}
+                  className="gap-2 rounded-xl"
+                >
+                  <LocateFixed className="w-4 h-4" />
+                  מיקומי
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <button 
+                onClick={() => setExpandedListPanel(expandedListPanel === "outposts" ? null : "outposts")}
+                className={cn(
+                  "text-center p-3 rounded-xl transition-all",
+                  expandedListPanel === "outposts" 
+                    ? "bg-amber-500/30 border-2 border-amber-500/50 ring-2 ring-amber-500/20" 
+                    : "bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20"
+                )}
+              >
+                <Building2 className="w-5 h-5 mx-auto mb-1 text-amber-600" />
+                <div className="text-xl font-bold text-amber-700">{filteredOutposts.length}</div>
+                <div className="text-[10px] text-amber-600/80 font-medium">מוצבים</div>
+              </button>
+              <button 
+                onClick={() => setExpandedListPanel(expandedListPanel === "routes" ? null : "routes")}
+                className={cn(
+                  "text-center p-3 rounded-xl transition-all",
+                  expandedListPanel === "routes" 
+                    ? "bg-red-500/30 border-2 border-red-500/50 ring-2 ring-red-500/20" 
+                    : "bg-red-500/10 border border-red-500/20 hover:bg-red-500/20"
+                )}
+              >
+                <Route className="w-5 h-5 mx-auto mb-1 text-red-600" />
+                <div className="text-xl font-bold text-red-700">{filteredRoutes.length}</div>
+                <div className="text-[10px] text-red-600/80 font-medium">צירים</div>
+              </button>
+              <button 
+                onClick={() => setExpandedListPanel(expandedListPanel === "events" ? null : "events")}
+                className={cn(
+                  "text-center p-3 rounded-xl transition-all",
+                  expandedListPanel === "events" 
+                    ? "bg-orange-500/30 border-2 border-orange-500/50 ring-2 ring-orange-500/20" 
+                    : "bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20"
+                )}
+              >
+                <AlertTriangle className="w-5 h-5 mx-auto mb-1 text-orange-600" />
+                <div className="text-xl font-bold text-orange-700">{eventsWithLocation.length}</div>
+                <div className="text-[10px] text-orange-600/80 font-medium">אירועים</div>
+              </button>
+              <button 
+                onClick={() => setExpandedListPanel(expandedListPanel === "safetyPoints" ? null : "safetyPoints")}
+                className={cn(
+                  "text-center p-3 rounded-xl transition-all",
+                  expandedListPanel === "safetyPoints" 
+                    ? "bg-purple-500/30 border-2 border-purple-500/50 ring-2 ring-purple-500/20" 
+                    : "bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20"
+                )}
+              >
+                <Shield className="w-5 h-5 mx-auto mb-1 text-purple-600" />
+                <div className="text-xl font-bold text-purple-700">{filteredVardim.length + filteredVulnerability.length + filteredParsa.length}</div>
+                <div className="text-[10px] text-purple-600/80 font-medium">נקודות</div>
+              </button>
+            </div>
 
-            {/* Routes Card */}
-            <button 
-              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-red-500/50 transition-all"
-              onClick={() => setExpandedSection(expandedSection === 'routes' ? null : 'routes')}
-            >
-              <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg">
-                <Route className="w-6 h-6 text-white" />
+            {/* Expanded List Panels */}
+            {expandedListPanel === "outposts" && (
+              <div className="mt-4 animate-fade-in">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-600" />
+                    רשימת מוצבים ({filteredOutposts.length})
+                  </h3>
+                  {canEdit && (
+                    <Button size="sm" className="gap-1 h-8" onClick={() => {
+                      setClickPosition({ lat: centerLat, lng: centerLng });
+                      setShowAddDialog(true);
+                    }}>
+                      <Plus className="w-4 h-4" />
+                      הוסף
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-2">
+                    {filteredOutposts.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">אין מוצבים להצגה</p>
+                    ) : (
+                      filteredOutposts.map((outpost) => (
+                        <div 
+                          key={outpost.id}
+                          className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+                              <Building2 className="w-4 h-4 text-amber-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{outpost.name}</p>
+                              {outpost.description && (
+                                <p className="text-xs text-muted-foreground truncate">{outpost.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleFocusOnItem(outpost.latitude, outpost.longitude)}
+                            >
+                              <Target className="w-4 h-4" />
+                            </Button>
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeletePoint(outpost.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
-              <div className="text-2xl font-bold text-foreground">{filteredRoutes.length}</div>
-              <div className="text-xs text-muted-foreground font-medium">צירים אדומים</div>
-            </button>
+            )}
 
-            {/* Events Card */}
-            <button 
-              className="premium-card p-4 text-center cursor-pointer hover:shadow-xl hover:border-orange-500/50 transition-all"
-              onClick={() => setExpandedSection(expandedSection === 'events' ? null : 'events')}
-            >
-              <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
-                <AlertTriangle className="w-6 h-6 text-white" />
+            {expandedListPanel === "routes" && (
+              <div className="mt-4 animate-fade-in">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    <Route className="w-4 h-4 text-red-600" />
+                    רשימת צירים ({filteredRoutes.length})
+                  </h3>
+                  {canEdit && (
+                    <Button size="sm" className="gap-1 h-8 bg-red-500 hover:bg-red-600" onClick={handleStartDrawingRoute}>
+                      <Plus className="w-4 h-4" />
+                      צייר ציר
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-2">
+                    {filteredRoutes.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">אין צירים מסוכנים להצגה</p>
+                    ) : (
+                      filteredRoutes.map((route) => (
+                        <div 
+                          key={route.id}
+                          className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                              <Route className="w-4 h-4 text-red-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{route.name}</p>
+                              {route.description && (
+                                <p className="text-xs text-muted-foreground truncate">{route.description}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleFocusOnRoute(route)}
+                            >
+                              <Target className="w-4 h-4" />
+                            </Button>
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEditRoute(route)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteRoute(route.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
-              <div className="text-2xl font-bold text-foreground">{eventsWithLocation.length}</div>
-              <div className="text-xs text-muted-foreground font-medium">אירועי בטיחות</div>
-            </button>
+            )}
+
+            {expandedListPanel === "events" && (
+              <div className="mt-4 animate-fade-in">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    רשימת אירועים ({eventsWithLocation.length})
+                  </h3>
+                  {canEdit && (
+                    <Button size="sm" className="gap-1 h-8 bg-orange-500 hover:bg-orange-600" onClick={() => {
+                      setEventFormData({
+                        title: "",
+                        description: "",
+                        category: "other",
+                        event_date: new Date().toISOString().split('T')[0],
+                        latitude: centerLat,
+                        longitude: centerLng,
+                      });
+                      setShowAddEventDialog(true);
+                    }}>
+                      <Plus className="w-4 h-4" />
+                      הוסף
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-2">
+                    {eventsWithLocation.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">אין אירועים להצגה</p>
+                    ) : (
+                      eventsWithLocation.map((event) => (
+                        <div 
+                          key={event.id}
+                          className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center shrink-0">
+                              <AlertTriangle className="w-4 h-4 text-orange-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{event.title}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{getCategoryLabel(event.category)}</span>
+                                {event.event_date && <span>• {new Date(event.event_date).toLocaleDateString('he-IL')}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => event.latitude && event.longitude && handleFocusOnItem(event.latitude, event.longitude)}
+                            >
+                              <Target className="w-4 h-4" />
+                            </Button>
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleEditEvent(event)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteEvent(event.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+
+            {expandedListPanel === "safetyPoints" && (
+              <div className="mt-4 animate-fade-in">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-purple-600" />
+                    נקודות מתיק בטיחות
+                  </h3>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-1 h-8"
+                    onClick={() => navigate('/safety-files')}
+                  >
+                    <List className="w-4 h-4" />
+                    לתיקי בטיחות
+                  </Button>
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="space-y-3">
+                    {/* Vardim */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-purple-500" />
+                        <span className="text-sm font-medium text-foreground">נקודות ורדים ({filteredVardim.length})</span>
+                      </div>
+                      {filteredVardim.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pr-5">אין נקודות ורדים</p>
+                      ) : (
+                        <div className="space-y-1 pr-5">
+                          {filteredVardim.slice(0, 5).map((point) => (
+                            <div 
+                              key={point.id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 transition-colors cursor-pointer"
+                              onClick={() => point.latitude && point.longitude && handleFocusOnItem(point.latitude, point.longitude)}
+                            >
+                              <span className="text-sm text-foreground truncate">{point.title}</span>
+                              <Target className="w-3 h-3 text-purple-600 shrink-0" />
+                            </div>
+                          ))}
+                          {filteredVardim.length > 5 && (
+                            <p className="text-xs text-muted-foreground">+{filteredVardim.length - 5} עוד</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Vulnerability */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-500" />
+                        <span className="text-sm font-medium text-foreground">נקודות תורפה ({filteredVulnerability.length})</span>
+                      </div>
+                      {filteredVulnerability.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pr-5">אין נקודות תורפה</p>
+                      ) : (
+                        <div className="space-y-1 pr-5">
+                          {filteredVulnerability.slice(0, 5).map((point) => (
+                            <div 
+                              key={point.id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                              onClick={() => point.latitude && point.longitude && handleFocusOnItem(point.latitude, point.longitude)}
+                            >
+                              <span className="text-sm text-foreground truncate">{point.title}</span>
+                              <Target className="w-3 h-3 text-amber-600 shrink-0" />
+                            </div>
+                          ))}
+                          {filteredVulnerability.length > 5 && (
+                            <p className="text-xs text-muted-foreground">+{filteredVulnerability.length - 5} עוד</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Parsa */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                        <span className="text-sm font-medium text-foreground">נקודות פרסה ({filteredParsa.length})</span>
+                      </div>
+                      {filteredParsa.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pr-5">אין נקודות פרסה</p>
+                      ) : (
+                        <div className="space-y-1 pr-5">
+                          {filteredParsa.slice(0, 5).map((point) => (
+                            <div 
+                              key={point.id}
+                              className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                              onClick={() => point.latitude && point.longitude && handleFocusOnItem(point.latitude, point.longitude)}
+                            >
+                              <span className="text-sm text-foreground truncate">{point.title}</span>
+                              <Target className="w-3 h-3 text-emerald-600 shrink-0" />
+                            </div>
+                          ))}
+                          {filteredParsa.length > 5 && (
+                            <p className="text-xs text-muted-foreground">+{filteredParsa.length - 5} עוד</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </div>
 
-          {/* Safety Files Filter Toggles */}
-          {(filteredVardim.length > 0 || filteredVulnerability.length > 0 || filteredParsa.length > 0) && (
-            <div className="mt-4 glass-card p-4">
-              <p className="text-sm font-bold text-foreground mb-3">נקודות מתיק בטיחות:</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setShowVardim(!showVardim)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                    showVardim 
-                      ? "bg-purple-500/20 text-purple-700 border border-purple-500/30" 
-                      : "bg-muted text-muted-foreground border border-transparent"
-                  }`}
+          {/* Region & Outpost Filters */}
+          <div className="glass-card p-4 mb-4">
+            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-primary" />
+              סינון לפי גזרה ומוצב
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">גזרה</Label>
+                <Select 
+                  value={selectedRegion} 
+                  onValueChange={(v) => {
+                    setSelectedRegion(v);
+                    setSelectedOutpostFilter("all");
+                  }}
                 >
-                  <MapPin className="w-4 h-4" />
-                  נקודות ורדים ({filteredVardim.length})
-                </button>
-                <button
-                  onClick={() => setShowVulnerability(!showVulnerability)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                    showVulnerability 
-                      ? "bg-amber-500/20 text-amber-700 border border-amber-500/30" 
-                      : "bg-muted text-muted-foreground border border-transparent"
-                  }`}
+                  <SelectTrigger className="h-10 rounded-xl bg-card border-border">
+                    <SelectValue placeholder="כל הגזרות" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הגזרות</SelectItem>
+                    {REGIONS.map(region => (
+                      <SelectItem key={region} value={region}>{region}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1.5 block">מוצב</Label>
+                <Select 
+                  value={selectedOutpostFilter} 
+                  onValueChange={setSelectedOutpostFilter}
+                  disabled={selectedRegion === "all"}
                 >
-                  <AlertTriangle className="w-4 h-4" />
-                  נקודות תורפה ({filteredVulnerability.length})
-                </button>
-                <button
-                  onClick={() => setShowParsa(!showParsa)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                    showParsa 
-                      ? "bg-emerald-500/20 text-emerald-700 border border-emerald-500/30" 
-                      : "bg-muted text-muted-foreground border border-transparent"
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  נקודות פרסה ({filteredParsa.length})
-                </button>
+                  <SelectTrigger className="h-10 rounded-xl bg-card border-border">
+                    <SelectValue placeholder="כל המוצבים" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל המוצבים בגזרה</SelectItem>
+                    {availableOutposts.map(outpost => (
+                      <SelectItem key={outpost} value={outpost}>{outpost}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          )}
-
-          {/* Expanded Sections */}
-          {expandedSection === 'outposts' && (
-            <div className="mt-4 glass-card p-4 animate-slide-up">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-foreground flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-amber-500" />
-                  רשימת מוצבים
-                </h3>
-                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
-                  <X className="w-4 h-4" />
+            {selectedRegion !== "all" && (
+              <div className="mt-3 flex items-center gap-2">
+                <Badge variant="secondary" className="gap-1">
+                  <Navigation className="w-3 h-3" />
+                  {selectedRegion}
+                </Badge>
+                {selectedOutpostFilter !== "all" && (
+                  <Badge variant="outline" className="gap-1">
+                    <Building2 className="w-3 h-3" />
+                    {selectedOutpostFilter}
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedRegion("all");
+                    setSelectedOutpostFilter("all");
+                  }}
+                  className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  נקה סינון
                 </Button>
               </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {filteredOutposts.map((point) => (
-                  <button
-                    key={point.id}
-                    onClick={() => {
-                      handleFocusOnItem(point.latitude, point.longitude);
-                      setExpandedSection(null);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-amber-500/20 hover:border-amber-500/30 transition-colors border border-transparent"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                        <Star className="w-4 h-4 text-amber-500" />
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-foreground text-sm">{point.name}</p>
-                        {point.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">{point.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <Navigation className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                ))}
-                {filteredOutposts.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">אין מוצבים להצגה</p>
-                )}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {expandedSection === 'routes' && (
-            <div className="mt-4 glass-card p-4 animate-slide-up">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-foreground flex items-center gap-2">
-                  <Route className="w-5 h-5 text-red-500" />
-                  רשימת צירים אדומים
-                </h3>
-                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {filteredRoutes.map((route) => (
-                  <button
-                    key={route.id}
-                    onClick={() => {
-                      handleFocusOnRoute(route);
-                      setExpandedSection(null);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-red-500/20 hover:border-red-500/30 transition-colors border border-transparent"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                        <Route className="w-4 h-4 text-red-500" />
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-foreground text-sm">{route.name}</p>
-                        {route.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">{route.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <Navigation className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                ))}
-                {filteredRoutes.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">אין צירים להצגה</p>
-                )}
-              </div>
+          {/* Unified Filter Toggles */}
+          <div className="glass-card p-4">
+            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+              <Filter className="w-4 h-4 text-primary" />
+              סינון שכבות
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowOutposts(!showOutposts)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showOutposts 
+                    ? "bg-amber-500/20 text-amber-700 border border-amber-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                מוצבים
+              </button>
+              <button
+                onClick={() => setShowEvents(!showEvents)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showEvents 
+                    ? "bg-orange-500/20 text-orange-700 border border-orange-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+                אירועי בטיחות
+              </button>
+              <button
+                onClick={() => setShowRoutes(!showRoutes)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showRoutes 
+                    ? "bg-red-500/20 text-red-700 border border-red-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <Route className="w-4 h-4" />
+                צירים אדומים
+              </button>
+              <button
+                onClick={() => setShowVardim(!showVardim)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showVardim 
+                    ? "bg-purple-500/20 text-purple-700 border border-purple-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <MapPin className="w-4 h-4" />
+                נקודות ורדים
+              </button>
+              <button
+                onClick={() => setShowVulnerability(!showVulnerability)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showVulnerability 
+                    ? "bg-amber-500/20 text-amber-700 border border-amber-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+                נקודות תורפה
+              </button>
+              <button
+                onClick={() => setShowParsa(!showParsa)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  showParsa 
+                    ? "bg-emerald-500/20 text-emerald-700 border border-emerald-500/30" 
+                    : "bg-muted text-muted-foreground border border-transparent"
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                נקודות פרסה
+              </button>
             </div>
-          )}
-
-          {expandedSection === 'events' && (
-            <div className="mt-4 glass-card p-4 animate-slide-up">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-foreground flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-orange-500" />
-                  רשימת אירועי בטיחות
-                </h3>
-                <Button variant="ghost" size="icon" onClick={() => setExpandedSection(null)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {eventsWithLocation.map((event) => (
-                  <button
-                    key={event.id}
-                    onClick={() => {
-                      handleFocusOnItem(event.latitude!, event.longitude!);
-                      setExpandedSection(null);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-orange-500/20 hover:border-orange-500/30 transition-colors border border-transparent"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                        <AlertTriangle className="w-4 h-4 text-orange-500" />
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-foreground text-sm">{event.title}</p>
-                        {event.event_date && (
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(event.event_date).toLocaleDateString("he-IL")}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Navigation className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                ))}
-                {eventsWithLocation.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">אין אירועים עם מיקום להצגה</p>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Search & Filters */}
+        {/* Search & View Mode */}
         <div className="px-4 space-y-3 mb-4">
           {/* Search */}
           <div className="relative">
@@ -1254,111 +1623,32 @@ const KnowTheArea = () => {
             />
           </div>
 
-          {/* View Mode & Filters */}
-          <div className="flex gap-2 flex-wrap">
-            {/* View Mode Toggle */}
-            <div className="flex p-1 bg-card rounded-xl border border-border">
-              <button
-                onClick={() => setViewMode("map")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                  viewMode === "map"
-                    ? "bg-primary text-primary-foreground shadow-md"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Layers className="w-4 h-4" />
-                מפה
-              </button>
-              <button
-                onClick={() => setViewMode("heatmap")}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                  viewMode === "heatmap"
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Flame className="w-4 h-4" />
-                חום
-              </button>
-            </div>
-
-            {/* Filter Toggles */}
-            <div className="flex gap-2 flex-1 overflow-x-auto">
-              <button
-                onClick={() => setShowOutposts(!showOutposts)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showOutposts
-                    ? "bg-amber-500/20 border-amber-500/50 text-amber-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showOutposts ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                מוצבים
-              </button>
-              <button
-                onClick={() => setShowRoutes(!showRoutes)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showRoutes
-                    ? "bg-red-500/20 border-red-500/50 text-red-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showRoutes ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                צירים
-              </button>
-              <button
-                onClick={() => setShowEvents(!showEvents)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showEvents
-                    ? "bg-orange-500/20 border-orange-500/50 text-orange-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showEvents ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                אירועים
-              </button>
-              <button
-                onClick={() => setShowVardim(!showVardim)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showVardim
-                    ? "bg-purple-500/20 border-purple-500/50 text-purple-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showVardim ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                ורדים
-              </button>
-              <button
-                onClick={() => setShowParsa(!showParsa)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showParsa
-                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showParsa ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                פרסה
-              </button>
-              <button
-                onClick={() => setShowVulnerability(!showVulnerability)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all border whitespace-nowrap",
-                  showVulnerability
-                    ? "bg-amber-500/20 border-amber-500/50 text-amber-700"
-                    : "bg-muted/50 border-border text-muted-foreground"
-                )}
-              >
-                {showVulnerability ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                תורפה
-              </button>
-            </div>
+          {/* View Mode Toggle */}
+          <div className="flex p-1 bg-card rounded-xl border border-border">
+            <button
+              onClick={() => setViewMode("map")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
+                viewMode === "map"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Layers className="w-4 h-4" />
+              מפה רגילה
+            </button>
+            <button
+              onClick={() => setViewMode("heatmap")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
+                viewMode === "heatmap"
+                  ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Flame className="w-4 h-4" />
+              מפת חום אירועים
+            </button>
           </div>
         </div>
 
@@ -1472,8 +1762,8 @@ const KnowTheArea = () => {
                 </>
               )}
               
-              {/* Sector Boundaries */}
-              {showBoundaries && sectorBoundaries.map((boundary) => (
+              {/* Sector Boundaries - only in map mode */}
+              {viewMode === "map" && showBoundaries && sectorBoundaries.map((boundary) => (
                 <Polygon
                   key={boundary.id}
                   positions={boundary.boundary_points.map(p => [p.lat, p.lng] as [number, number])}
@@ -1515,8 +1805,8 @@ const KnowTheArea = () => {
               {/* Heat layer for heatmap mode */}
               {viewMode === "heatmap" && <HeatLayer points={heatPoints} />}
               
-              {/* Dangerous Routes */}
-              {showRoutes && dangerousRoutes.map((route) => (
+              {/* Dangerous Routes - only in map mode */}
+              {viewMode === "map" && showRoutes && dangerousRoutes.map((route) => (
                 <Polyline
                   key={route.id}
                   positions={route.route_points.map(p => [p.lat, p.lng] as [number, number])}
@@ -1563,8 +1853,8 @@ const KnowTheArea = () => {
                 <Marker key={idx} position={[point.lat, point.lng]} icon={createRoutePointIcon(idx)} />
               ))}
               
-              {/* Outposts */}
-              {showOutposts && filteredOutposts.map((point) => (
+              {/* Outposts - only in map mode */}
+              {viewMode === "map" && showOutposts && filteredOutposts.map((point) => (
                 <Marker key={point.id} position={[point.latitude, point.longitude]} icon={createOutpostIcon()}>
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
@@ -1609,43 +1899,10 @@ const KnowTheArea = () => {
                 </Marker>
               ))}
               
-              {/* Safety Events with coordinates - Heatmap Mode - Styled Icons */}
-              {showEvents && viewMode === "heatmap" && eventsWithLocation.map((event) => (
-                <Marker key={event.id} position={[event.latitude!, event.longitude!]} icon={createHeatmapEventIcon()}>
-                  <Popup>
-                    <div className="text-right p-3 min-w-[220px]" dir="rtl">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="1">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                          </svg>
-                        </div>
-                        <h3 className="font-bold text-lg">{event.title}</h3>
-                      </div>
-                      <Badge className="bg-red-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
-                      {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
-                      {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
-                      {(canEdit || canDelete) && (
-                        <div className="flex gap-2 mt-3">
-                          {canEdit && (
-                            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEditEvent(event)}>
-                              <Pencil className="w-4 h-4 ml-1" />עריכה
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteEvent(event.id)}>
-                              <Trash2 className="w-4 h-4 ml-1" />מחק
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
+              {/* In heatmap mode, we only show the HeatLayer - no individual markers */}
 
-              {/* Safety Files - Vardim Points */}
-              {showVardim && filteredVardim.map((file) => (
+              {/* Safety Files - Vardim Points - only in map mode */}
+              {viewMode === "map" && showVardim && filteredVardim.map((file) => (
                 <Marker key={`vardim-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createVardimIcon()}>
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
@@ -1658,8 +1915,8 @@ const KnowTheArea = () => {
                 </Marker>
               ))}
 
-              {/* Safety Files - Vulnerability Points */}
-              {showVulnerability && filteredVulnerability.map((file) => (
+              {/* Safety Files - Vulnerability Points - only in map mode */}
+              {viewMode === "map" && showVulnerability && filteredVulnerability.map((file) => (
                 <Marker key={`vuln-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createVulnerabilityIcon()}>
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
@@ -1672,8 +1929,8 @@ const KnowTheArea = () => {
                 </Marker>
               ))}
 
-              {/* Safety Files - Parsa Points */}
-              {showParsa && filteredParsa.map((file) => (
+              {/* Safety Files - Parsa Points - only in map mode */}
+              {viewMode === "map" && showParsa && filteredParsa.map((file) => (
                 <Marker key={`parsa-${file.id}`} position={[file.latitude!, file.longitude!]} icon={createParsaIcon()}>
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
@@ -2071,7 +2328,8 @@ const KnowTheArea = () => {
           50% { transform: scale(1.5); opacity: 0.1; }
         }
       `}</style>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 

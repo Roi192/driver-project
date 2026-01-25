@@ -20,6 +20,24 @@ export const REGIONS = [
   "מכבים",
 ] as const;
 
+// Region to outposts mapping
+export const REGION_OUTPOSTS: Record<string, string[]> = {
+  "ארץ בנימין": ["בית אל", "עפרה", 'מבו"ש', "עטרת"],
+  "טלמונים": ["חורש ירון", "נווה יאיר", "רנתיס"],
+  "גבעת בנימין": ["כוכב יעקב", "רמה", "ענתות"],
+  "מכבים": ["מכבים", "חשמונאים"],
+};
+
+// Get region from outpost
+export const getRegionFromOutpost = (outpost: string): string | null => {
+  for (const [region, outposts] of Object.entries(REGION_OUTPOSTS)) {
+    if (outposts.includes(outpost)) {
+      return region;
+    }
+  }
+  return null;
+};
+
 export const SHIFT_TYPES = [
   "משמרת בוקר",
   "משמרת צהריים",

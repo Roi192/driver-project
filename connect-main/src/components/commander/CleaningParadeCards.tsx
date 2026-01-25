@@ -32,17 +32,28 @@ interface ParadePhoto {
   photo_url: string;
 }
 
-const DAY_OPTIONS = [
-  { value: "monday", label: "יום שני", deadline: "12:00" },
-  { value: "wednesday", label: "יום רביעי", deadline: "11:00" },
-  { value: "saturday_night", label: "מוצאי שבת", deadline: "22:00" },
-];
+const DAY_LABELS: Record<number, string> = {
+  0: "ראשון",
+  1: "שני",
+  2: "שלישי",
+  3: "רביעי",
+  4: "חמישי",
+  5: "שישי",
+  6: "שבת"
+};
+
+interface ParadeDayOption {
+  value: number;
+  label: string;
+  dayKey: string;
+}
 
 export function CleaningParadeCards() {
   const [completedParades, setCompletedParades] = useState<CompletedParade[]>([]);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showAllParades, setShowAllParades] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeDays, setActiveDays] = useState<ParadeDayOption[]>([]);
   
   // History range
   const [historyDays, setHistoryDays] = useState<number>(7); // 7 = this week, 30 = 30 days
@@ -59,13 +70,43 @@ export function CleaningParadeCards() {
   const currentWeekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
   useEffect(() => {
-    fetchCompletedParades();
-  }, [historyDays]);
+    fetchActiveDays();
+  }, []);
+
+  useEffect(() => {
+    if (activeDays.length > 0) {
+      fetchCompletedParades();
+    }
+  }, [historyDays, activeDays]);
 
   useEffect(() => {
     // Trigger cleanup on mount
     cleanupOldData();
   }, []);
+
+  const fetchActiveDays = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("cleaning_parade_config")
+        .select("day_of_week, outpost")
+        .eq("is_active", true);
+
+      if (error) throw error;
+
+      // Get unique days that have active parades
+      const uniqueDays = [...new Set((data || []).map(d => d.day_of_week))].sort();
+      
+      const dayOptions: ParadeDayOption[] = uniqueDays.map(day => ({
+        value: day,
+        label: DAY_LABELS[day] || `יום ${day}`,
+        dayKey: DAY_LABELS[day] || String(day)
+      }));
+
+      setActiveDays(dayOptions);
+    } catch (error) {
+      console.error("Error fetching active days:", error);
+    }
+  };
 
   const cleanupOldData = async () => {
     try {
@@ -192,21 +233,23 @@ export function CleaningParadeCards() {
     }
   };
 
-  const getParadesForDay = (day: string) => {
+  const getParadesForDay = (dayValue: number) => {
+    const dayLabel = DAY_LABELS[dayValue];
     // Only get current week parades for day view
     return completedParades.filter(p => 
-      p.day_of_week === day && p.parade_date >= currentWeekStart
+      p.day_of_week === dayLabel && p.parade_date >= currentWeekStart
     );
   };
 
-  const getParadesForOutpost = (outpost: string, day: string) => {
+  const getParadesForOutpost = (outpost: string, dayValue: number) => {
+    const dayLabel = DAY_LABELS[dayValue];
     return completedParades.filter(p => 
-      p.outpost === outpost && p.day_of_week === day && p.parade_date >= currentWeekStart
+      p.outpost === outpost && p.day_of_week === dayLabel && p.parade_date >= currentWeekStart
     );
   };
 
-  const getDayStats = (day: string) => {
-    const dayParades = getParadesForDay(day);
+  const getDayStats = (dayValue: number) => {
+    const dayParades = getParadesForDay(dayValue);
     const uniqueOutposts = [...new Set(dayParades.map(p => p.outpost))];
     return {
       completed: uniqueOutposts.length,
@@ -215,8 +258,12 @@ export function CleaningParadeCards() {
     };
   };
 
-  const getDayInfo = (dayValue: string) => {
-    return DAY_OPTIONS.find(d => d.value === dayValue);
+  const getDayInfo = (dayValue: number) => {
+    return activeDays.find(d => d.value === dayValue);
+  };
+
+  const getDayInfoByLabel = (dayLabel: string) => {
+    return activeDays.find(d => d.label === dayLabel);
   };
 
   // Get recent parades for quick view
@@ -242,8 +289,8 @@ export function CleaningParadeCards() {
       </div>
 
       {/* Day Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        {DAY_OPTIONS.map(day => {
+      <div className={cn("grid gap-3", activeDays.length <= 3 ? "grid-cols-3" : "grid-cols-2")}>
+        {activeDays.map(day => {
           const stats = getDayStats(day.value);
           const percentage = Math.round((stats.completed / stats.total) * 100);
           const isComplete = stats.completed === stats.total;
@@ -264,7 +311,7 @@ export function CleaningParadeCards() {
                 )}>
                   {stats.completed}/{stats.total}
                 </div>
-                <p className="text-xs font-bold text-slate-600">{day.label}</p>
+                <p className="text-xs font-bold text-slate-600">יום {day.label}</p>
                 <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div 
                     className={cn("h-full transition-all", isComplete ? "bg-emerald-500" : "bg-primary")}
@@ -305,7 +352,7 @@ export function CleaningParadeCards() {
                         {parade.outpost}
                       </Badge>
                       <span className="text-xs text-slate-400">
-                        {getDayInfo(parade.day_of_week)?.label}
+                        יום {parade.day_of_week}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-slate-600">
@@ -337,7 +384,7 @@ export function CleaningParadeCards() {
           <DialogHeader className="p-4 pb-2 border-b border-slate-100">
             <DialogTitle className="flex items-center gap-2 text-slate-900">
               <Calendar className="w-5 h-5 text-primary" />
-              מסדרי {getDayInfo(selectedDay || "")?.label}
+              מסדרי יום {selectedDay !== null ? DAY_LABELS[selectedDay] : ""}
             </DialogTitle>
           </DialogHeader>
           
@@ -464,7 +511,7 @@ export function CleaningParadeCards() {
                           {parade.outpost}
                         </Badge>
                         <span className="text-xs text-slate-400">
-                          {getDayInfo(parade.day_of_week)?.label}
+                          יום {parade.day_of_week}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-slate-600">

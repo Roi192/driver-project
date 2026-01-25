@@ -11,6 +11,7 @@ import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
 import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
+import { REGIONS, OUTPOSTS } from "@/lib/constants";
 
 type View = "categories" | "items" | "itemDetail";
 type ContentCategory = "flag_investigations" | "sector_events" | "neighbor_events" | "monthly_summaries";
@@ -28,6 +29,8 @@ interface SafetyContent {
   longitude: number | null;
   event_type: string | null;
   driver_type: string | null;
+  region: string | null;
+  outpost: string | null;
 }
 
 const categories = [
@@ -105,6 +108,20 @@ const getFields = (category: ContentCategory, soldiers: { id: string; full_name:
     const sectorFields: FieldConfig[] = [
       { name: "title", label: "כותרת", type: "text", required: true, placeholder: "הזן כותרת..." },
       { name: "event_date", label: "תאריך", type: "date", placeholder: "בחר תאריך" },
+      { 
+        name: "region", 
+        label: "גזרה", 
+        type: "select",
+        options: REGIONS.map(r => ({ value: r, label: r })),
+        placeholder: "בחר גזרה"
+      },
+      { 
+        name: "outpost", 
+        label: "מוצב", 
+        type: "select",
+        options: OUTPOSTS.map(o => ({ value: o, label: o })),
+        placeholder: "בחר מוצב"
+      },
       { 
         name: "event_type", 
         label: "סוג אירוע", 
@@ -233,6 +250,8 @@ export default function SafetyEvents() {
       longitude,
       event_type: eventType,
       driver_type: driverType,
+      region: data.region || null,
+      outpost: data.outpost || null,
     };
 
     const { error } = await supabase.from("safety_content").insert([insertData]);
@@ -304,6 +323,8 @@ export default function SafetyEvents() {
       longitude,
       event_type: data.event_type || null,
       driver_type: data.driver_type || null,
+      region: data.region || null,
+      outpost: data.outpost || null,
     };
 
     const { error } = await supabase

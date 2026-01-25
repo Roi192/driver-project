@@ -28,11 +28,11 @@ import {
   ChevronRight,
   Calendar,
   Camera,
-  Bell,
-  Layers
+  Bell
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ChecklistWithGroups } from "@/components/admin/ChecklistWithGroups";
 
 interface ChecklistItem {
   id: string;
@@ -40,6 +40,14 @@ interface ChecklistItem {
   item_name: string;
   item_order: number;
   is_active: boolean;
+  responsibility_area_id: string | null;
+  responsible_soldier_id?: string | null;
+  shift_day?: string | null;
+  shift_type?: string | null;
+  deadline_time?: string | null;
+  default_shift_type?: string | null;
+  source_schedule_day?: number | null;
+  source_schedule_shift?: string | null;
 }
 
 interface ReferencePhoto {
@@ -94,7 +102,7 @@ export default function CleaningParadesAdmin() {
   // Selection state
   const [selectedOutpost, setSelectedOutpost] = useState<string>(OUTPOSTS[0]);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
-  const [activeTab, setActiveTab] = useState("checklist");
+  const [activeTab, setActiveTab] = useState("photos");
   
   // Dialog states
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -421,155 +429,164 @@ export default function CleaningParadesAdmin() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid grid-cols-3 w-full">
-              <TabsTrigger value="checklist" className="gap-1">
-                <ListChecks className="w-4 h-4" />
-                צ'קליסט
+              <TabsTrigger value="photos" className="gap-1 text-xs px-2">
+                <Edit className="w-4 h-4" />
+                עריכת צ'קליסט
               </TabsTrigger>
-              <TabsTrigger value="photos" className="gap-1">
-                <Image className="w-4 h-4" />
-                תמונות
+              <TabsTrigger value="checklist" className="gap-1 text-xs px-2">
+                <Calendar className="w-4 h-4" />
+                שיבוץ למסדר
               </TabsTrigger>
-              <TabsTrigger value="assignments" className="gap-1">
+              <TabsTrigger value="assignments" className="gap-1 text-xs px-2">
                 <Users className="w-4 h-4" />
-                שיבוצים
+                שיבוצים ידניים
               </TabsTrigger>
             </TabsList>
 
-            {/* Checklist Tab */}
+            {/* Checklist Tab with Groups */}
             <TabsContent value="checklist" className="space-y-4">
-              <Card className="border-slate-200/60 shadow-lg">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <ListChecks className="w-5 h-5 text-primary" />
-                      פריטי צ'קליסט ({checklistItems.length})
-                    </CardTitle>
-                    <Button size="sm" onClick={() => {
+              <ChecklistWithGroups
+                outpost={selectedOutpost}
+                checklistItems={checklistItems}
+                referencePhotos={referencePhotos}
+                soldiers={soldiers}
+                onRefresh={fetchChecklistItems}
+                onAddPhoto={(item) => {
+                  setSelectedItemForPhoto(item);
+                  setPhotoForm({ description: "" });
+                  setImageFile(null);
+                  setImagePreview(null);
+                  setPhotoDialogOpen(true);
+                }}
+              />
+            </TabsContent>
+
+            {/* Photos Tab - Full Checklist Editor */}
+            <TabsContent value="photos" className="space-y-4">
+              {/* Add New Item Card */}
+              <Card className="border-primary/30 border-dashed shadow-lg">
+                <CardContent className="p-4">
+                  <Button 
+                    className="w-full gap-2" 
+                    variant="outline"
+                    onClick={() => {
                       setEditingItem(null);
                       setItemForm({ item_name: "" });
                       setItemDialogOpen(true);
-                    }}>
-                      <Plus className="w-4 h-4 ml-1" />
-                      הוסף
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  {checklistItems.length === 0 ? (
-                    <p className="text-center text-slate-500 py-4">אין פריטים - הוסף פריט חדש</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {checklistItems.map((item, index) => {
-                        const photoCount = getItemPhotoCount(item.id);
-                        return (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="w-7 h-7 flex items-center justify-center bg-primary/10 text-primary text-sm font-bold rounded-lg shrink-0">
-                                {index + 1}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-slate-800 block truncate">{item.item_name}</span>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <Camera className="w-3 h-3 text-slate-400" />
-                                  <span className="text-xs text-slate-500">{photoCount} תמונות</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                className="h-8 px-2"
-                                onClick={() => {
-                                  setSelectedItemForPhoto(item);
-                                  setPhotoForm({ description: "" });
-                                  setImageFile(null);
-                                  setImagePreview(null);
-                                  setPhotoDialogOpen(true);
-                                }}
-                              >
-                                <Camera className="w-4 h-4 text-purple-500" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    הוסף פריט חדש לצ'קליסט
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Checklist Items with Photos */}
+              {checklistItems.length === 0 ? (
+                <Card className="border-slate-200/60 shadow-lg">
+                  <CardContent className="py-8 text-center text-slate-500">
+                    <ListChecks className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                    <p className="font-medium">אין פריטים בצ'קליסט</p>
+                    <p className="text-sm">לחץ על "הוסף פריט חדש" כדי להתחיל</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                checklistItems.map((item, index) => {
+                  const itemPhotos = referencePhotos.filter(p => p.checklist_item_id === item.id);
+                  
+                  return (
+                    <Card key={item.id} className="border-slate-200/60 shadow-lg overflow-hidden">
+                      <CardHeader className="pb-2 bg-gradient-to-r from-primary/5 to-transparent">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="w-6 h-6 flex items-center justify-center bg-primary text-primary-foreground text-xs font-bold rounded shrink-0">
+                              {index + 1}
+                            </span>
+                            <CardTitle className="text-sm truncate">{item.item_name}</CardTitle>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge variant="outline" className="text-xs gap-1">
+                              <Camera className="w-3 h-3" />
+                              {itemPhotos.length}
+                            </Badge>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7"
+                              onClick={() => {
                                 setEditingItem(item);
                                 setItemForm({ item_name: item.item_name });
                                 setItemDialogOpen(true);
-                              }}>
-                                <Edit className="w-4 h-4 text-slate-500" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteItem(item.id)}>
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                              </Button>
-                            </div>
+                              }}
+                            >
+                              <Edit className="w-3 h-3 text-slate-500" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7"
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
+                              <Trash2 className="w-3 h-3 text-red-500" />
+                            </Button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Photos Tab */}
-            <TabsContent value="photos" className="space-y-4">
-              {/* Photos grouped by item */}
-              {checklistItems.map((item) => {
-                const itemPhotos = referencePhotos.filter(p => p.checklist_item_id === item.id);
-                
-                return (
-                  <Card key={item.id} className="border-slate-200/60 shadow-lg">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-sm">
-                          <Layers className="w-4 h-4 text-purple-500" />
-                          {item.item_name}
-                          <Badge variant="outline" className="text-xs">{itemPhotos.length}</Badge>
-                        </CardTitle>
-                        <Button size="sm" variant="outline" onClick={() => {
-                          setSelectedItemForPhoto(item);
-                          setPhotoForm({ description: "" });
-                          setImageFile(null);
-                          setImagePreview(null);
-                          setPhotoDialogOpen(true);
-                        }}>
-                          <Plus className="w-3 h-3 ml-1" />
-                          תמונה
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      {itemPhotos.length === 0 ? (
-                        <p className="text-center text-slate-400 text-sm py-2">אין תמונות</p>
-                      ) : (
-                        <div className="grid grid-cols-3 gap-2">
-                          {itemPhotos.map((photo) => (
-                            <div key={photo.id} className="relative group">
-                              <img 
-                                src={photo.image_url} 
-                                alt={photo.description || ''}
-                                className="w-full aspect-square object-cover rounded-lg border border-slate-200"
-                              />
-                              {photo.description && (
-                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 rounded-b-lg">
-                                  <p className="text-white text-[10px] truncate">{photo.description}</p>
-                                </div>
-                              )}
-                              <Button 
-                                variant="destructive" 
-                                size="icon"
-                                className="absolute top-1 left-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => handleDeletePhoto(photo.id)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ))}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardHeader>
+                      <CardContent className="p-4 pt-2">
+                        {/* Photos Grid */}
+                        {itemPhotos.length === 0 ? (
+                          <div className="text-center py-4">
+                            <Camera className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                            <p className="text-slate-400 text-sm mb-2">אין תמונות עדיין</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            {itemPhotos.map((photo) => (
+                              <div key={photo.id} className="relative group">
+                                <img 
+                                  src={photo.image_url} 
+                                  alt={photo.description || ''}
+                                  className="w-full aspect-square object-cover rounded-lg border border-slate-200"
+                                />
+                                {photo.description && (
+                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 rounded-b-lg">
+                                    <p className="text-white text-[10px] truncate">{photo.description}</p>
+                                  </div>
+                                )}
+                                <Button 
+                                  variant="destructive" 
+                                  size="icon"
+                                  className="absolute top-1 left-1 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleDeletePhoto(photo.id)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Add Photo Button */}
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="w-full gap-1"
+                          onClick={() => {
+                            setSelectedItemForPhoto(item);
+                            setPhotoForm({ description: "" });
+                            setImageFile(null);
+                            setImagePreview(null);
+                            setPhotoDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="w-3 h-3" />
+                          הוסף תמונה לפריט
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
 
               {/* General photos (not linked to item) */}
               <Card className="border-slate-200/60 shadow-lg">

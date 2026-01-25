@@ -11,6 +11,7 @@ import { CommanderQuickActions } from "./CommanderQuickActions";
 import { CleaningParadeCards } from "./CleaningParadeCards";
 import { TripFormsCard } from "./TripFormsCard";
 
+
 export function CommanderDashboard() {
   const { user, signOut } = useAuth();
   const { isAdmin } = useUserRole();
@@ -114,7 +115,7 @@ export function CommanderDashboard() {
         </section>
 
         {/* Trip Forms Card */}
-        <section className="animate-slide-up" style={{ animationDelay: '0.28s' }}>
+        <section className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
           <TripFormsCard />
         </section>
 

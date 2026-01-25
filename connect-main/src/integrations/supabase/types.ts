@@ -203,29 +203,130 @@ export type Database = {
       cleaning_checklist_items: {
         Row: {
           created_at: string
+          deadline_time: string | null
+          default_shift_type: string | null
           id: string
           is_active: boolean
           item_name: string
           item_order: number
           outpost: string
+          responsibility_area_id: string | null
+          responsible_soldier_id: string | null
+          shift_day: string | null
+          shift_type: string | null
+          source_schedule_day: number | null
+          source_schedule_shift: string | null
         }
         Insert: {
           created_at?: string
+          deadline_time?: string | null
+          default_shift_type?: string | null
           id?: string
           is_active?: boolean
           item_name: string
           item_order?: number
           outpost: string
+          responsibility_area_id?: string | null
+          responsible_soldier_id?: string | null
+          shift_day?: string | null
+          shift_type?: string | null
+          source_schedule_day?: number | null
+          source_schedule_shift?: string | null
         }
         Update: {
           created_at?: string
+          deadline_time?: string | null
+          default_shift_type?: string | null
           id?: string
           is_active?: boolean
           item_name?: string
           item_order?: number
           outpost?: string
+          responsibility_area_id?: string | null
+          responsible_soldier_id?: string | null
+          shift_day?: string | null
+          shift_type?: string | null
+          source_schedule_day?: number | null
+          source_schedule_shift?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_checklist_items_responsibility_area_id_fkey"
+            columns: ["responsibility_area_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_responsibility_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_checklist_items_responsible_soldier_id_fkey"
+            columns: ["responsible_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_checklist_items_responsible_soldier_id_fkey"
+            columns: ["responsible_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleaning_item_assignments: {
+        Row: {
+          created_at: string
+          deadline_time: string | null
+          id: string
+          item_id: string
+          manual_soldier_id: string | null
+          outpost: string
+          parade_day: number
+          shift_type: string
+        }
+        Insert: {
+          created_at?: string
+          deadline_time?: string | null
+          id?: string
+          item_id: string
+          manual_soldier_id?: string | null
+          outpost: string
+          parade_day: number
+          shift_type: string
+        }
+        Update: {
+          created_at?: string
+          deadline_time?: string | null
+          id?: string
+          item_id?: string
+          manual_soldier_id?: string | null
+          outpost?: string
+          parade_day?: number
+          shift_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_item_assignments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "cleaning_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_item_assignments_manual_soldier_id_fkey"
+            columns: ["manual_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_item_assignments_manual_soldier_id_fkey"
+            columns: ["manual_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cleaning_manual_assignments: {
         Row: {
@@ -313,6 +414,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cleaning_parade_config: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          id: string
+          is_active: boolean
+          outpost: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_active?: boolean
+          outpost: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_active?: boolean
+          outpost?: string
+        }
+        Relationships: []
       }
       cleaning_parade_submissions: {
         Row: {
@@ -435,6 +560,60 @@ export type Database = {
             columns: ["checklist_item_id"]
             isOneToOne: false
             referencedRelation: "cleaning_checklist_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleaning_responsibility_areas: {
+        Row: {
+          created_at: string
+          deadline_time: string | null
+          id: string
+          manual_soldier_id: string | null
+          name: string
+          outpost: string
+          shift_day: string | null
+          shift_type: string | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deadline_time?: string | null
+          id?: string
+          manual_soldier_id?: string | null
+          name: string
+          outpost: string
+          shift_day?: string | null
+          shift_type?: string | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deadline_time?: string | null
+          id?: string
+          manual_soldier_id?: string | null
+          name?: string
+          outpost?: string
+          shift_day?: string | null
+          shift_type?: string | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaning_responsibility_areas_manual_soldier_id_fkey"
+            columns: ["manual_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cleaning_responsibility_areas_manual_soldier_id_fkey"
+            columns: ["manual_soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
             referencedColumns: ["id"]
           },
         ]
@@ -1290,6 +1469,8 @@ export type Database = {
           image_url: string | null
           latitude: number | null
           longitude: number | null
+          outpost: string | null
+          region: string | null
           title: string
           updated_at: string
           video_url: string | null
@@ -1306,6 +1487,8 @@ export type Database = {
           image_url?: string | null
           latitude?: number | null
           longitude?: number | null
+          outpost?: string | null
+          region?: string | null
           title: string
           updated_at?: string
           video_url?: string | null
@@ -1322,6 +1505,8 @@ export type Database = {
           image_url?: string | null
           latitude?: number | null
           longitude?: number | null
+          outpost?: string | null
+          region?: string | null
           title?: string
           updated_at?: string
           video_url?: string | null
@@ -1338,6 +1523,7 @@ export type Database = {
           latitude: number | null
           lessons_learned: string | null
           longitude: number | null
+          region: string | null
           title: string
           updated_at: string
         }
@@ -1350,6 +1536,7 @@ export type Database = {
           latitude?: number | null
           lessons_learned?: string | null
           longitude?: number | null
+          region?: string | null
           title: string
           updated_at?: string
         }
@@ -1362,6 +1549,7 @@ export type Database = {
           latitude?: number | null
           lessons_learned?: string | null
           longitude?: number | null
+          region?: string | null
           title?: string
           updated_at?: string
         }
@@ -1377,6 +1565,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           outpost: string
+          region: string | null
           title: string
           updated_at: string
         }
@@ -1389,6 +1578,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           outpost: string
+          region?: string | null
           title: string
           updated_at?: string
         }
@@ -1401,6 +1591,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           outpost?: string
+          region?: string | null
           title?: string
           updated_at?: string
         }
