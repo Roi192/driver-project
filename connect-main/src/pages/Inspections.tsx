@@ -730,22 +730,26 @@ export default function Inspections() {
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-amber-500 hover:text-amber-600 hover:bg-amber-50 px-2 h-auto py-1"
-                                onClick={() => openEditDialog(inspection)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-auto py-1"
-                                onClick={() => { setInspectionToDelete(inspection.id); setDeleteDialogOpen(true); }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-amber-500 hover:text-amber-600 hover:bg-amber-50 px-2 h-auto py-1"
+                                  onClick={() => openEditDialog(inspection)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-auto py-1"
+                                  onClick={() => { setInspectionToDelete(inspection.id); setDeleteDialogOpen(true); }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </ScrollArea>

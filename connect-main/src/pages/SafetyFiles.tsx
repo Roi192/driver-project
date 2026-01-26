@@ -36,7 +36,8 @@ const getFields = (): FieldConfig[] => [
   { name: "title", label: "שם הנקודה", type: "text", required: true, placeholder: "הזן שם..." },
   { name: "content", label: "תיאור", type: "textarea", placeholder: "תיאור מפורט של הנקודה..." },
   { name: "image_url", label: "תמונה", type: "image" },
-  { name: "get_location", label: "מיקום", type: "location", latField: "latitude", lngField: "longitude" },
+  { name: "map_picker", label: "דקירה במפה", type: "map_picker", latField: "latitude", lngField: "longitude" },
+  { name: "get_location", label: "מיקום נוכחי", type: "location", latField: "latitude", lngField: "longitude" },
   { name: "latitude", label: "קו רוחב", type: "text", placeholder: "31.9" },
   { name: "longitude", label: "קו אורך", type: "text", placeholder: "35.2" },
 ];

@@ -447,26 +447,28 @@ export default function PunishmentsTracking() {
                             {p.notes && (
                               <p className="text-sm text-slate-500 mt-1"><strong>הערות:</strong> {p.notes}</p>
                             )}
-                            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditDialog(p)}
-                                className="rounded-xl flex-1"
-                              >
-                                <Edit className="w-4 h-4 ml-1" />
-                                עריכה
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => { setItemToDelete(p); setDeleteConfirmOpen(true); }}
-                                className="rounded-xl text-red-500 flex-1"
-                              >
-                                <Trash2 className="w-4 h-4 ml-1" />
-                                מחיקה
-                              </Button>
-                            </div>
+                            {isAdmin && (
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditDialog(p)}
+                                  className="rounded-xl flex-1"
+                                >
+                                  <Edit className="w-4 h-4 ml-1" />
+                                  עריכה
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setItemToDelete(p); setDeleteConfirmOpen(true); }}
+                                  className="rounded-xl text-red-500 flex-1"
+                                >
+                                  <Trash2 className="w-4 h-4 ml-1" />
+                                  מחיקה
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

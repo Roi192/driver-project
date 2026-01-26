@@ -65,6 +65,7 @@ interface ItemAssignment {
   source_shift?: string | null;
   manual_soldier_id?: string | null;
   additional_soldier_id?: string | null;
+  deadline_time?: string | null;
 }
 
 interface ParadeDay {
@@ -99,9 +100,23 @@ const DAYS_OF_WEEK = [
   { value: 6, label: "שבת", short: "ש'" }
 ];
 
-// Build schedule options for selection
+// Build schedule options for selection - including previous week's Saturday
 const buildScheduleOptions = () => {
-  const options: { value: string; dayLabel: string; shiftLabel: string; day: number; shift: string }[] = [];
+  const options: { value: string; dayLabel: string; shiftLabel: string; day: number; shift: string; isPrevWeek?: boolean }[] = [];
+  
+  // Add previous week's Saturday shifts first (for Sunday parade assignments)
+  SHIFT_TYPES.forEach(shift => {
+    options.push({
+      value: `prev-6-${shift.value}`, // prev- prefix indicates previous week
+      dayLabel: "שבת (שבוע קודם)",
+      shiftLabel: shift.label,
+      day: 6, // Saturday
+      shift: shift.value,
+      isPrevWeek: true
+    });
+  });
+  
+  // Add current week days
   DAYS_OF_WEEK.forEach(day => {
     SHIFT_TYPES.forEach(shift => {
       options.push({
@@ -109,7 +124,8 @@ const buildScheduleOptions = () => {
         dayLabel: day.label,
         shiftLabel: shift.label,
         day: day.value,
-        shift: shift.value
+        shift: shift.value,
+        isPrevWeek: false
       });
     });
   });
@@ -127,6 +143,7 @@ export function ChecklistWithGroups({
   onAddPhoto
 }: ChecklistWithGroupsProps) {
   const [workSchedule, setWorkSchedule] = useState<WorkScheduleEntry[]>([]);
+  const [prevWeekSchedule, setPrevWeekSchedule] = useState<WorkScheduleEntry[]>([]);
   const [paradeDays, setParadeDays] = useState<ParadeDay[]>([]);
   const [assignments, setAssignments] = useState<Map<string, ItemAssignment>>(new Map());
   const [pendingChanges, setPendingChanges] = useState<Map<string, Partial<ItemAssignment> | null>>(new Map());
@@ -145,6 +162,7 @@ export function ChecklistWithGroups({
   const [selectedScheduleOption, setSelectedScheduleOption] = useState<string>("");
   const [selectedManualSoldier, setSelectedManualSoldier] = useState<string>("");
   const [selectedAdditionalSoldier, setSelectedAdditionalSoldier] = useState<string>("");
+  const [selectedDeadlineTime, setSelectedDeadlineTime] = useState<string>("");
 
   useEffect(() => {
     fetchAllData();
@@ -162,12 +180,27 @@ export function ChecklistWithGroups({
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const { data } = await supabase
-      .from("work_schedule")
-      .select("day_of_week, morning_soldier_id, afternoon_soldier_id, evening_soldier_id")
-      .eq("outpost", outpost)
-      .eq("week_start_date", weekStartStr);
-    setWorkSchedule(data || []);
+    // Calculate previous week start
+    const prevWeekStart = new Date(weekStart);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevWeekStartStr = format(prevWeekStart, "yyyy-MM-dd");
+    
+    // Fetch both current and previous week schedules
+    const [currentRes, prevRes] = await Promise.all([
+      supabase
+        .from("work_schedule")
+        .select("day_of_week, morning_soldier_id, afternoon_soldier_id, evening_soldier_id")
+        .eq("outpost", outpost)
+        .eq("week_start_date", weekStartStr),
+      supabase
+        .from("work_schedule")
+        .select("day_of_week, morning_soldier_id, afternoon_soldier_id, evening_soldier_id")
+        .eq("outpost", outpost)
+        .eq("week_start_date", prevWeekStartStr)
+    ]);
+    
+    setWorkSchedule(currentRes.data || []);
+    setPrevWeekSchedule(prevRes.data || []);
   };
 
   const fetchParadeDays = async () => {
@@ -208,8 +241,9 @@ export function ChecklistWithGroups({
     setPendingChanges(new Map());
   };
 
-  const getSoldierFromSchedule = (dayOfWeek: number, shiftType: string): Soldier | null => {
-    const scheduleEntry = workSchedule.find(s => s.day_of_week === dayOfWeek);
+  const getSoldierFromSchedule = (dayOfWeek: number, shiftType: string, isPrevWeek?: boolean): Soldier | null => {
+    const schedule = isPrevWeek ? prevWeekSchedule : workSchedule;
+    const scheduleEntry = schedule.find(s => s.day_of_week === dayOfWeek);
     if (!scheduleEntry) return null;
 
     let soldierId: string | null = null;
@@ -874,7 +908,7 @@ export function ChecklistWithGroups({
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       {SCHEDULE_OPTIONS.map(option => {
-                        const soldier = getSoldierFromSchedule(option.day, option.shift);
+                        const soldier = getSoldierFromSchedule(option.day, option.shift, option.isPrevWeek);
                         const ShiftIcon = SHIFT_TYPES.find(s => s.value === option.shift)?.icon || Sun;
                         return (
                           <SelectItem key={option.value} value={option.value}>

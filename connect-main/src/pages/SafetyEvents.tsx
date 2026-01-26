@@ -163,7 +163,8 @@ const getFields = (category: ContentCategory, soldiers: { id: string; full_name:
       { name: "image_url", label: "תמונה", type: "image" },
       { name: "file_url", label: "קובץ PDF", type: "media", mediaTypes: ["pdf", "file"] },
       { name: "video_url", label: "סרטון (קובץ / YouTube)", type: "media", mediaTypes: ["video", "youtube"] },
-      { name: "get_location", label: "מיקום", type: "location", latField: "latitude", lngField: "longitude" },
+      { name: "get_location", label: "מיקום נוכחי", type: "location", latField: "latitude", lngField: "longitude" },
+      { name: "map_picker", label: "דקירה במפה", type: "map_picker", latField: "latitude", lngField: "longitude" },
       { name: "latitude", label: "קו רוחב", type: "text", placeholder: "31.9" },
       { name: "longitude", label: "קו אורך", type: "text", placeholder: "35.2" },
     ];

@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, differenceInDays, parseISO, startOfWeek, endOfWeek, addWeeks } from "date-fns";
+import { format, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, differenceInDays, parseISO, startOfWeek, endOfWeek, addWeeks, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { 
   Calendar as CalendarIcon, 
@@ -173,6 +173,8 @@ export default function AnnualWorkPlan() {
     end_date: "",
     status: "pending" as "pending" | "in_progress" | "completed",
     category: "platoon",
+    is_recurring: false,
+    recurring_count: 6, // כמה אירועים ליצור (כברירת מחדל 6 = 3 חודשים)
   });
 
   useEffect(() => {
@@ -221,7 +223,32 @@ export default function AnnualWorkPlan() {
       return;
     }
 
-    const eventData = {
+    // בדוק אם יש אירוע כלשהו שבועיים לפני ותעתיק חיילים מצופים
+    let copiedExpectedSoldiers: string[] = [];
+    if (!editingEvent) {
+      const newEventDate = parseISO(formData.event_date);
+      const twoWeeksAgo = addDays(newEventDate, -14);
+      const twoWeeksAgoStr = format(twoWeeksAgo, "yyyy-MM-dd");
+      
+      console.log("Looking for event from 2 weeks ago:", twoWeeksAgoStr);
+      console.log("All events:", events.map(e => ({ date: e.event_date, title: e.title, expected: e.expected_soldiers?.length || 0 })));
+      
+      // חפש כל אירוע שהיה בדיוק שבועיים לפני (ללא קשר לכותרת)
+      const matchingEvent = events.find(event => 
+        event.event_date === twoWeeksAgoStr &&
+        event.expected_soldiers && 
+        event.expected_soldiers.length > 0
+      );
+      
+      console.log("Matching event found:", matchingEvent);
+      
+      if (matchingEvent) {
+        copiedExpectedSoldiers = matchingEvent.expected_soldiers;
+        toast.info(`העתקנו ${copiedExpectedSoldiers.length} חיילים מצופים מהמופע "${matchingEvent.title}" מתאריך ${format(twoWeeksAgo, "dd/MM/yyyy", { locale: he })}`);
+      }
+    }
+
+    const baseEventData = {
       title: formData.title,
       description: formData.description || null,
       event_date: formData.event_date,
@@ -230,13 +257,13 @@ export default function AnnualWorkPlan() {
       category: formData.category,
       color: formData.category === "platoon" ? "blue" : formData.category === "brigade" ? "purple" : "amber",
       attendees: [],
-      expected_soldiers: editingEvent?.expected_soldiers || [],
+      expected_soldiers: editingEvent?.expected_soldiers || copiedExpectedSoldiers,
     };
 
     if (editingEvent) {
       const { error } = await supabase
         .from("work_plan_events")
-        .update(eventData)
+        .update(baseEventData)
         .eq("id", editingEvent.id);
 
       if (error) {
@@ -246,14 +273,19 @@ export default function AnnualWorkPlan() {
         fetchData();
       }
     } else {
+      // אירוע בודד - כבר לא צריך את האופציה של אירועים חוזרים אוטומטית
       const { error } = await supabase
         .from("work_plan_events")
-        .insert(eventData);
+        .insert(baseEventData);
 
       if (error) {
         toast.error("שגיאה ביצירת המופע");
       } else {
-        toast.success("המופע נוצר בהצלחה");
+        if (copiedExpectedSoldiers.length > 0) {
+          toast.success("המופע נוצר בהצלחה עם החיילים המצופים מהמופע הקודם");
+        } else {
+          toast.success("המופע נוצר בהצלחה");
+        }
         fetchData();
       }
     }
@@ -284,6 +316,8 @@ export default function AnnualWorkPlan() {
       end_date: "",
       status: "pending",
       category: "platoon",
+      is_recurring: false,
+      recurring_count: 6,
     });
     setEditingEvent(null);
   };
@@ -297,6 +331,8 @@ export default function AnnualWorkPlan() {
       end_date: event.end_date || "",
       status: event.status,
       category: event.category || "platoon",
+      is_recurring: event.is_series || false,
+      recurring_count: 6,
     });
     setDialogOpen(true);
     setDetailDialogOpen(false);
@@ -372,17 +408,34 @@ export default function AnnualWorkPlan() {
   const saveExpectedSoldiers = async () => {
     if (!selectedEvent) return;
 
-    const { error } = await supabase
-      .from("work_plan_events")
-      .update({ expected_soldiers: selectedExpectedSoldiers })
-      .eq("id", selectedEvent.id);
+    // אם זה חלק מסדרה, עדכן את כל האירועים בסדרה
+    if (selectedEvent.is_series && selectedEvent.series_id) {
+      const { error } = await supabase
+        .from("work_plan_events")
+        .update({ expected_soldiers: selectedExpectedSoldiers })
+        .eq("series_id", selectedEvent.series_id);
 
-    if (error) {
-      toast.error("שגיאה בשמירת החיילים המצופים");
+      if (error) {
+        toast.error("שגיאה בשמירת החיילים המצופים");
+      } else {
+        toast.success("רשימת החיילים המצופים נשמרה לכל האירועים בסדרה");
+        fetchData();
+        setExpectedSoldiersDialogOpen(false);
+      }
     } else {
-      toast.success("רשימת החיילים המצופים נשמרה");
-      fetchData();
-      setExpectedSoldiersDialogOpen(false);
+      // אירוע בודד
+      const { error } = await supabase
+        .from("work_plan_events")
+        .update({ expected_soldiers: selectedExpectedSoldiers })
+        .eq("id", selectedEvent.id);
+
+      if (error) {
+        toast.error("שגיאה בשמירת החיילים המצופים");
+      } else {
+        toast.success("רשימת החיילים המצופים נשמרה");
+        fetchData();
+        setExpectedSoldiersDialogOpen(false);
+      }
     }
   };
 
@@ -825,6 +878,11 @@ export default function AnnualWorkPlan() {
                                       {event.expected_soldiers.length} מצופים
                                     </div>
                                   )}
+                                  {event.is_series && (
+                                    <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 mt-1">
+                                      🔄 חוזר כל שבועיים
+                                    </Badge>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -918,6 +976,44 @@ export default function AnnualWorkPlan() {
                   </Select>
                 </div>
               </div>
+
+              {/* אירוע חוזר - רק בהוספה חדשה */}
+              {!editingEvent && (
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="is_recurring"
+                      checked={formData.is_recurring}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_recurring: !!checked })}
+                    />
+                    <Label htmlFor="is_recurring" className="cursor-pointer">
+                      <span className="font-bold text-blue-800">אירוע חוזר כל שבועיים</span>
+                      <p className="text-xs text-blue-600">ייצור סדרת אירועים אוטומטית בהפרש של שבועיים</p>
+                    </Label>
+                  </div>
+
+                  {formData.is_recurring && (
+                    <div>
+                      <Label className="text-blue-700">כמה אירועים ליצור?</Label>
+                      <Select
+                        value={formData.recurring_count.toString()}
+                        onValueChange={(v) => setFormData({ ...formData, recurring_count: parseInt(v) })}
+                      >
+                        <SelectTrigger className="bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="4">4 אירועים (חודשיים)</SelectItem>
+                          <SelectItem value="6">6 אירועים (3 חודשים)</SelectItem>
+                          <SelectItem value="8">8 אירועים (4 חודשים)</SelectItem>
+                          <SelectItem value="12">12 אירועים (חצי שנה)</SelectItem>
+                          <SelectItem value="24">24 אירועים (שנה)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <DialogFooter className="mt-6">
@@ -939,13 +1035,18 @@ export default function AnnualWorkPlan() {
                     <div className={`w-3 h-12 rounded-full ${getCategoryColor(selectedEvent.category)}`} />
                     <div>
                       <DialogTitle>{selectedEvent.title}</DialogTitle>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-1 flex-wrap">
                         <Badge className={`${statusColors[selectedEvent.status]} text-white`}>
                           {statusLabels[selectedEvent.status]}
                         </Badge>
                         <Badge variant="outline">
                           {categoryLabels[selectedEvent.category as keyof typeof categoryLabels] || "פלוגתי"}
                         </Badge>
+                        {selectedEvent.is_series && (
+                          <Badge variant="outline" className="text-purple-600 border-purple-300">
+                            🔄 חוזר כל שבועיים
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1091,6 +1192,17 @@ export default function AnnualWorkPlan() {
             <p className="text-sm text-slate-600">
               בחר את החיילים שאמורים להגיע למופע זה. מי שלא ברשימה יסומן אוטומטית כ"לא בסבב".
             </p>
+
+            {selectedEvent?.is_series && (
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
+                <p className="text-sm text-purple-700 font-medium">
+                  🔄 אירוע זה חלק מסדרה חוזרת כל שבועיים
+                </p>
+                <p className="text-xs text-purple-600">
+                  השינויים יחולו על כל האירועים בסדרה
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-2 my-2">
               <Button variant="outline" size="sm" onClick={selectAllExpected}>בחר הכל</Button>

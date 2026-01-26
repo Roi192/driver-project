@@ -342,22 +342,22 @@ const CoursesManagement = () => {
         )}
 
         <Tabs defaultValue="enrollments" dir="rtl" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-800/50">
-            <TabsTrigger value="enrollments">
+          <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted">
+            <TabsTrigger value="enrollments" className="text-slate-700 data-[state=active]:text-foreground">
               <Users className="w-4 h-4 ml-2" />
               חיילים בקורסים
             </TabsTrigger>
-            <TabsTrigger value="courses">
+            <TabsTrigger value="courses" className="text-slate-700 data-[state=active]:text-foreground">
               <BookOpen className="w-4 h-4 ml-2" />
               רשימת קורסים
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="enrollments" className="mt-4">
-            <Card className="bg-slate-900/70 border-slate-700">
+            <Card className="bg-white border-border shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-emerald-400" />
+                <CardTitle className="flex items-center gap-2 text-slate-800">
+                  <Users className="w-5 h-5 text-emerald-600" />
                   רישומים לקורסים ({soldierCourses.length})
                 </CardTitle>
               </CardHeader>
@@ -378,26 +378,26 @@ const CoursesManagement = () => {
                   <ScrollArea className="h-[500px]">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-slate-700">
-                          <TableHead className="text-right">חייל</TableHead>
-                          <TableHead className="text-right">קורס</TableHead>
-                          <TableHead className="text-right">תאריך התחלה</TableHead>
-                          <TableHead className="text-right">תאריך סיום</TableHead>
-                          <TableHead className="text-right">סטטוס</TableHead>
-                          <TableHead className="text-right">פעולות</TableHead>
+                        <TableRow className="border-border bg-muted/50">
+                          <TableHead className="text-right text-slate-700">חייל</TableHead>
+                          <TableHead className="text-right text-slate-700">קורס</TableHead>
+                          <TableHead className="text-right text-slate-700">תאריך התחלה</TableHead>
+                          <TableHead className="text-right text-slate-700">תאריך סיום</TableHead>
+                          <TableHead className="text-right text-slate-700">סטטוס</TableHead>
+                          <TableHead className="text-right text-slate-700">פעולות</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {soldierCourses.map((sc) => (
-                          <TableRow key={sc.id} className="border-slate-700/50">
-                            <TableCell className="font-medium">
+                          <TableRow key={sc.id} className="border-border/50 hover:bg-muted/30">
+                            <TableCell className="font-medium text-slate-800">
                               {sc.soldiers?.full_name || "-"}
                             </TableCell>
-                            <TableCell>{sc.courses?.name || "-"}</TableCell>
-                            <TableCell>
+                            <TableCell className="text-slate-700">{sc.courses?.name || "-"}</TableCell>
+                            <TableCell className="text-slate-700">
                               {format(parseISO(sc.start_date), "dd/MM/yyyy")}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-slate-700">
                               {format(parseISO(sc.end_date), "dd/MM/yyyy")}
                             </TableCell>
                             <TableCell>{getStatusBadge(sc.status)}</TableCell>
@@ -407,13 +407,13 @@ const CoursesManagement = () => {
                                   value={sc.status}
                                   onValueChange={(val) => handleUpdateEnrollmentStatus(sc.id, val)}
                                 >
-                                  <SelectTrigger className="w-24 h-8 text-xs">
+                                  <SelectTrigger className="w-24 h-8 text-xs bg-white text-slate-700 border-border">
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="in_progress">בקורס</SelectItem>
-                                    <SelectItem value="completed">הושלם</SelectItem>
-                                    <SelectItem value="cancelled">בוטל</SelectItem>
+                                  <SelectContent className="bg-white border-border">
+                                    <SelectItem value="in_progress" className="text-slate-700">בקורס</SelectItem>
+                                    <SelectItem value="completed" className="text-slate-700">הושלם</SelectItem>
+                                    <SelectItem value="cancelled" className="text-slate-700">בוטל</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <Button
@@ -438,9 +438,9 @@ const CoursesManagement = () => {
 
           <TabsContent value="courses" className="mt-4 space-y-4">
             {/* Main Vehicle Courses */}
-            <Card className="bg-slate-900/70 border-slate-700">
+            <Card className="bg-white border-border shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-slate-800">
                   <BookOpen className="w-5 h-5 text-primary" />
                   קורסי רכב ({mainCourses.length})
                 </CardTitle>
@@ -450,20 +450,20 @@ const CoursesManagement = () => {
                   {mainCourses.map((course) => (
                     <div
                       key={course.id}
-                      className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50"
+                      className="p-4 bg-muted/50 rounded-xl border border-border"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-lg">{course.name}</span>
+                        <span className="font-bold text-lg text-slate-800">{course.name}</span>
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => openEditCourse(course)}
-                          className="h-7 w-7"
+                          className="h-7 w-7 text-slate-600 hover:text-primary"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
                         <Clock className="w-3 h-3" />
                         {course.duration_days || "-"} ימים
                       </div>
@@ -475,10 +475,10 @@ const CoursesManagement = () => {
 
             {/* Custom Courses */}
             {customCourses.length > 0 && (
-              <Card className="bg-slate-900/70 border-slate-700">
+              <Card className="bg-white border-border shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="w-5 h-5 text-amber-400" />
+                  <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <Plus className="w-5 h-5 text-amber-600" />
                     קורסים נוספים ({customCourses.length})
                   </CardTitle>
                 </CardHeader>
@@ -486,19 +486,19 @@ const CoursesManagement = () => {
                   <ScrollArea className="h-[200px]">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-slate-700">
-                          <TableHead className="text-right">שם הקורס</TableHead>
-                          <TableHead className="text-right">משך (ימים)</TableHead>
-                          <TableHead className="text-right">תיאור</TableHead>
-                          <TableHead className="text-right">פעולות</TableHead>
+                        <TableRow className="border-border bg-muted/50">
+                          <TableHead className="text-right text-slate-700">שם הקורס</TableHead>
+                          <TableHead className="text-right text-slate-700">משך (ימים)</TableHead>
+                          <TableHead className="text-right text-slate-700">תיאור</TableHead>
+                          <TableHead className="text-right text-slate-700">פעולות</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {customCourses.map((course) => (
-                          <TableRow key={course.id} className="border-slate-700/50">
-                            <TableCell className="font-medium">{course.name}</TableCell>
-                            <TableCell>{course.duration_days || "-"}</TableCell>
-                            <TableCell className="text-slate-400 max-w-xs truncate">
+                          <TableRow key={course.id} className="border-border/50 hover:bg-muted/30">
+                            <TableCell className="font-medium text-slate-800">{course.name}</TableCell>
+                            <TableCell className="text-slate-700">{course.duration_days || "-"}</TableCell>
+                            <TableCell className="text-slate-600 max-w-xs truncate">
                               {course.description || "-"}
                             </TableCell>
                             <TableCell>
@@ -533,9 +533,9 @@ const CoursesManagement = () => {
 
         {/* Add/Edit Course Dialog */}
         <Dialog open={courseDialogOpen} onOpenChange={setCourseDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-700 max-w-md" dir="rtl">
+          <DialogContent className="bg-white border-border max-w-md" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 text-slate-800">
                 <BookOpen className="w-5 h-5 text-primary" />
                 {editingCourse ? "עריכת קורס" : "הוספת קורס חדש"}
               </DialogTitle>
@@ -543,30 +543,33 @@ const CoursesManagement = () => {
 
             <div className="space-y-4">
               <div>
-                <Label>שם הקורס *</Label>
+                <Label className="text-slate-700">שם הקורס *</Label>
                 <Input
                   value={courseForm.name}
                   onChange={(e) => setCourseForm({ ...courseForm, name: e.target.value })}
                   placeholder="לדוגמה: קורס הנדסה"
+                  className="bg-white text-slate-800 border-border"
                 />
               </div>
 
               <div>
-                <Label>משך הקורס (ימים)</Label>
+                <Label className="text-slate-700">משך הקורס (ימים)</Label>
                 <Input
                   type="number"
                   min={1}
                   value={courseForm.duration_days}
                   onChange={(e) => setCourseForm({ ...courseForm, duration_days: parseInt(e.target.value) || 1 })}
+                  className="bg-white text-slate-800 border-border"
                 />
               </div>
 
               <div>
-                <Label>תיאור</Label>
+                <Label className="text-slate-700">תיאור</Label>
                 <Textarea
                   value={courseForm.description}
                   onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
                   placeholder="תיאור הקורס..."
+                  className="bg-white text-slate-800 border-border"
                 />
               </div>
             </div>
@@ -584,27 +587,27 @@ const CoursesManagement = () => {
 
         {/* Enroll Soldier Dialog */}
         <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
-          <DialogContent className="bg-slate-900 border-slate-700 max-w-md" dir="rtl">
+          <DialogContent className="bg-white border-border max-w-md" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-emerald-400" />
+              <DialogTitle className="flex items-center gap-2 text-slate-800">
+                <UserCheck className="w-5 h-5 text-emerald-600" />
                 רישום חייל לקורס
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
               <div>
-                <Label>בחר חייל *</Label>
+                <Label className="text-slate-700">בחר חייל *</Label>
                 <Select
                   value={enrollForm.soldier_id}
                   onValueChange={(val) => setEnrollForm({ ...enrollForm, soldier_id: val })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white text-slate-800 border-border">
                     <SelectValue placeholder="בחר חייל" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border-border">
                     {soldiers.map((soldier) => (
-                      <SelectItem key={soldier.id} value={soldier.id}>
+                      <SelectItem key={soldier.id} value={soldier.id} className="text-slate-700">
                         {soldier.full_name} ({soldier.personal_number})
                       </SelectItem>
                     ))}
@@ -613,15 +616,15 @@ const CoursesManagement = () => {
               </div>
 
               <div>
-                <Label>בחר קורס *</Label>
+                <Label className="text-slate-700">בחר קורס *</Label>
                 <Select
                   value={enrollForm.course_id}
                   onValueChange={(val) => setEnrollForm({ ...enrollForm, course_id: val })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white text-slate-800 border-border">
                     <SelectValue placeholder="בחר קורס" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border-border">
                     {/* Show only vehicle courses (MAIN_COURSES) and custom courses */}
                     {courses
                       .filter((course) => 
@@ -629,7 +632,7 @@ const CoursesManagement = () => {
                         !["מכונאות בסיסית", "נהיגה מונעת", "נהיגה מתקדמת", "עזרה ראשונה", "רענון"].includes(course.name)
                       )
                       .map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
+                        <SelectItem key={course.id} value={course.id} className="text-slate-700">
                           {course.name}
                         </SelectItem>
                       ))}

@@ -21,12 +21,13 @@ import { Loader2, Sparkles, MapPin, Crosshair } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { VideoUpload } from "./VideoUpload";
 import { MediaUpload } from "./MediaUpload";
+import { MapPicker } from "./MapPicker";
 import { toast } from "sonner";
 
 export interface FieldConfig {
   name: string;
   label: string;
-  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media" | "location" | "date";
+  type: "text" | "textarea" | "url" | "select" | "number" | "image" | "video" | "media" | "location" | "date" | "map_picker";
   placeholder?: string;
   required?: boolean;
   options?: { value: string; label: string }[];
@@ -62,17 +63,25 @@ export function AddEditDialog({
 }: AddEditDialogProps) {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Only reset form when dialog opens or initialData changes, NOT when fields change
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
+    if (open) {
+      if (initialData) {
+        setFormData(initialData);
+      } else {
+        const defaultData: Record<string, any> = {};
+        fields.forEach((field) => {
+          defaultData[field.name] = "";
+        });
+        setFormData(defaultData);
+      }
+      setIsInitialized(true);
     } else {
-      const defaultData: Record<string, any> = {};
-      fields.forEach((field) => {
-        defaultData[field.name] = "";
-      });
-      setFormData(defaultData);
+      setIsInitialized(false);
     }
-  }, [initialData, fields, open]);
+  }, [initialData, open]); // Removed 'fields' from dependencies to prevent reset on field changes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,19 +155,19 @@ export function AddEditDialog({
                   value={formData[field.name] || ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   required={field.required}
-                  className="min-h-[100px] bg-background/60 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all resize-none"
+                  className="min-h-[100px] bg-white text-slate-800 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all resize-none"
                 />
               ) : field.type === "select" ? (
                 <Select
                   value={formData[field.name] || ""}
                   onValueChange={(value) => handleChange(field.name, value)}
                 >
-                  <SelectTrigger className="h-12 bg-background/60 border-2 border-border/50 focus:border-primary/50 rounded-xl">
+                  <SelectTrigger className="h-12 bg-white text-slate-800 border-2 border-border/50 focus:border-primary/50 rounded-xl">
                     <SelectValue placeholder={field.placeholder || "בחר..."} />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border-2 border-border/50 rounded-xl">
+                  <SelectContent className="bg-white border-2 border-border/50 rounded-xl">
                     {field.options?.map((option) => (
-                      <SelectItem key={option.value} value={option.value} className="rounded-lg">
+                      <SelectItem key={option.value} value={option.value} className="rounded-lg text-slate-700">
                         {option.label}
                       </SelectItem>
                     ))}
@@ -195,6 +204,15 @@ export function AddEditDialog({
                   )}
                   {gettingLocation ? "מקבל מיקום..." : "הוסף מיקום בזמן אמת"}
                 </Button>
+              ) : field.type === "map_picker" ? (
+                <MapPicker
+                  latitude={formData[field.latField || "latitude"]}
+                  longitude={formData[field.lngField || "longitude"]}
+                  onLocationSelect={(lat, lng) => {
+                    handleChange(field.latField || "latitude", lat.toFixed(6));
+                    handleChange(field.lngField || "longitude", lng.toFixed(6));
+                  }}
+                />
               ) : field.type === "date" ? (
                 <Input
                   id={field.name}
@@ -202,7 +220,7 @@ export function AddEditDialog({
                   value={formData[field.name] || ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   required={field.required}
-                  className="h-12 bg-background/60 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all"
+                  className="h-12 bg-white text-slate-800 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all"
                 />
               ) : (
                 <Input
@@ -212,7 +230,7 @@ export function AddEditDialog({
                   value={formData[field.name] || ""}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   required={field.required}
-                  className="h-12 bg-background/60 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all"
+                  className="h-12 bg-white text-slate-800 border-2 border-border/50 focus:border-primary/50 rounded-xl transition-all"
                 />
               )}
             </div>

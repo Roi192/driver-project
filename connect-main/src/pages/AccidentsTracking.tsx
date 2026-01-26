@@ -37,6 +37,7 @@ import { he } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
 import * as XLSX from 'xlsx';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Soldier {
   id: string;
@@ -96,6 +97,7 @@ const incidentTypeColors: Record<IncidentType, string> = {
 };
 
 const AccidentsTracking = () => {
+  const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingAccident, setEditingAccident] = useState<Accident | null>(null);
@@ -767,17 +769,6 @@ const AccidentsTracking = () => {
                               title="פרטי אירוע וצ'קליסט"
                             >
                               <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(accident)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-destructive hover:text-destructive/80"
-                              onClick={() => { setAccidentToDelete(accident.id); setDeleteConfirmOpen(true); }}
-                            >
-                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>

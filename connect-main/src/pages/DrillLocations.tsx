@@ -70,6 +70,7 @@ const getAddFields = (): FieldConfig[] => [
   { name: "name", label: "שם הנקודה", type: "text", required: true, placeholder: "הזן שם..." },
   { name: "description", label: "תיאור", type: "textarea", placeholder: "תיאור הנקודה..." },
   { name: "image_url", label: "תמונה", type: "image" },
+  { name: "map_picker", label: "דקירה במפה", type: "map_picker", latField: "latitude", lngField: "longitude" },
   { name: "latitude", label: "קו רוחב", type: "number", placeholder: "31.8456" },
   { name: "longitude", label: "קו אורך", type: "number", placeholder: "35.2345" },
   { name: "instructions", label: "הוראות ביצוע", type: "textarea", placeholder: "הוראות ביצוע התרגולת..." },
