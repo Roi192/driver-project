@@ -5,13 +5,23 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
-import { FileSignature, Users, Calendar, Loader2, CheckCircle2, XCircle, ChevronLeft, Search, Download } from "lucide-react";
+import { FileSignature, Users, Calendar, Loader2, CheckCircle2, XCircle, ChevronLeft, Search, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import unitLogo from "@/assets/unit-logo.png";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SignatureRecord {
   id: string;
@@ -55,6 +65,9 @@ export function ProcedureSignaturesCard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProcedure, setSelectedProcedure] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [signatureToDelete, setSignatureToDelete] = useState<SignatureRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [stats, setStats] = useState<SignatureStats>({
     totalSigners: 0,
     byProcedure: {
@@ -180,6 +193,33 @@ export function ProcedureSignaturesCard() {
       console.error("Export error:", error);
       toast.error("שגיאה בייצוא הקובץ");
     }
+  };
+
+  const handleDeleteSignature = async () => {
+    if (!signatureToDelete) return;
+    
+    setIsDeleting(true);
+    const { error } = await supabase
+      .from("procedure_signatures")
+      .delete()
+      .eq("id", signatureToDelete.id);
+
+    if (error) {
+      console.error("Error deleting signature:", error);
+      toast.error("שגיאה במחיקת החתימה");
+    } else {
+      toast.success(`החתימה של ${signatureToDelete.full_name} נמחקה בהצלחה`);
+      fetchSignatures();
+    }
+    
+    setIsDeleting(false);
+    setDeleteDialogOpen(false);
+    setSignatureToDelete(null);
+  };
+
+  const openDeleteDialog = (sig: SignatureRecord) => {
+    setSignatureToDelete(sig);
+    setDeleteDialogOpen(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -337,14 +377,30 @@ export function ProcedureSignaturesCard() {
                             </div>
                             <div>
                               <p className="font-bold text-slate-800">{sig.full_name}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">חתימה: {sig.signature}</p>
+                              {sig.signature && sig.signature.startsWith("data:image") ? (
+                                <img 
+                                  src={sig.signature} 
+                                  alt="חתימה" 
+                                  className="h-8 mt-1 border border-slate-200 rounded bg-white"
+                                />
+                              ) : (
+                                <p className="text-xs text-slate-500 mt-0.5">חתימה: {sig.signature}</p>
+                              )}
                             </div>
                           </div>
-                          <div className="text-left">
+                          <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-1 text-xs text-slate-500">
                               <Calendar className="w-3 h-3" />
                               {formatDate(sig.created_at)}
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDeleteDialog(sig)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 h-7 px-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -356,6 +412,35 @@ export function ProcedureSignaturesCard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>מחיקת חתימה</AlertDialogTitle>
+            <AlertDialogDescription>
+              האם אתה בטוח שברצונך למחוק את החתימה של{" "}
+              <span className="font-bold">{signatureToDelete?.full_name}</span>?
+              <br />
+              פעולה זו תאפשר לחייל לחתום מחדש על הנוהל.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel disabled={isDeleting}>ביטול</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSignature}
+              disabled={isDeleting}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "מחק חתימה"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

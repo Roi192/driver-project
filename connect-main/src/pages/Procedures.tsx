@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import unitLogo from "@/assets/unit-logo.png";
+import { SignatureCanvas } from "@/components/shared/SignatureCanvas";
 
 interface ProcedureItem {
   id: string;
@@ -360,13 +361,11 @@ export default function Procedures() {
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                           <PenLine className="w-4 h-4" />
-                          חתימה
+                          חתימה דיגיטלית
                         </label>
-                        <Input
+                        <SignatureCanvas
                           value={signature}
-                          onChange={(e) => setSignature(e.target.value)}
-                          placeholder="הזן חתימה"
-                          className="h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-primary text-slate-800 text-right"
+                          onChange={setSignature}
                         />
                       </div>
 
