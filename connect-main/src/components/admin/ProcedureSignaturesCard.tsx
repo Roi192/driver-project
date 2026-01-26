@@ -83,13 +83,14 @@ export function ProcedureSignaturesCard() {
 
   const fetchSignatures = async () => {
     setLoading(true);
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1).toISOString();
+    // Fetch all signatures from the last 12 months to include previous year's signatures
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
     
     const { data, error } = await supabase
       .from("procedure_signatures")
       .select("*")
-      .gte("created_at", startOfYear)
+      .gte("created_at", twelveMonthsAgo.toISOString())
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -428,7 +429,10 @@ export function ProcedureSignaturesCard() {
           <AlertDialogFooter className="flex gap-2">
             <AlertDialogCancel disabled={isDeleting}>ביטול</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteSignature}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteSignature();
+              }}
               disabled={isDeleting}
               className="bg-red-500 hover:bg-red-600"
             >
