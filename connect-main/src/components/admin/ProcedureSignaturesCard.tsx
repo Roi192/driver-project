@@ -429,10 +429,7 @@ export function ProcedureSignaturesCard() {
           <AlertDialogFooter className="flex gap-2">
             <AlertDialogCancel disabled={isDeleting}>ביטול</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                handleDeleteSignature();
-              }}
+              onClick={handleDeleteSignature}
               disabled={isDeleting}
               className="bg-red-500 hover:bg-red-600"
             >
