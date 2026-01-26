@@ -83,14 +83,14 @@ export function ProcedureSignaturesCard() {
 
   const fetchSignatures = async () => {
     setLoading(true);
-    // Fetch all signatures from the last 12 months to include previous year's signatures
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    // Fetch signatures from the start of current year only
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1).toISOString();
     
     const { data, error } = await supabase
       .from("procedure_signatures")
       .select("*")
-      .gte("created_at", twelveMonthsAgo.toISOString())
+      .gte("created_at", startOfYear)
       .order("created_at", { ascending: false });
 
     if (error) {
