@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MapPin, Crosshair, Loader2, Map } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -20,6 +20,19 @@ interface MapPickerProps {
   latitude?: number | string | null;
   longitude?: number | string | null;
   onLocationSelect: (lat: number, lng: number) => void;
+}
+
+// Component to fly to position when it changes
+function FlyToPosition({ position }: { position: [number, number] | null }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 15, { duration: 0.5 });
+    }
+  }, [position, map]);
+  
+  return null;
 }
 
 function LocationMarker({ 
@@ -141,12 +154,16 @@ export function MapPicker({ latitude, longitude, onLocationSelect }: MapPickerPr
               zoom={position ? 15 : 10}
               style={{ height: "100%", width: "100%" }}
               zoomControl={true}
+              maxBounds={[[29.5, 34.2], [33.3, 35.9]]}
+              maxBoundsViscosity={1.0}
+              minZoom={8}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               <LocationMarker position={position} setPosition={setPosition} />
+              <FlyToPosition position={position} />
             </MapContainer>
           </div>
           
