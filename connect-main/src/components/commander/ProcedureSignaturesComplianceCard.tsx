@@ -75,26 +75,31 @@ export function ProcedureSignaturesComplianceCard() {
     }
   };
 
-  const getSignedUserIds = (procedureType: string): Set<string> => {
-    const latestSignatures = new Map<string, SignatureRecord>();
+  // Match by normalized name instead of user_id since soldiers table uses different IDs
+  const getSignedNames = (procedureType: string): Set<string> => {
+    const signedNames = new Set<string>();
     signatures
       .filter(s => s.procedure_type === procedureType)
       .forEach(sig => {
-        if (!latestSignatures.has(sig.user_id)) {
-          latestSignatures.set(sig.user_id, sig);
-        }
+        // Normalize name for comparison
+        const normalizedName = sig.full_name.trim().toLowerCase();
+        signedNames.add(normalizedName);
       });
-    return new Set(latestSignatures.keys());
+    return signedNames;
   };
 
   const getComplianceStats = () => {
     const stats: Record<string, { signed: number; unsigned: number }> = {};
     
     ["routine", "shift", "aluf70"].forEach(procedureType => {
-      const signedIds = getSignedUserIds(procedureType);
+      const signedNames = getSignedNames(procedureType);
+      // Count how many soldiers have their name in the signed set
+      const signedCount = soldiers.filter(s => 
+        signedNames.has(s.full_name.trim().toLowerCase())
+      ).length;
       stats[procedureType] = {
-        signed: signedIds.size,
-        unsigned: soldiers.length - signedIds.size
+        signed: signedCount,
+        unsigned: soldiers.length - signedCount
       };
     });
     
@@ -104,11 +109,11 @@ export function ProcedureSignaturesComplianceCard() {
   const getFilteredSoldiers = () => {
     if (!selectedProcedure) return [];
     
-    const signedIds = getSignedUserIds(selectedProcedure);
+    const signedNames = getSignedNames(selectedProcedure);
     
     let filtered = soldiers.map(soldier => ({
       ...soldier,
-      isSigned: signedIds.has(soldier.id)
+      isSigned: signedNames.has(soldier.full_name.trim().toLowerCase())
     }));
     
     if (filterType === "signed") {
