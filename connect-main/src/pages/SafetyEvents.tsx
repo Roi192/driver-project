@@ -317,6 +317,7 @@ export default function SafetyEvents() {
 
     const latitude = data.latitude ? parseFloat(data.latitude) : null;
     const longitude = data.longitude ? parseFloat(data.longitude) : null;
+    const eventType = data.event_type || null;
 
     const updateData = {
       title: data.title as string,
@@ -327,7 +328,7 @@ export default function SafetyEvents() {
       file_url: data.file_url || null,
       latitude,
       longitude,
-      event_type: data.event_type || null,
+      event_type: eventType,
       driver_type: data.driver_type || null,
       region: data.region || null,
       outpost: data.outpost || null,
@@ -343,6 +344,43 @@ export default function SafetyEvents() {
       console.error(error);
     } else {
       toast.success("התוכן עודכן בהצלחה");
+      
+      // Sync to safety_events table for map display when coordinates are added/updated
+      if ((selectedCategory === "sector_events" || selectedCategory === "neighbor_events") && latitude && longitude) {
+        const eventCategory = eventType === "accident" ? "accident" : "other";
+        
+        // Check if this event already exists in safety_events (by matching title and approximate date)
+        const { data: existingEvent } = await supabase
+          .from("safety_events")
+          .select("id")
+          .eq("title", data.title)
+          .maybeSingle();
+        
+        if (existingEvent) {
+          // Update existing
+          await supabase.from("safety_events").update({
+            title: data.title,
+            description: data.description || null,
+            category: eventCategory,
+            event_date: data.event_date || null,
+            latitude,
+            longitude,
+            region: data.region || null,
+          }).eq("id", existingEvent.id);
+        } else {
+          // Insert new
+          await supabase.from("safety_events").insert([{
+            title: data.title,
+            description: data.description || null,
+            category: eventCategory,
+            event_date: data.event_date || null,
+            latitude,
+            longitude,
+            region: data.region || null,
+          }]);
+        }
+      }
+      
       setEditDialogOpen(false);
       if (selectedCategory) {
         fetchItems(selectedCategory);
