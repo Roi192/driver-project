@@ -288,15 +288,20 @@ export default function SafetyEvents() {
         }]);
       }
       
-      // If it's a sector event with location, also add to safety_events table
-      if (selectedCategory === "sector_events" && latitude && longitude) {
+      // Sync to safety_events table for map display in "Know The Area"
+      // For sector_events and neighbor_events - sync if it has location
+      if ((selectedCategory === "sector_events" || selectedCategory === "neighbor_events") && latitude && longitude) {
+        // Map event types to valid safety_events categories
+        // Valid categories: 'accident' | 'fire' | 'vehicle' | 'weapon' | 'other'
+        const eventCategory = eventType === "accident" ? "accident" : "other";
         await supabase.from("safety_events").insert([{
           title: data.title,
           description: data.description || null,
-          category: "other",
+          category: eventCategory,
           event_date: data.event_date || null,
           latitude,
           longitude,
+          region: data.region || null,
         }]);
       }
       
