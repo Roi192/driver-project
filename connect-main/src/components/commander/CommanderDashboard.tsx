@@ -10,7 +10,8 @@ import { NextUpSection } from "./NextUpSection";
 import { CommanderQuickActions } from "./CommanderQuickActions";
 import { CleaningParadeCards } from "./CleaningParadeCards";
 import { TripFormsCard } from "./TripFormsCard";
-
+import { ProcedureSignaturesComplianceCard } from "./ProcedureSignaturesComplianceCard";
+import { TripFormsComplianceCard } from "./TripFormsComplianceCard";
 
 export function CommanderDashboard() {
   const { user, signOut } = useAuth();
@@ -117,6 +118,16 @@ export function CommanderDashboard() {
         {/* Trip Forms Card */}
         <section className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
           <TripFormsCard />
+        </section>
+
+        {/* Procedure Signatures Compliance Card */}
+        <section className="animate-slide-up" style={{ animationDelay: '0.35s' }}>
+          <ProcedureSignaturesComplianceCard />
+        </section>
+
+        {/* Trip Forms Compliance Card (based on expected soldiers) */}
+        <section className="animate-slide-up" style={{ animationDelay: '0.38s' }}>
+          <TripFormsComplianceCard />
         </section>
 
         {/* Next Up Section */}
