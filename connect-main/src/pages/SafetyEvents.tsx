@@ -234,8 +234,20 @@ export default function SafetyEvents() {
     if (!selectedCategory) return;
     setIsSubmitting(true);
 
-    const latitude = data.latitude ? parseFloat(data.latitude) : null;
-    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+    // Parse and validate coordinates - must be in valid range for Israel
+    let latitude = data.latitude ? parseFloat(data.latitude) : null;
+    let longitude = data.longitude ? parseFloat(data.longitude) : null;
+    
+    // Validate coordinates are in reasonable range (Israel is roughly lat: 29-34, lng: 34-36)
+    if (latitude !== null && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+      console.warn("Invalid latitude:", data.latitude, "-> resetting to null");
+      latitude = null;
+    }
+    if (longitude !== null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+      console.warn("Invalid longitude:", data.longitude, "-> resetting to null");
+      longitude = null;
+    }
+    
     const eventType = data.event_type || null;
     const driverType = data.driver_type || null;
 
@@ -315,8 +327,20 @@ export default function SafetyEvents() {
     if (!selectedItem) return;
     setIsSubmitting(true);
 
-    const latitude = data.latitude ? parseFloat(data.latitude) : null;
-    const longitude = data.longitude ? parseFloat(data.longitude) : null;
+    // Parse and validate coordinates - must be in valid range for Israel
+    let latitude = data.latitude ? parseFloat(data.latitude) : null;
+    let longitude = data.longitude ? parseFloat(data.longitude) : null;
+    
+    // Validate coordinates are in reasonable range (Israel is roughly lat: 29-34, lng: 34-36)
+    if (latitude !== null && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+      console.warn("Invalid latitude:", data.latitude, "-> resetting to null");
+      latitude = null;
+    }
+    if (longitude !== null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+      console.warn("Invalid longitude:", data.longitude, "-> resetting to null");
+      longitude = null;
+    }
+    
     const eventType = data.event_type || null;
 
     const updateData = {

@@ -92,6 +92,14 @@ export function AddEditDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleLocationChange = (latField: string, lngField: string, lat: number, lng: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      [latField]: lat.toFixed(6),
+      [lngField]: lng.toFixed(6),
+    }));
+  };
+
   const getCurrentLocation = (latField: string, lngField: string) => {
     setGettingLocation(true);
     if (navigator.geolocation) {
@@ -209,8 +217,7 @@ export function AddEditDialog({
                   latitude={formData[field.latField || "latitude"]}
                   longitude={formData[field.lngField || "longitude"]}
                   onLocationSelect={(lat, lng) => {
-                    handleChange(field.latField || "latitude", lat.toFixed(6));
-                    handleChange(field.lngField || "longitude", lng.toFixed(6));
+                    handleLocationChange(field.latField || "latitude", field.lngField || "longitude", lat, lng);
                   }}
                 />
               ) : field.type === "date" ? (
