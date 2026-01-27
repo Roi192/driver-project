@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,16 +50,16 @@ export function TimePicker({ value, onChange, placeholder = "בחר שעה", cla
           {value || placeholder}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-0 bg-white" align="start">
-        <ScrollArea className="h-64">
-          <div className="p-2 grid grid-cols-2 gap-1">
+      <PopoverContent className="w-56 p-0 bg-white max-h-[300px] overflow-hidden" align="start" sideOffset={4}>
+        <ScrollArea className="h-[280px]">
+          <div className="p-2 grid grid-cols-3 gap-1">
             {TIME_SLOTS.map((time) => (
               <Button
                 key={time}
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "text-slate-700 hover:bg-blue-50 hover:text-blue-700",
+                  "text-slate-700 hover:bg-blue-50 hover:text-blue-700 text-xs",
                   value === time && "bg-blue-100 text-blue-700 font-bold"
                 )}
                 onClick={() => handleSelect(time)}
@@ -68,6 +68,7 @@ export function TimePicker({ value, onChange, placeholder = "בחר שעה", cla
               </Button>
             ))}
           </div>
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
       </PopoverContent>
     </Popover>
