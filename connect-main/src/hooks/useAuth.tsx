@@ -53,6 +53,7 @@ interface AuthContextType {
   canAccessDriverInterviews: boolean;
   canAccessAdminDashboard: boolean;
   canAccessWorkSchedule: boolean;
+  canAccessWeeklyMeeting: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -242,6 +243,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   // Admin and platoon_commander can access work schedule
   const canAccessWorkSchedule = role === 'admin' || role === 'platoon_commander';
+  
+  // Admin and platoon_commander can access weekly meeting
+  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander';
 
   const value = {
     user,
@@ -279,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAccessDriverInterviews,
     canAccessAdminDashboard,
     canAccessWorkSchedule,
+    canAccessWeeklyMeeting,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
