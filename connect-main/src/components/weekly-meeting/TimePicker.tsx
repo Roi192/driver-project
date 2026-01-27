@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,26 +12,39 @@ interface TimePickerProps {
   className?: string;
 }
 
-// Generate time slots from 06:00 to 23:00 in 15-minute intervals
-const generateTimeSlots = () => {
-  const slots: string[] = [];
-  for (let hour = 6; hour <= 23; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      const h = hour.toString().padStart(2, "0");
-      const m = minute.toString().padStart(2, "0");
-      slots.push(`${h}:${m}`);
-    }
-  }
-  return slots;
-};
+// Generate hours 00-23
+const HOURS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
 
-const TIME_SLOTS = generateTimeSlots();
+// Generate minutes 00, 05, 10, ..., 55
+const MINUTES = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"));
 
 export function TimePicker({ value, onChange, placeholder = "בחר שעה", className }: TimePickerProps) {
   const [open, setOpen] = useState(false);
+  const [selectedHour, setSelectedHour] = useState<string>("08");
+  const [selectedMinute, setSelectedMinute] = useState<string>("00");
 
-  const handleSelect = (time: string) => {
+  // Parse value when it changes
+  useEffect(() => {
+    if (value) {
+      const [h, m] = value.split(":");
+      if (h) setSelectedHour(h);
+      if (m) {
+        // Round to nearest 5 minutes
+        const mins = parseInt(m);
+        const rounded = Math.round(mins / 5) * 5;
+        setSelectedMinute(rounded.toString().padStart(2, "0"));
+      }
+    }
+  }, [value]);
+
+  const handleConfirm = () => {
+    const time = `${selectedHour}:${selectedMinute}`;
     onChange(time);
+    setOpen(false);
+  };
+
+  const handleClear = () => {
+    onChange("");
     setOpen(false);
   };
 
@@ -50,26 +63,82 @@ export function TimePicker({ value, onChange, placeholder = "בחר שעה", cla
           {value || placeholder}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0 bg-white max-h-[300px] overflow-hidden" align="start" sideOffset={4}>
-        <ScrollArea className="h-[280px]">
-          <div className="p-2 grid grid-cols-3 gap-1">
-            {TIME_SLOTS.map((time) => (
-              <Button
-                key={time}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "text-slate-700 hover:bg-blue-50 hover:text-blue-700 text-xs",
-                  value === time && "bg-blue-100 text-blue-700 font-bold"
-                )}
-                onClick={() => handleSelect(time)}
-              >
-                {time}
-              </Button>
-            ))}
+      <PopoverContent className="w-64 p-0 bg-white" align="start" sideOffset={4}>
+        <div className="p-3 border-b border-slate-200">
+          <div className="text-center text-lg font-bold text-slate-800">
+            {selectedHour}:{selectedMinute}
           </div>
-          <ScrollBar orientation="vertical" />
-        </ScrollArea>
+        </div>
+        
+        <div className="flex">
+          {/* Hours Column */}
+          <div className="flex-1 border-l border-slate-200">
+            <div className="text-center text-xs font-medium text-slate-500 py-2 bg-slate-50">
+              שעה
+            </div>
+            <ScrollArea className="h-48">
+              <div className="p-1">
+                {HOURS.map((hour) => (
+                  <Button
+                    key={hour}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "w-full justify-center text-slate-700 hover:bg-primary/10 hover:text-primary",
+                      selectedHour === hour && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground font-bold"
+                    )}
+                    onClick={() => setSelectedHour(hour)}
+                  >
+                    {hour}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Minutes Column */}
+          <div className="flex-1">
+            <div className="text-center text-xs font-medium text-slate-500 py-2 bg-slate-50">
+              דקות
+            </div>
+            <ScrollArea className="h-48">
+              <div className="p-1">
+                {MINUTES.map((minute) => (
+                  <Button
+                    key={minute}
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "w-full justify-center text-slate-700 hover:bg-primary/10 hover:text-primary",
+                      selectedMinute === minute && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground font-bold"
+                    )}
+                    onClick={() => setSelectedMinute(minute)}
+                  >
+                    {minute}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+
+        <div className="flex gap-2 p-3 border-t border-slate-200">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={handleClear}
+          >
+            נקה
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1"
+            onClick={handleConfirm}
+          >
+            אישור
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
