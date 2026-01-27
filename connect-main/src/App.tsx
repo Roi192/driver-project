@@ -35,6 +35,8 @@ import DriverInterviews from "./pages/DriverInterviews";
 import AdminDriverInterviews from "./pages/AdminDriverInterviews";
 import CoursesManagement from "./pages/CoursesManagement";
 import WorkSchedule from "./pages/WorkSchedule";
+import ProcedureSignaturesTracking from "./pages/ProcedureSignaturesTracking";
+import WeeklyMeeting from "./pages/WeeklyMeeting";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -272,6 +274,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <WorkSchedule />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/weekly-meeting"
+              element={
+                <ProtectedRoute>
+                  <WeeklyMeeting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/procedure-signatures-tracking"
+              element={
+                <ProtectedRoute>
+                  <ProcedureSignaturesTracking />
                 </ProtectedRoute>
               }
             />

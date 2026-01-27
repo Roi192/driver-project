@@ -68,6 +68,7 @@ export function useUserRole() {
   const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander';
   const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander';
   const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander';
   const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
 
   return {
@@ -98,6 +99,7 @@ export function useUserRole() {
     canAccessCleaningManagement,
     canAccessSafetyScores,
     canAccessDriverInterviews,
+    canAccessWeeklyMeeting,
     canAccessAdminDashboard,
   };
 }

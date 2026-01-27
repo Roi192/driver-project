@@ -618,6 +618,45 @@ export type Database = {
           },
         ]
       }
+      commander_weekly_schedule: {
+        Row: {
+          commander_id: string
+          completed: boolean | null
+          created_at: string
+          description: string | null
+          id: string
+          scheduled_day: number
+          scheduled_time: string | null
+          title: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          commander_id: string
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          scheduled_day: number
+          scheduled_time?: string | null
+          title: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          commander_id?: string
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          scheduled_day?: number
+          scheduled_time?: string | null
+          title?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           category: string | null
@@ -1203,6 +1242,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mp_weekly_notes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          general_notes: string | null
+          id: string
+          region_emphases: Json | null
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          general_notes?: string | null
+          id?: string
+          region_emphases?: Json | null
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          general_notes?: string | null
+          id?: string
+          region_emphases?: Json | null
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: []
       }
       procedure_signatures: {
         Row: {
@@ -2071,6 +2140,342 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      weekly_closings: {
+        Row: {
+          commander_notes: string | null
+          created_at: string
+          created_by: string | null
+          discipline_events_summary: string | null
+          id: string
+          planning_vs_execution: string | null
+          safety_events_summary: string | null
+          unresolved_deviations: string | null
+          updated_at: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          commander_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          discipline_events_summary?: string | null
+          id?: string
+          planning_vs_execution?: string | null
+          safety_events_summary?: string | null
+          unresolved_deviations?: string | null
+          updated_at?: string
+          weekly_opening_id: string
+        }
+        Update: {
+          commander_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          discipline_events_summary?: string | null
+          id?: string
+          planning_vs_execution?: string | null
+          safety_events_summary?: string | null
+          unresolved_deviations?: string | null
+          updated_at?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_closings_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_commander_summary: {
+        Row: {
+          action_items: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          summary_text: string | null
+          updated_at: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          action_items?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          summary_text?: string | null
+          updated_at?: string
+          weekly_opening_id: string
+        }
+        Update: {
+          action_items?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          summary_text?: string | null
+          updated_at?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_commander_summary_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_fitness_issues: {
+        Row: {
+          created_at: string
+          id: string
+          issue_details: string | null
+          issue_type: string
+          resolved: boolean | null
+          soldier_id: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          issue_details?: string | null
+          issue_type: string
+          resolved?: boolean | null
+          soldier_id: string
+          weekly_opening_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          issue_details?: string | null
+          issue_type?: string
+          resolved?: boolean | null
+          soldier_id?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_fitness_issues_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_fitness_issues_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_fitness_issues_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_manpower: {
+        Row: {
+          absence_reason: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          soldier_id: string
+          status: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          absence_reason?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          soldier_id: string
+          status?: string
+          weekly_opening_id: string
+        }
+        Update: {
+          absence_reason?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          soldier_id?: string
+          status?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_manpower_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manpower_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_manpower_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_openings: {
+        Row: {
+          commander_help_description: string | null
+          commander_id: string | null
+          concerns: string | null
+          created_at: string
+          id: string
+          needs_commander_help: boolean | null
+          region: string
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          commander_help_description?: string | null
+          commander_id?: string | null
+          concerns?: string | null
+          created_at?: string
+          id?: string
+          needs_commander_help?: boolean | null
+          region: string
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          commander_help_description?: string | null
+          commander_id?: string | null
+          concerns?: string | null
+          created_at?: string
+          id?: string
+          needs_commander_help?: boolean | null
+          region?: string
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
+      weekly_safety_activities: {
+        Row: {
+          activity_type: string
+          commander_help_type: string | null
+          completed: boolean | null
+          created_at: string
+          description: string | null
+          id: string
+          needs_commander_help: boolean | null
+          planned_date: string | null
+          soldier_id: string | null
+          title: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          activity_type: string
+          commander_help_type?: string | null
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          needs_commander_help?: boolean | null
+          planned_date?: string | null
+          soldier_id?: string | null
+          title: string
+          weekly_opening_id: string
+        }
+        Update: {
+          activity_type?: string
+          commander_help_type?: string | null
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          needs_commander_help?: boolean | null
+          planned_date?: string | null
+          soldier_id?: string | null
+          title?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_safety_activities_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_safety_activities_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_safety_activities_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_schedule: {
+        Row: {
+          completed: boolean | null
+          created_at: string
+          description: string | null
+          end_time: string | null
+          id: string
+          schedule_type: string
+          scheduled_day: number
+          scheduled_time: string | null
+          title: string
+          weekly_opening_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          schedule_type: string
+          scheduled_day: number
+          scheduled_time?: string | null
+          title: string
+          weekly_opening_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          schedule_type?: string
+          scheduled_day?: number
+          scheduled_time?: string | null
+          title?: string
+          weekly_opening_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_schedule_weekly_opening_id_fkey"
+            columns: ["weekly_opening_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_openings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       work_plan_events: {
         Row: {
