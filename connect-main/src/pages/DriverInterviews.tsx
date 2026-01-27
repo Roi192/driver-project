@@ -728,12 +728,13 @@ export default function DriverInterviews() {
 
             <div>
               <Label>1. מצב משפחתי של החייל ורקע כללי</Label>
+              <p className="text-xs text-slate-500 mb-1">פרט על מצב משפחתי ורקע, תחביבים, לימודים, במה עובד</p>
               <Textarea
                 value={formData.family_status}
                 onChange={(e) => setFormData({ ...formData, family_status: e.target.value })}
-                placeholder="פרט על מצב משפחתי ורקע..."
+                placeholder="פרט על מצב משפחתי ורקע, תחביבים, לימודים, במה עובד..."
                 className="rounded-xl mt-2"
-                rows={3}
+                rows={4}
               />
             </div>
 

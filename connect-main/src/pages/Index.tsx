@@ -6,10 +6,10 @@ import { QuickActions } from "@/components/home/QuickActions";
 import { DriverHomeContent } from "@/components/home/DriverHomeContent";
 
 const Index = () => {
-  const { user, isAdmin, isPlatoonCommander, loading } = useAuth();
+  const { user, isAdmin, isPlatoonCommander, isBattalionAdmin, loading } = useAuth();
 
   // Check if user has any admin-level role that should see commander dashboard
-  const hasAdminAccess = isAdmin || isPlatoonCommander;
+  const hasAdminAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
 
   // Show loading while checking role
   if (loading) {

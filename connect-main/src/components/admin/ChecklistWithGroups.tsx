@@ -25,9 +25,11 @@ import {
   Save,
   UserPlus,
   X,
-  User
+  User,
+  Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TimePicker } from "@/components/weekly-meeting/TimePicker";
 
 interface ChecklistItem {
   id: string;
@@ -234,7 +236,8 @@ export function ChecklistWithGroups({
         item_id: a.item_id,
         parade_day: a.parade_day,
         shift_type: a.shift_type,
-        manual_soldier_id: a.manual_soldier_id
+        manual_soldier_id: a.manual_soldier_id,
+        deadline_time: a.deadline_time
       });
     });
     setAssignments(assignmentMap);
@@ -286,12 +289,14 @@ export function ChecklistWithGroups({
         setSelectedManualSoldier("");
         setSelectedAdditionalSoldier(assignment.manual_soldier_id || "");
       }
+      setSelectedDeadlineTime(assignment.deadline_time || "");
     } else {
       // No assignment
       setAssignmentType("schedule");
       setSelectedScheduleOption("");
       setSelectedManualSoldier("");
       setSelectedAdditionalSoldier("");
+      setSelectedDeadlineTime("");
     }
     
     setAssignDialogOpen(true);
@@ -309,7 +314,8 @@ export function ChecklistWithGroups({
         item_id: currentCell.itemId,
         parade_day: currentCell.paradeDay,
         shift_type: selectedScheduleOption, // e.g., "0-morning" for Sunday Morning
-        manual_soldier_id: selectedAdditionalSoldier || null
+        manual_soldier_id: selectedAdditionalSoldier || null,
+        deadline_time: selectedDeadlineTime || null
       });
     } else if (assignmentType === "manual" && selectedManualSoldier) {
       // Manual only: store soldier_id without shift_type
@@ -317,7 +323,8 @@ export function ChecklistWithGroups({
         item_id: currentCell.itemId,
         parade_day: currentCell.paradeDay,
         shift_type: `manual-${selectedManualSoldier}`, // Mark as manual
-        manual_soldier_id: selectedManualSoldier
+        manual_soldier_id: selectedManualSoldier,
+        deadline_time: selectedDeadlineTime || null
       });
     } else {
       // Clear assignment
@@ -342,8 +349,8 @@ export function ChecklistWithGroups({
     setIsSaving(true);
     try {
       const toDelete: string[] = [];
-      const toInsert: { outpost: string; item_id: string; parade_day: number; shift_type: string; manual_soldier_id?: string | null }[] = [];
-      const toUpdate: { id: string; shift_type: string; manual_soldier_id?: string | null }[] = [];
+      const toInsert: { outpost: string; item_id: string; parade_day: number; shift_type: string; manual_soldier_id?: string | null; deadline_time?: string | null }[] = [];
+      const toUpdate: { id: string; shift_type: string; manual_soldier_id?: string | null; deadline_time?: string | null }[] = [];
       
       pendingChanges.forEach((value, key) => {
         const existing = assignments.get(key);
@@ -356,7 +363,8 @@ export function ChecklistWithGroups({
           toUpdate.push({ 
             id: existing.id, 
             shift_type: value.shift_type!,
-            manual_soldier_id: value.manual_soldier_id ?? null
+            manual_soldier_id: value.manual_soldier_id ?? null,
+            deadline_time: value.deadline_time ?? null
           });
         } else {
           toInsert.push({
@@ -364,7 +372,8 @@ export function ChecklistWithGroups({
             item_id: value.item_id!,
             parade_day: value.parade_day!,
             shift_type: value.shift_type!,
-            manual_soldier_id: value.manual_soldier_id ?? null
+            manual_soldier_id: value.manual_soldier_id ?? null,
+            deadline_time: value.deadline_time ?? null
           });
         }
       });
@@ -387,7 +396,11 @@ export function ChecklistWithGroups({
       for (const update of toUpdate) {
         const { error } = await (supabase as any)
           .from("cleaning_item_assignments")
-          .update({ shift_type: update.shift_type, manual_soldier_id: update.manual_soldier_id })
+          .update({ 
+            shift_type: update.shift_type, 
+            manual_soldier_id: update.manual_soldier_id,
+            deadline_time: update.deadline_time
+          })
           .eq("id", update.id);
         if (error) {
           console.error("Update error:", error);
@@ -717,6 +730,13 @@ export function ChecklistWithGroups({
                                 </div>
                               )}
                               
+                              {/* Execution Time */}
+                              {assignment?.deadline_time && (
+                                <div className="text-[9px] text-primary truncate text-center bg-primary/10 rounded px-1 py-0.5 flex items-center justify-center gap-0.5">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {assignment.deadline_time.substring(0, 5)}
+                                </div>
+                              )}
                               {/* Clear button */}
                               <Button
                                 variant="ghost"
@@ -991,6 +1011,22 @@ export function ChecklistWithGroups({
                 </p>
               </div>
             )}
+
+            {/* Execution Time - Available for both types */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                שעת ביצוע המסדר (אופציונלי)
+              </Label>
+              <TimePicker
+                value={selectedDeadlineTime}
+                onChange={setSelectedDeadlineTime}
+                placeholder="בחר שעת ביצוע"
+              />
+              <p className="text-xs text-slate-500">
+                הגדר שעת ביצוע מומלצת למשימה
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>ביטול</Button>
