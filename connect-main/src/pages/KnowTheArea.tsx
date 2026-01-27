@@ -16,10 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { REGIONS, REGION_OUTPOSTS, getRegionFromOutpost } from "@/lib/constants";
+import { REGIONS, REGION_OUTPOSTS, OUTPOSTS, getRegionFromOutpost } from "@/lib/constants";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { 
   Map, 
   Flame, 
@@ -253,6 +254,11 @@ interface SafetyEvent {
   event_date: string | null;
   latitude: number | null;
   longitude: number | null;
+  region: string | null;
+  outpost: string | null;
+  event_type: string | null;
+  driver_type: string | null;
+  image_url: string | null;
 }
 
 interface DangerousRoute {
@@ -471,6 +477,7 @@ const KnowTheArea = () => {
   
   // View/Filter states
   const [viewMode, setViewMode] = useState<"map" | "heatmap">("map");
+  const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
   const [searchQuery, setSearchQuery] = useState("");
   const [showOutposts, setShowOutposts] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
@@ -531,14 +538,89 @@ const KnowTheArea = () => {
     color: "#000000",
   });
   
-  const [eventFormData, setEventFormData] = useState({
-    title: "",
-    description: "",
-    category: "other" as "fire" | "accident" | "weapon" | "vehicle" | "other",
-    event_date: new Date().toISOString().split('T')[0],
-    latitude: null as number | null,
-    longitude: null as number | null,
-  });
+  const [eventFormData, setEventFormData] = useState<Record<string, any>>({});
+  const [soldiers, setSoldiers] = useState<{ id: string; full_name: string; personal_number: string }[]>([]);
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+
+  // Event types for the form
+  const EVENT_TYPES = [
+    { value: "accident", label: "תאונה" },
+    { value: "stuck", label: "התחפרות" },
+    { value: "other", label: "אחר" },
+  ];
+
+  const DRIVER_TYPES = [
+    { value: "security", label: 'נהג בט"ש' },
+    { value: "combat", label: "נהג גדוד" },
+  ];
+
+  const SEVERITY_TYPES = [
+    { value: "minor", label: "קל" },
+    { value: "moderate", label: "בינוני" },
+    { value: "severe", label: "חמור" },
+  ];
+
+  // Field configuration for event form - matches SafetyEvents
+  const getEventFields = (): FieldConfig[] => {
+    return [
+      { name: "title", label: "כותרת", type: "text", required: true, placeholder: "הזן כותרת..." },
+      { name: "event_date", label: "תאריך", type: "date", placeholder: "בחר תאריך" },
+      { 
+        name: "region", 
+        label: "גזרה", 
+        type: "select",
+        options: REGIONS.map(r => ({ value: r, label: r })),
+        placeholder: "בחר גזרה"
+      },
+      { 
+        name: "outpost", 
+        label: "מוצב", 
+        type: "select",
+        options: OUTPOSTS.map(o => ({ value: o, label: o })),
+        placeholder: "בחר מוצב"
+      },
+      { 
+        name: "event_type", 
+        label: "סוג אירוע", 
+        type: "select",
+        options: EVENT_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר סוג אירוע"
+      },
+      { 
+        name: "driver_type", 
+        label: "סוג נהג", 
+        type: "select",
+        options: DRIVER_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר סוג נהג"
+      },
+      { 
+        name: "soldier_id", 
+        label: "בחר חייל", 
+        type: "select",
+        options: soldiers.map(s => ({ value: s.id, label: `${s.full_name} (${s.personal_number})` })),
+        placeholder: "בחר חייל מהרשימה",
+        dependsOn: { field: "driver_type", value: "security" }
+      },
+      { 
+        name: "driver_name", 
+        label: "שם הנהג", 
+        type: "text",
+        placeholder: "הזן שם נהג...",
+        dependsOn: { field: "driver_type", value: "combat" }
+      },
+      { name: "vehicle_number", label: "מספר רכב צבאי", type: "text", placeholder: "הזן מספר רכב..." },
+      { 
+        name: "severity", 
+        label: "חומרת האירוע", 
+        type: "select",
+        options: SEVERITY_TYPES.map(t => ({ value: t.value, label: t.label })),
+        placeholder: "בחר חומרה"
+      },
+      { name: "description", label: "תיאור", type: "textarea", placeholder: "תיאור מפורט..." },
+      { name: "image_url", label: "תמונה", type: "image" },
+      { name: "map_picker", label: "דקירה במפה", type: "map_picker", latField: "latitude", lngField: "longitude" },
+    ];
+  };
 
   // Get user location on mount
   useEffect(() => {
@@ -558,7 +640,17 @@ const KnowTheArea = () => {
 
   useEffect(() => {
     fetchData();
+    fetchSoldiers();
   }, []);
+
+  const fetchSoldiers = async () => {
+    const { data } = await supabase
+      .from("soldiers")
+      .select("id, full_name, personal_number")
+      .eq("is_active", true)
+      .order("full_name");
+    if (data) setSoldiers(data);
+  };
 
   const fetchData = async () => {
     try {
@@ -566,7 +658,12 @@ const KnowTheArea = () => {
       
       const [pointsRes, eventsRes, routesRes, boundariesRes, safetyFilesRes] = await Promise.all([
         supabase.from("map_points_of_interest").select("*").eq("is_active", true),
-        supabase.from("safety_events").select("*").order("event_date", { ascending: false }).limit(100),
+        supabase.from("safety_content")
+          .select("*")
+          .in("category", ["sector_events", "neighbor_events"])
+          .not("latitude", "is", null)
+          .order("event_date", { ascending: false })
+          .limit(100),
         supabase.from("dangerous_routes").select("*").eq("is_active", true),
         supabase.from("sector_boundaries").select("*").eq("is_active", true),
         supabase.from("safety_files").select("*").not("latitude", "is", null),
@@ -622,12 +719,21 @@ const KnowTheArea = () => {
       .filter(p => matchesRegionFilter(p.name));
   }, [mapPoints, searchQuery, selectedRegion, selectedOutpostFilter]);
 
+  // Helper to check if an event matches the region filter
+  const matchesEventRegionFilter = (eventRegion: string | null | undefined): boolean => {
+    if (selectedRegion === "all") return true;
+    if (!eventRegion) return false;
+    return eventRegion === selectedRegion;
+  };
+
   const filteredEvents = useMemo(() => {
-    return safetyEvents.filter(e => 
-      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (e.description?.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [safetyEvents, searchQuery]);
+    return safetyEvents
+      .filter(e => 
+        e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (e.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+      .filter(e => matchesEventRegionFilter(e.region));
+  }, [safetyEvents, searchQuery, selectedRegion]);
 
   const filteredRoutes = useMemo(() => {
     return dangerousRoutes.filter(r => 
@@ -817,7 +923,7 @@ const KnowTheArea = () => {
   const handleDeleteEvent = async (id: string) => {
     if (!confirm("האם למחוק את האירוע?")) return;
     try {
-      const { error } = await supabase.from("safety_events").delete().eq("id", id);
+      const { error } = await supabase.from("safety_content").delete().eq("id", id);
       if (error) throw error;
       toast.success("האירוע נמחק");
       fetchData();
@@ -831,36 +937,57 @@ const KnowTheArea = () => {
     setEventFormData({
       title: event.title,
       description: event.description || "",
-      category: event.category as any,
       event_date: event.event_date || new Date().toISOString().split('T')[0],
       latitude: event.latitude,
       longitude: event.longitude,
+      region: event.region || "",
+      outpost: event.outpost || "",
+      event_type: event.event_type || "",
+      driver_type: event.driver_type || "",
+      image_url: event.image_url || "",
     });
     setShowAddEventDialog(true);
   };
 
-  const handleUpdateEvent = async () => {
-    if (!editingEvent || !eventFormData.title.trim()) {
-      toast.error("יש למלא את כותרת האירוע");
-      return;
+  const handleUpdateEvent = async (data: Record<string, any>) => {
+    if (!editingEvent) return;
+    setIsSubmittingEvent(true);
+    
+    let latitude = data.latitude ? parseFloat(data.latitude) : null;
+    let longitude = data.longitude ? parseFloat(data.longitude) : null;
+    
+    if (latitude !== null && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+      latitude = null;
     }
+    if (longitude !== null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+      longitude = null;
+    }
+    
     try {
-      const { error } = await supabase.from("safety_events").update({
-        title: eventFormData.title,
-        description: eventFormData.description || null,
-        category: eventFormData.category,
-        event_date: eventFormData.event_date,
-        latitude: eventFormData.latitude,
-        longitude: eventFormData.longitude,
+      const { error } = await supabase.from("safety_content").update({
+        title: data.title,
+        description: data.description || null,
+        event_date: data.event_date || null,
+        latitude,
+        longitude,
+        region: data.region || null,
+        outpost: data.outpost || null,
+        event_type: data.event_type || null,
+        driver_type: data.driver_type || null,
+        image_url: data.image_url || null,
       }).eq("id", editingEvent.id);
+      
       if (error) throw error;
       toast.success("האירוע עודכן");
       setShowAddEventDialog(false);
       setEditingEvent(null);
-      setEventFormData({ title: "", description: "", category: "other", event_date: new Date().toISOString().split('T')[0], latitude: null, longitude: null });
+      setEventFormData({});
       fetchData();
     } catch (error) {
+      console.error("Error:", error);
       toast.error("שגיאה בעדכון");
+    } finally {
+      setIsSubmittingEvent(false);
     }
   };
 
@@ -966,51 +1093,75 @@ const KnowTheArea = () => {
     }
   };
 
-  // Add safety event handler
-  const handleAddSafetyEvent = async () => {
+  // Add safety event handler - uses AddEditDialog onSubmit format
+  const handleAddSafetyEvent = async (data: Record<string, any>) => {
     if (editingEvent) {
-      await handleUpdateEvent();
+      await handleUpdateEvent(data);
       return;
     }
     
-    if (!eventFormData.title.trim()) {
+    if (!data.title?.trim()) {
       toast.error("יש למלא את כותרת האירוע");
       return;
     }
 
+    setIsSubmittingEvent(true);
+    
+    let latitude = data.latitude ? parseFloat(data.latitude) : null;
+    let longitude = data.longitude ? parseFloat(data.longitude) : null;
+    
+    if (latitude !== null && (isNaN(latitude) || latitude < -90 || latitude > 90)) {
+      latitude = null;
+    }
+    if (longitude !== null && (isNaN(longitude) || longitude < -180 || longitude > 180)) {
+      longitude = null;
+    }
+
     try {
-      const { error } = await supabase.from("safety_events").insert([{
-        title: eventFormData.title,
-        description: eventFormData.description || null,
-        category: eventFormData.category,
-        event_date: eventFormData.event_date,
-        latitude: eventFormData.latitude,
-        longitude: eventFormData.longitude,
+      const { error } = await supabase.from("safety_content").insert([{
+        title: data.title,
+        description: data.description || null,
+        category: "sector_events", // Always save as sector_events for map display
+        event_date: data.event_date || null,
+        latitude,
+        longitude,
+        region: data.region || null,
+        outpost: data.outpost || null,
+        event_type: data.event_type || null,
+        driver_type: data.driver_type || null,
+        image_url: data.image_url || null,
       }]);
 
       if (error) throw error;
 
       toast.success("אירוע הבטיחות נוסף בהצלחה");
       setShowAddEventDialog(false);
-      setEventFormData({ title: "", description: "", category: "other", event_date: new Date().toISOString().split('T')[0], latitude: null, longitude: null });
+      setEventFormData({});
       fetchData();
     } catch (error) {
       console.error("Error:", error);
       toast.error("שגיאה בהוספת האירוע");
+    } finally {
+      setIsSubmittingEvent(false);
     }
   };
 
-  const getCategoryLabel = (category: string) => {
+  const getEventTypeLabel = (eventType: string | null) => {
     const labels: Record<string, string> = {
-      fire: "שריפה", accident: "תאונה", weapon: "נשק", vehicle: "רכב", other: "אחר"
+      accident: "תאונה", 
+      stuck: "התחפרות", 
+      fire: "שריפה", 
+      weapon: "נשק", 
+      vehicle: "רכב", 
+      other: "אחר"
     };
-    return labels[category] || "אחר";
+    return labels[eventType || "other"] || "אחר";
   };
 
-  // Build heat map points
+  // Build heat map points - uses filtered events for region filtering
   const heatPoints = useMemo(() => {
     const points: Array<[number, number, number]> = [];
-    const eventsWithCoords = safetyEvents.filter(e => e.latitude && e.longitude);
+    const eventsWithCoords = filteredEvents.filter(e => e.latitude && e.longitude);
     
     eventsWithCoords.forEach(e => {
       if (e.latitude && e.longitude) {
@@ -1027,7 +1178,7 @@ const KnowTheArea = () => {
     });
     
     return points;
-  }, [safetyEvents]);
+  }, [filteredEvents]);
 
   if (loading) {
     return (
@@ -1312,7 +1463,7 @@ const KnowTheArea = () => {
                             <div className="min-w-0">
                               <p className="font-medium text-foreground truncate">{event.title}</p>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{getCategoryLabel(event.category)}</span>
+                                <span>{getEventTypeLabel(event.event_type)}</span>
                                 {event.event_date && <span>• {new Date(event.event_date).toLocaleDateString('he-IL')}</span>}
                               </div>
                             </div>
@@ -1647,7 +1798,35 @@ const KnowTheArea = () => {
               )}
             >
               <Flame className="w-4 h-4" />
-              מפת חום אירועים
+              מפת חום
+            </button>
+          </div>
+
+          {/* Map Type Toggle */}
+          <div className="flex p-1 bg-card rounded-xl border border-border">
+            <button
+              onClick={() => setMapType("standard")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
+                mapType === "standard"
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Map className="w-4 h-4" />
+              מפה
+            </button>
+            <button
+              onClick={() => setMapType("satellite")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
+                mapType === "satellite"
+                  ? "bg-emerald-600 text-white shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Navigation className="w-4 h-4" />
+              לוויין
             </button>
           </div>
         </div>
@@ -1727,10 +1906,17 @@ const KnowTheArea = () => {
               maxBoundsViscosity={1.0}
               minZoom={8}
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
+              {mapType === "satellite" ? (
+                <TileLayer
+                  attribution='&copy; Esri'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+              ) : (
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+              )}
               
               <MapClickHandler 
                 onMapClick={handleMapClick} 
@@ -1877,7 +2063,7 @@ const KnowTheArea = () => {
                   <Popup>
                     <div className="text-right p-3 min-w-[200px]" dir="rtl">
                       <h3 className="font-bold text-lg mb-2">{event.title}</h3>
-                      <Badge className="bg-orange-500 text-white mb-2">{getCategoryLabel(event.category)}</Badge>
+                      <Badge className="bg-orange-500 text-white mb-2">{getEventTypeLabel(event.event_type)}</Badge>
                       {event.event_date && <p className="text-xs text-gray-500">{new Date(event.event_date).toLocaleDateString("he-IL")}</p>}
                       {event.description && <p className="text-sm text-gray-600 mt-2">{event.description}</p>}
                       {(canEdit || canDelete) && (
@@ -2118,87 +2304,30 @@ const KnowTheArea = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Event Dialog */}
-      <Dialog open={showAddEventDialog} onOpenChange={(open) => {
-        setShowAddEventDialog(open);
-        if (!open) {
-          setEditingEvent(null);
-          setEventFormData({ title: "", description: "", category: "other", event_date: new Date().toISOString().split('T')[0], latitude: null, longitude: null });
-        }
-      }}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>{editingEvent ? "עריכת אירוע בטיחות" : "הוספת אירוע בטיחות"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>כותרת</Label>
-              <Input
-                value={eventFormData.title}
-                onChange={(e) => setEventFormData(p => ({ ...p, title: e.target.value }))}
-                placeholder="כותרת האירוע..."
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>תיאור</Label>
-              <Textarea
-                value={eventFormData.description}
-                onChange={(e) => setEventFormData(p => ({ ...p, description: e.target.value }))}
-                placeholder="תיאור האירוע..."
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>תאריך</Label>
-              <Input
-                type="date"
-                value={eventFormData.event_date}
-                onChange={(e) => setEventFormData(p => ({ ...p, event_date: e.target.value }))}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>מיקום</Label>
-              {eventFormData.latitude && eventFormData.longitude ? (
-                <div className="mt-1 p-3 rounded-xl bg-muted flex items-center justify-between">
-                  <span className="font-mono text-sm">
-                    {eventFormData.latitude.toFixed(5)}, {eventFormData.longitude.toFixed(5)}
-                  </span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setEventFormData(p => ({ ...p, latitude: null, longitude: null }))}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="mt-1 grid grid-cols-2 gap-2">
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="קו רוחב"
-                    onChange={(e) => setEventFormData(p => ({ ...p, latitude: parseFloat(e.target.value) || null }))}
-                  />
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="קו אורך"
-                    onChange={(e) => setEventFormData(p => ({ ...p, longitude: parseFloat(e.target.value) || null }))}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddEventDialog(false)}>ביטול</Button>
-            <Button onClick={handleAddSafetyEvent}>
-              {editingEvent ? "עדכן" : "הוסף"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Add/Edit Event Dialog - Using AddEditDialog for consistency with SafetyEvents */}
+      <AddEditDialog
+        open={showAddEventDialog}
+        onOpenChange={(open) => {
+          setShowAddEventDialog(open);
+          if (!open) {
+            setEditingEvent(null);
+            setEventFormData({});
+          }
+        }}
+        title={editingEvent ? "עריכת אירוע בטיחות" : "הוספת אירוע בטיחות"}
+        fields={getEventFields()}
+        initialData={editingEvent ? {
+          ...eventFormData,
+          latitude: clickPosition?.lat?.toFixed(6) || eventFormData.latitude,
+          longitude: clickPosition?.lng?.toFixed(6) || eventFormData.longitude,
+        } : {
+          event_date: new Date().toISOString().split('T')[0],
+          latitude: clickPosition?.lat?.toFixed(6) || "",
+          longitude: clickPosition?.lng?.toFixed(6) || "",
+        }}
+        onSubmit={handleAddSafetyEvent}
+        isLoading={isSubmittingEvent}
+      />
 
       {/* Save Route Dialog */}
       <Dialog open={showRouteDialog} onOpenChange={setShowRouteDialog}>
