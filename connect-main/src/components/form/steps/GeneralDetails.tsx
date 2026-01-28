@@ -1,10 +1,10 @@
 import { useFormContext } from "react-hook-form";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OUTPOSTS } from "@/lib/constants";
-import { Calendar, Clock, MapPin, User, Car, Sun, Moon, CloudSun, Sparkles, AlertTriangle, TrendingDown, Gauge } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Car, Sun, Moon, CloudSun, Sparkles, AlertTriangle, TrendingDown, Gauge, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -13,6 +13,30 @@ const SHIFT_TYPES_ENHANCED = [
   { value: "afternoon", label: "משמרת צהריים", icon: CloudSun },
   { value: "evening", label: "משמרת ערב", icon: Moon },
 ];
+
+/**
+ * Get the allowed shift type based on current hour
+ * - 5:00 AM - 2:00 PM (5-14) → morning only
+ * - 12:00 PM - 10:00 PM (12-22) → afternoon only
+ * - 8:00 PM - 5:00 AM (20-5) → evening only
+ */
+function getAllowedShift(): "morning" | "afternoon" | "evening" {
+  const currentHour = new Date().getHours();
+  
+  // 5:00 AM to 2:00 PM (05:00-14:00) → morning
+  if (currentHour >= 5 && currentHour < 14) {
+    return "morning";
+  }
+  // 12:00 PM to 10:00 PM (12:00-22:00) → afternoon
+  // Note: 12-14 overlaps with morning, but we prioritize morning
+  if (currentHour >= 14 && currentHour < 22) {
+    return "afternoon";
+  }
+  // 8:00 PM to 5:00 AM (20:00-05:00) → evening
+  // Note: 20-22 overlaps with afternoon, but we prioritize afternoon
+  // So evening is: 22:00-05:00
+  return "evening";
+}
 
 interface PreviousMonthScore {
   safety_score: number;
@@ -42,6 +66,14 @@ export function GeneralDetails() {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  // Get allowed shift based on current time
+  const allowedShift = useMemo(() => getAllowedShift(), []);
+  
+  // Set the shift type automatically on mount
+  useEffect(() => {
+    setValue("shiftType", allowedShift);
+  }, [allowedShift, setValue]);
 
   // Fetch previous month safety score for the logged-in user
   useEffect(() => {
@@ -319,38 +351,52 @@ export function GeneralDetails() {
         />
       </div>
 
-      {/* Shift Type */}
+      {/* Shift Type - Locked to current time */}
       <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/15 to-purple-500/5 flex items-center justify-center border border-purple-200">
             <Sun className="w-6 h-6 text-purple-600" />
           </div>
           <div className="flex-1">
-            <Label className="font-bold text-slate-800 text-lg">סוג משמרת *</Label>
-            <p className="text-xs text-slate-500">בחר את סוג המשמרת</p>
+            <Label className="font-bold text-slate-800 text-lg">סוג משמרת</Label>
+            <p className="text-xs text-slate-500">נקבע אוטומטית לפי השעה</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {SHIFT_TYPES_ENHANCED.map((shift) => {
             const isSelected = watch("shiftType") === shift.value;
+            const isAllowed = shift.value === allowedShift;
             const ShiftIcon = shift.icon;
             return (
               <button
                 key={shift.value}
                 type="button"
-                onClick={() => setValue("shiftType", shift.value)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl font-bold transition-all duration-300 border-2 ${
+                disabled={!isAllowed}
+                onClick={() => isAllowed && setValue("shiftType", shift.value)}
+                className={`relative flex flex-col items-center gap-2 p-4 rounded-xl font-bold transition-all duration-300 border-2 ${
                   isSelected
                     ? "bg-primary/10 text-primary border-primary shadow-md"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                    : isAllowed
+                      ? "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                      : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
                 }`}
               >
+                {!isAllowed && (
+                  <div className="absolute top-2 left-2">
+                    <Lock className="w-3 h-3 text-slate-400" />
+                  </div>
+                )}
                 <ShiftIcon className="w-6 h-6" />
                 <span className="text-sm">{shift.label.replace("משמרת ", "")}</span>
               </button>
             );
           })}
         </div>
+        <p className="mt-3 text-xs text-center text-slate-500">
+          {allowedShift === "morning" && "שעות 05:00-14:00 → משמרת בוקר"}
+          {allowedShift === "afternoon" && "שעות 14:00-22:00 → משמרת צהריים"}
+          {allowedShift === "evening" && "שעות 22:00-05:00 → משמרת ערב"}
+        </p>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { StorageImage } from "@/components/shared/StorageImage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -429,7 +430,7 @@ export default function DrillLocations() {
               </div>
             )}
             {location.image_url && (
-              <img
+              <StorageImage
                 src={location.image_url}
                 alt={location.name}
                 className="w-full h-52 object-cover"

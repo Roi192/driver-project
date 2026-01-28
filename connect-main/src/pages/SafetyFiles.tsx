@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { StorageImage } from "@/components/shared/StorageImage";
 import { useNavigate } from "react-router-dom";
 
 type View = "outposts" | "categories" | "points" | "pointDetail";
@@ -367,7 +368,7 @@ export default function SafetyFiles() {
         <div className="space-y-6 animate-fade-in">
           <div className="glass-card overflow-hidden">
             {selectedPoint.image_url && (
-              <img
+              <StorageImage
                 src={selectedPoint.image_url}
                 alt={selectedPoint.title}
                 className="w-full h-48 object-cover"

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
+import { StorageImage } from "@/components/shared/StorageImage";
 import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
 import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
 import { REGIONS, OUTPOSTS } from "@/lib/constants";
@@ -646,11 +647,16 @@ export default function SafetyEvents() {
                 )}
                 
                 <div className="relative">
-                  <img
-                    src={item.image_url || defaultThumbnail}
-                    alt={item.title}
-                    className="w-full h-44 object-cover"
-                  />
+                  {item.image_url ? (
+                    <StorageImage
+                      src={item.image_url}
+                      alt={item.title}
+                      className="w-full h-44 object-cover"
+                      fallback={<img src={defaultThumbnail} alt={item.title} className="w-full h-44 object-cover" />}
+                    />
+                  ) : (
+                    <img src={defaultThumbnail} alt={item.title} className="w-full h-44 object-cover" />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="relative">
@@ -695,16 +701,20 @@ export default function SafetyEvents() {
               onClick={() => handleItemSelect(item)}
             >
               <div className="flex gap-4">
-                {item.image_url && (
+                {item.image_url ? (
                   <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-border/30">
-                    <img 
+                    <StorageImage 
                       src={item.image_url} 
                       alt={item.title}
                       className="w-full h-full object-cover"
+                      fallback={
+                        <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                          <MapPin className="w-8 h-8 text-primary" />
+                        </div>
+                      }
                     />
                   </div>
-                )}
-                {!item.image_url && (
+                ) : (
                   <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center flex-shrink-0 border border-border/30">
                     <MapPin className="w-8 h-8 text-primary" />
                   </div>
@@ -757,7 +767,7 @@ export default function SafetyEvents() {
           {/* Image */}
           {selectedItem.image_url && (
             <div className="glass-card p-4">
-              <img 
+              <StorageImage 
                 src={selectedItem.image_url} 
                 alt={selectedItem.title}
                 className="w-full rounded-xl"

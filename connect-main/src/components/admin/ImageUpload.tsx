@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { getSignedUrl } from "@/lib/storage-utils";
 
 interface ImageUploadProps {
   value?: string;
@@ -19,8 +20,31 @@ export function ImageUpload({
   folder = "uploads"
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<string | null>(value || null);
+  const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate signed URL for preview when value changes
+  useEffect(() => {
+    let mounted = true;
+    
+    async function loadPreview() {
+      if (!value) {
+        setPreview(null);
+        return;
+      }
+      
+      const signedUrl = await getSignedUrl(value, bucket);
+      if (mounted && signedUrl) {
+        setPreview(signedUrl);
+      }
+    }
+    
+    loadPreview();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [value, bucket]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,18 +78,18 @@ export function ImageUpload({
         throw uploadError;
       }
 
-      // Get signed URL (48 hours validity for security)
-      // Shorter validity reduces risk if URL is shared/leaked
+      // Get signed URL for immediate preview
       const { data: signedUrlData, error: signedError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
+        .createSignedUrl(fileName, 60 * 60 * 24);
 
       if (signedError || !signedUrlData?.signedUrl) {
         throw signedError || new Error('Failed to generate signed URL');
       }
 
       setPreview(signedUrlData.signedUrl);
-      onChange(signedUrlData.signedUrl);
+      // Store the file path (not the signed URL) so we can regenerate URLs later
+      onChange(fileName);
       toast.success("התמונה הועלתה בהצלחה");
     } catch (error: any) {
       console.error("Upload error:", error);
