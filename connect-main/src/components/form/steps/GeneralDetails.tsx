@@ -9,9 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 const SHIFT_TYPES_ENHANCED = [
-  { value: "morning", label: "משמרת בוקר", icon: Sun },
-  { value: "afternoon", label: "משמרת צהריים", icon: CloudSun },
-  { value: "evening", label: "משמרת ערב", icon: Moon },
+  { value: "morning", label: "משמרת בוקר", timeLabel: "6:00-14:00", icon: Sun },
+  { value: "afternoon", label: "משמרת צהריים", timeLabel: "14:00-22:00", icon: CloudSun },
+  { value: "evening", label: "משמרת ערב", timeLabel: "22:00-6:00", icon: Moon },
 ];
 
 /**
@@ -385,14 +385,15 @@ export function GeneralDetails() {
                 )}
                 <ShiftIcon className="w-6 h-6" />
                 <span className="text-sm">{shift.label.replace("משמרת ", "")}</span>
+                <span className="text-xs text-slate-500">{shift.timeLabel}</span>
               </button>
             );
           })}
         </div>
         <p className="mt-3 text-xs text-center text-slate-500">
-          {allowedShift === "morning" && "שעות 05:00-14:00 → משמרת בוקר"}
-          {allowedShift === "afternoon" && "שעות 14:00-22:00 → משמרת צהריים"}
-          {allowedShift === "evening" && "שעות 22:00-05:00 → משמרת ערב"}
+          {allowedShift === "morning" && "ניתן להזין מ-05:00 עד 13:00"}
+          {allowedShift === "afternoon" && "ניתן להזין מ-13:00 עד 21:00"}
+          {allowedShift === "evening" && "ניתן להזין מ-21:00 עד 05:00"}
         </p>
       </div>
     </div>
