@@ -16,25 +16,22 @@ const SHIFT_TYPES_ENHANCED = [
 
 /**
  * Get the allowed shift type based on current hour
- * - 5:00 AM - 2:00 PM (5-14) → morning only
- * - 12:00 PM - 10:00 PM (12-22) → afternoon only
- * - 8:00 PM - 5:00 AM (20-5) → evening only
+ * - 05:00 - 13:00 → morning only
+ * - 13:00 - 21:00 → afternoon only
+ * - 21:00 - 05:00 → evening only
  */
 function getAllowedShift(): "morning" | "afternoon" | "evening" {
   const currentHour = new Date().getHours();
   
-  // 5:00 AM to 2:00 PM (05:00-14:00) → morning
-  if (currentHour >= 5 && currentHour < 14) {
+  // 05:00 to 13:00 → morning
+  if (currentHour >= 5 && currentHour < 13) {
     return "morning";
   }
-  // 12:00 PM to 10:00 PM (12:00-22:00) → afternoon
-  // Note: 12-14 overlaps with morning, but we prioritize morning
-  if (currentHour >= 14 && currentHour < 22) {
+  // 13:00 to 21:00 → afternoon
+  if (currentHour >= 13 && currentHour < 21) {
     return "afternoon";
   }
-  // 8:00 PM to 5:00 AM (20:00-05:00) → evening
-  // Note: 20-22 overlaps with afternoon, but we prioritize afternoon
-  // So evening is: 22:00-05:00
+  // 21:00 to 05:00 → evening
   return "evening";
 }
 

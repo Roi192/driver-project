@@ -298,12 +298,9 @@ export default function DriverInterviews() {
     }
   };
 
-  // Show all soldiers from the selected outpost, or all soldiers if no outpost match
-  const filteredSoldiers = formData.outpost 
-    ? soldiers.filter(s => s.outpost === formData.outpost).length > 0
-      ? soldiers.filter(s => s.outpost === formData.outpost)
-      : soldiers // Show all soldiers if no match found for the outpost
-    : soldiers;
+  // Always show all soldiers from the soldiers control table
+  // Battalion admin and all management roles should see the full roster
+  const filteredSoldiers = soldiers;
 
   const getSignatureData = (): string => {
     if (signatureRef.current) {
