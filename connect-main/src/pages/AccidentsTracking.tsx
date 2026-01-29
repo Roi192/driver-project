@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -29,15 +29,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter, Eye, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Car, Shield, AlertTriangle, TrendingUp, FileSpreadsheet, Filter, Eye } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, subMonths, parseISO, differenceInDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import { StorageImage } from '@/components/shared/StorageImage';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
+import { REGIONS, OUTPOSTS } from '@/lib/constants';
 
 interface Soldier {
   id: string;
@@ -45,22 +47,26 @@ interface Soldier {
   personal_number: string;
 }
 
-interface Accident {
+interface SectorEvent {
   id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  image_url: string | null;
+  video_url: string | null;
+  file_url: string | null;
+  event_date: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  event_type: string | null;
+  driver_type: string | null;
+  region: string | null;
+  outpost: string | null;
   soldier_id: string | null;
   driver_name: string | null;
-  accident_date: string;
-  driver_type: 'security' | 'combat';
   vehicle_number: string | null;
-  description: string | null;
-  severity: 'minor' | 'moderate' | 'severe';
-  location: string | null;
-  notes: string | null;
-  created_at: string;
+  severity: string | null;
   soldiers?: Soldier;
-  was_judged: boolean;
-  judgment_result: string | null;
-  incident_type: 'accident' | 'stuck' | 'other';
 }
 
 type DriverType = 'security' | 'combat';
@@ -69,16 +75,16 @@ type IncidentType = 'accident' | 'stuck' | 'other';
 
 const driverTypeLabels: Record<DriverType, string> = {
   security: 'נהג בט"ש',
-  combat: 'נהג לוחם'
+  combat: 'נהג גדוד'
 };
 
-const severityLabels: Record<Severity, string> = {
+const severityLabels: Record<string, string> = {
   minor: 'קל',
   moderate: 'בינוני',
   severe: 'חמור'
 };
 
-const severityColors: Record<Severity, string> = {
+const severityColors: Record<string, string> = {
   minor: 'bg-yellow-100 text-yellow-800',
   moderate: 'bg-orange-100 text-orange-800',
   severe: 'bg-red-100 text-red-800'
@@ -90,19 +96,20 @@ const incidentTypeLabels: Record<IncidentType, string> = {
   other: 'אחר'
 };
 
-const incidentTypeColors: Record<IncidentType, string> = {
+const incidentTypeColors: Record<string, string> = {
   accident: 'bg-red-100 text-red-800',
   stuck: 'bg-amber-100 text-amber-800',
   other: 'bg-gray-100 text-gray-800'
 };
 
 const AccidentsTracking = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canDelete } = useAuth();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingAccident, setEditingAccident] = useState<Accident | null>(null);
+  const [editingEvent, setEditingEvent] = useState<SectorEvent | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [accidentToDelete, setAccidentToDelete] = useState<string | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null);
+  const [viewDetailEvent, setViewDetailEvent] = useState<SectorEvent | null>(null);
   
   // Filters
   const [filterDriverType, setFilterDriverType] = useState<string>('all');
@@ -111,28 +118,24 @@ const AccidentsTracking = () => {
   const [filterDateFrom, setFilterDateFrom] = useState<string>('');
   const [filterDateTo, setFilterDateTo] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
-  
-  // KPI dialogs for filtered accident lists
-  const [securityAccidentsDialogOpen, setSecurityAccidentsDialogOpen] = useState(false);
-  const [combatAccidentsDialogOpen, setCombatAccidentsDialogOpen] = useState(false);
-
-  // Detail dialog for single accident with checklist
-  const [accidentDetailOpen, setAccidentDetailOpen] = useState(false);
-  const [selectedAccident, setSelectedAccident] = useState<Accident | null>(null);
 
   const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    event_date: format(new Date(), 'yyyy-MM-dd'),
+    event_type: 'accident' as IncidentType,
+    driver_type: 'security' as DriverType,
     soldier_id: '',
     driver_name: '',
-    accident_date: format(new Date(), 'yyyy-MM-dd'),
-    driver_type: 'security' as DriverType,
     vehicle_number: '',
-    description: '',
     severity: 'minor' as Severity,
-    incident_type: 'accident' as IncidentType,
-    location: '',
-    notes: '',
-    was_judged: false,
-    judgment_result: ''
+    region: '',
+    outpost: '',
+    image_url: '',
+    video_url: '',
+    file_url: '',
+    latitude: '',
+    longitude: '',
   });
 
   // Fetch soldiers
@@ -149,44 +152,48 @@ const AccidentsTracking = () => {
     }
   });
 
-  // Fetch accidents
-  const { data: accidents = [], isLoading } = useQuery({
-    queryKey: ['accidents'],
+  // Fetch sector events from safety_content
+  const { data: sectorEvents = [], isLoading } = useQuery({
+    queryKey: ['sector-events-for-accidents'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('accidents')
+        .from('safety_content')
         .select('*, soldiers(id, full_name, personal_number)')
-        .order('accident_date', { ascending: false });
+        .eq('category', 'sector_events')
+        .order('event_date', { ascending: false });
       if (error) throw error;
-      return (data || []).map(a => ({
-        ...a,
-        was_judged: a.was_judged || false,
-        judgment_result: a.judgment_result || null
-      })) as Accident[];
+      return (data || []) as SectorEvent[];
     }
   });
 
-  // Add accident mutation
+  // Add event mutation
   const addMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from('accidents').insert({
-        accident_date: data.accident_date,
-        driver_type: data.driver_type,
-        vehicle_number: data.vehicle_number || null,
+      const insertData = {
+        category: 'sector_events',
+        title: data.title,
         description: data.description || null,
-        severity: data.severity,
-        incident_type: data.incident_type,
-        location: data.location || null,
-        notes: data.notes || null,
+        event_date: data.event_date || null,
+        event_type: data.event_type,
+        driver_type: data.driver_type,
         soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
         driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
-        was_judged: data.was_judged,
-        judgment_result: data.judgment_result || null
-      });
+        vehicle_number: data.vehicle_number || null,
+        severity: data.severity,
+        region: data.region || null,
+        outpost: data.outpost || null,
+        image_url: data.image_url || null,
+        video_url: data.video_url || null,
+        file_url: data.file_url || null,
+        latitude: data.latitude ? parseFloat(data.latitude) : null,
+        longitude: data.longitude ? parseFloat(data.longitude) : null,
+      };
+      const { error } = await supabase.from('safety_content').insert(insertData);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accidents'] });
+      queryClient.invalidateQueries({ queryKey: ['sector-events-for-accidents'] });
+      queryClient.invalidateQueries({ queryKey: ['safety-content'] });
       toast.success('האירוע נוסף בהצלחה');
       setIsAddDialogOpen(false);
       resetForm();
@@ -194,139 +201,153 @@ const AccidentsTracking = () => {
     onError: () => toast.error('שגיאה בהוספת האירוע')
   });
 
-  // Update accident mutation
+  // Update event mutation
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData & { id: string }) => {
+      const updateData = {
+        title: data.title,
+        description: data.description || null,
+        event_date: data.event_date || null,
+        event_type: data.event_type,
+        driver_type: data.driver_type,
+        soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
+        driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
+        vehicle_number: data.vehicle_number || null,
+        severity: data.severity,
+        region: data.region || null,
+        outpost: data.outpost || null,
+        image_url: data.image_url || null,
+        video_url: data.video_url || null,
+        file_url: data.file_url || null,
+        latitude: data.latitude ? parseFloat(data.latitude) : null,
+        longitude: data.longitude ? parseFloat(data.longitude) : null,
+      };
       const { error } = await supabase
-        .from('accidents')
-        .update({
-          accident_date: data.accident_date,
-          driver_type: data.driver_type,
-          vehicle_number: data.vehicle_number || null,
-          description: data.description || null,
-          severity: data.severity,
-          incident_type: data.incident_type,
-          location: data.location || null,
-          notes: data.notes || null,
-          soldier_id: data.driver_type === 'security' ? data.soldier_id : null,
-          driver_name: data.driver_type === 'combat' ? (data.driver_name || null) : null,
-          was_judged: data.was_judged,
-          judgment_result: data.judgment_result || null
-        })
+        .from('safety_content')
+        .update(updateData)
         .eq('id', data.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accidents'] });
+      queryClient.invalidateQueries({ queryKey: ['sector-events-for-accidents'] });
+      queryClient.invalidateQueries({ queryKey: ['safety-content'] });
       toast.success('האירוע עודכן בהצלחה');
-      setEditingAccident(null);
+      setEditingEvent(null);
       resetForm();
     },
     onError: () => toast.error('שגיאה בעדכון האירוע')
   });
 
-  // Delete accident mutation
+  // Delete event mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('accidents').delete().eq('id', id);
+      const { error } = await supabase.from('safety_content').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accidents'] });
-      toast.success('התאונה נמחקה בהצלחה');
+      queryClient.invalidateQueries({ queryKey: ['sector-events-for-accidents'] });
+      queryClient.invalidateQueries({ queryKey: ['safety-content'] });
+      toast.success('האירוע נמחק בהצלחה');
     },
-    onError: () => toast.error('שגיאה במחיקת התאונה')
+    onError: () => toast.error('שגיאה במחיקת האירוע')
   });
 
   const resetForm = () => {
     setFormData({
+      title: '',
+      description: '',
+      event_date: format(new Date(), 'yyyy-MM-dd'),
+      event_type: 'accident',
+      driver_type: 'security',
       soldier_id: '',
       driver_name: '',
-      accident_date: format(new Date(), 'yyyy-MM-dd'),
-      driver_type: 'security',
       vehicle_number: '',
-      description: '',
       severity: 'minor',
-      incident_type: 'accident',
-      location: '',
-      notes: '',
-      was_judged: false,
-      judgment_result: ''
+      region: '',
+      outpost: '',
+      image_url: '',
+      video_url: '',
+      file_url: '',
+      latitude: '',
+      longitude: '',
     });
   };
 
-  const openEditDialog = (accident: Accident) => {
-    setEditingAccident(accident);
+  const openEditDialog = (event: SectorEvent) => {
+    setEditingEvent(event);
     setFormData({
-      soldier_id: accident.soldier_id || '',
-      driver_name: accident.driver_name || '',
-      accident_date: accident.accident_date,
-      driver_type: accident.driver_type,
-      vehicle_number: accident.vehicle_number || '',
-      description: accident.description || '',
-      severity: accident.severity,
-      incident_type: accident.incident_type || 'accident',
-      location: accident.location || '',
-      notes: accident.notes || '',
-      was_judged: accident.was_judged || false,
-      judgment_result: accident.judgment_result || ''
+      title: event.title || '',
+      description: event.description || '',
+      event_date: event.event_date || format(new Date(), 'yyyy-MM-dd'),
+      event_type: (event.event_type as IncidentType) || 'accident',
+      driver_type: (event.driver_type as DriverType) || 'security',
+      soldier_id: event.soldier_id || '',
+      driver_name: event.driver_name || '',
+      vehicle_number: event.vehicle_number || '',
+      severity: (event.severity as Severity) || 'minor',
+      region: event.region || '',
+      outpost: event.outpost || '',
+      image_url: event.image_url || '',
+      video_url: event.video_url || '',
+      file_url: event.file_url || '',
+      latitude: event.latitude?.toString() || '',
+      longitude: event.longitude?.toString() || '',
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate based on driver type
+    if (!formData.title.trim()) {
+      toast.error('יש להזין כותרת');
+      return;
+    }
+    
     if (formData.driver_type === 'security' && !formData.soldier_id) {
       toast.error('יש לבחור חייל');
       return;
     }
-    if (formData.driver_type === 'combat' && !formData.driver_name.trim()) {
-      toast.error('יש להזין שם נהג');
-      return;
-    }
     
-    if (editingAccident) {
-      updateMutation.mutate({ ...formData, id: editingAccident.id });
+    if (editingEvent) {
+      updateMutation.mutate({ ...formData, id: editingEvent.id });
     } else {
       addMutation.mutate(formData);
     }
   };
 
   // Get driver name for display
-  const getDriverName = (accident: Accident): string => {
-    if (accident.driver_type === 'security' && accident.soldiers) {
-      return accident.soldiers.full_name;
+  const getDriverName = (event: SectorEvent): string => {
+    if (event.driver_type === 'security' && event.soldiers) {
+      return event.soldiers.full_name;
     }
-    return accident.driver_name || 'לא צוין';
+    if (event.driver_type === 'combat' && event.driver_name) {
+      return event.driver_name;
+    }
+    return 'לא הוזן';
   };
 
-  // Calculate statistics - based on filtered accidents
-  // Filter accidents - must be before stats
-  const filteredAccidents = useMemo(() => {
-    return accidents.filter(a => {
-      if (filterDriverType !== 'all' && a.driver_type !== filterDriverType) return false;
-      if (filterSeverity !== 'all' && a.severity !== filterSeverity) return false;
-      if (filterIncidentType !== 'all' && a.incident_type !== filterIncidentType) return false;
-      if (filterDateFrom && a.accident_date < filterDateFrom) return false;
-      if (filterDateTo && a.accident_date > filterDateTo) return false;
+  // Filter events
+  const filteredEvents = useMemo(() => {
+    return sectorEvents.filter(e => {
+      if (filterDriverType !== 'all' && e.driver_type !== filterDriverType) return false;
+      if (filterSeverity !== 'all' && e.severity !== filterSeverity) return false;
+      if (filterIncidentType !== 'all' && e.event_type !== filterIncidentType) return false;
+      if (filterDateFrom && e.event_date && e.event_date < filterDateFrom) return false;
+      if (filterDateTo && e.event_date && e.event_date > filterDateTo) return false;
       return true;
     });
-  }, [accidents, filterDriverType, filterSeverity, filterIncidentType, filterDateFrom, filterDateTo]);
+  }, [sectorEvents, filterDriverType, filterSeverity, filterIncidentType, filterDateFrom, filterDateTo]);
 
-  // Calculate statistics - based on filtered accidents
+  // Calculate statistics
   const stats = useMemo(() => {
-    const securityAccidents = filteredAccidents.filter(a => a.driver_type === 'security').length;
-    const combatAccidents = filteredAccidents.filter(a => a.driver_type === 'combat').length;
-    const judgedAccidents = filteredAccidents.filter(a => a.was_judged).length;
-    
+    const securityCount = filteredEvents.filter(e => e.driver_type === 'security').length;
+    const combatCount = filteredEvents.filter(e => e.driver_type === 'combat').length;
     return {
-      security: securityAccidents,
-      combat: combatAccidents,
-      total: securityAccidents + combatAccidents,
-      judged: judgedAccidents
+      security: securityCount,
+      combat: combatCount,
+      total: securityCount + combatCount,
     };
-  }, [filteredAccidents]);
+  }, [filteredEvents]);
 
   // Calculate monthly trends (last 12 months)
   const monthlyTrends = useMemo(() => {
@@ -338,13 +359,14 @@ const AccidentsTracking = () => {
       const monthEnd = endOfMonth(date);
       const monthLabel = format(date, 'MMM yy', { locale: he });
       
-      const monthAccidents = accidents.filter(a => {
-        const accidentDate = parseISO(a.accident_date);
-        return accidentDate >= monthStart && accidentDate <= monthEnd;
+      const monthEvents = sectorEvents.filter(e => {
+        if (!e.event_date) return false;
+        const eventDate = parseISO(e.event_date);
+        return eventDate >= monthStart && eventDate <= monthEnd;
       });
       
-      const security = monthAccidents.filter(a => a.driver_type === 'security').length;
-      const combat = monthAccidents.filter(a => a.driver_type === 'combat').length;
+      const security = monthEvents.filter(e => e.driver_type === 'security').length;
+      const combat = monthEvents.filter(e => e.driver_type === 'combat').length;
       
       months.push({
         month: monthLabel,
@@ -355,30 +377,29 @@ const AccidentsTracking = () => {
     }
     
     return months;
-  }, [accidents]);
+  }, [sectorEvents]);
 
   // Export to Excel
   const exportToExcel = () => {
-    const data = filteredAccidents.map(accident => ({
-      'תאריך': format(parseISO(accident.accident_date), 'dd/MM/yyyy'),
-      'שם נהג': getDriverName(accident),
-      'סוג נהג': driverTypeLabels[accident.driver_type],
-      'סוג אירוע': incidentTypeLabels[accident.incident_type || 'accident'],
-      'מספר רכב': accident.vehicle_number || '-',
-      'חומרה': severityLabels[accident.severity],
-      'מיקום': accident.location || '-',
-      'תיאור': accident.description || '-',
-      'הערות': accident.notes || '-'
+    const data = filteredEvents.map(event => ({
+      'תאריך': event.event_date ? format(parseISO(event.event_date), 'dd/MM/yyyy') : '-',
+      'שם נהג': getDriverName(event),
+      'סוג נהג': event.driver_type ? driverTypeLabels[event.driver_type as DriverType] : '-',
+      'סוג אירוע': event.event_type ? incidentTypeLabels[event.event_type as IncidentType] : '-',
+      'חומרה': event.severity ? severityLabels[event.severity] : '-',
+      'תיאור': event.title || '-',
+      'מספר רכב': event.vehicle_number || '-',
+      'גזרה': event.region || '-',
+      'מוצב': event.outpost || '-',
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'תאונות');
-    XLSX.writeFile(wb, `דוח_תאונות_${format(new Date(), 'dd-MM-yyyy')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'אירועי בטיחות');
+    XLSX.writeFile(wb, `מעקב_תאונות_${format(new Date(), 'dd-MM-yyyy')}.xlsx`);
     toast.success('הקובץ יוצא בהצלחה');
   };
 
-  // Clear filters
   const clearFilters = () => {
     setFilterDriverType('all');
     setFilterSeverity('all');
@@ -387,9 +408,42 @@ const AccidentsTracking = () => {
     setFilterDateTo('');
   };
 
-  // Form content as JSX element instead of function to prevent re-renders and focus loss
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label>כותרת האירוע *</Label>
+        <Input
+          value={formData.title}
+          onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))}
+          placeholder="תיאור קצר של האירוע"
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>תאריך</Label>
+          <Input
+            type="date"
+            value={formData.event_date}
+            onChange={(e) => setFormData(p => ({ ...p, event_date: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>סוג אירוע</Label>
+          <Select value={formData.event_type} onValueChange={(v: IncidentType) => setFormData(p => ({ ...p, event_type: v }))}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="accident">תאונה</SelectItem>
+              <SelectItem value="stuck">התחפרות</SelectItem>
+              <SelectItem value="other">אחר</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>סוג נהג *</Label>
@@ -402,72 +456,10 @@ const AccidentsTracking = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="security">נהג בט"ש</SelectItem>
-              <SelectItem value="combat">נהג לוחם</SelectItem>
+              <SelectItem value="combat">נהג גדוד</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>תאריך תאונה *</Label>
-          <Input
-            type="date"
-            value={formData.accident_date}
-            onChange={(e) => setFormData(p => ({ ...p, accident_date: e.target.value }))}
-            required
-          />
-        </div>
-      </div>
-
-      {/* Conditional driver selection based on type */}
-      {formData.driver_type === 'security' ? (
-        <div className="space-y-2">
-          <Label>חייל (מהרשימה) *</Label>
-          <Select value={formData.soldier_id} onValueChange={(v) => setFormData(p => ({ ...p, soldier_id: v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="בחר חייל" />
-            </SelectTrigger>
-            <SelectContent>
-              {soldiers.map(s => (
-                <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.personal_number})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <Label>שם הנהג *</Label>
-          <Input
-            value={formData.driver_name}
-            onChange={(e) => setFormData(p => ({ ...p, driver_name: e.target.value }))}
-            placeholder="הזן שם נהג לוחם"
-          />
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>סוג אירוע *</Label>
-          <Select value={formData.incident_type} onValueChange={(v: IncidentType) => setFormData(p => ({ ...p, incident_type: v }))}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="accident">תאונה</SelectItem>
-              <SelectItem value="stuck">התחפרות</SelectItem>
-              <SelectItem value="other">אחר</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>מספר רכב</Label>
-          <Input
-            value={formData.vehicle_number}
-            onChange={(e) => setFormData(p => ({ ...p, vehicle_number: e.target.value }))}
-            placeholder="מספר רכב"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>חומרה</Label>
           <Select value={formData.severity} onValueChange={(v: Severity) => setFormData(p => ({ ...p, severity: v }))}>
@@ -481,64 +473,83 @@ const AccidentsTracking = () => {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {formData.driver_type === 'security' ? (
         <div className="space-y-2">
-          <Label>מיקום</Label>
+          <Label>בחר חייל (מהרשימה) *</Label>
+          <Select value={formData.soldier_id} onValueChange={(v) => setFormData(p => ({ ...p, soldier_id: v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר חייל" />
+            </SelectTrigger>
+            <SelectContent>
+              {soldiers.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.personal_number})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label>שם הנהג</Label>
           <Input
-            value={formData.location}
-            onChange={(e) => setFormData(p => ({ ...p, location: e.target.value }))}
-            placeholder="מיקום האירוע"
+            value={formData.driver_name}
+            onChange={(e) => setFormData(p => ({ ...p, driver_name: e.target.value }))}
+            placeholder="הזן שם נהג גדוד"
           />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>מספר רכב</Label>
+          <Input
+            value={formData.vehicle_number}
+            onChange={(e) => setFormData(p => ({ ...p, vehicle_number: e.target.value }))}
+            placeholder="מספר רכב"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>גזרה</Label>
+          <Select value={formData.region} onValueChange={(v) => setFormData(p => ({ ...p, region: v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר גזרה" />
+            </SelectTrigger>
+            <SelectContent>
+              {REGIONS.map(r => (
+                <SelectItem key={r} value={r}>{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label>מוצב</Label>
+        <Select value={formData.outpost} onValueChange={(v) => setFormData(p => ({ ...p, outpost: v }))}>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר מוצב" />
+          </SelectTrigger>
+          <SelectContent>
+            {OUTPOSTS.map(o => (
+              <SelectItem key={o} value={o}>{o}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="space-y-2">
-        <Label>תיאור התאונה</Label>
+        <Label>תיאור מפורט</Label>
         <Textarea
           value={formData.description}
           onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
-          placeholder="תיאור מפורט של התאונה"
+          placeholder="תיאור מפורט של האירוע"
           rows={3}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>הערות</Label>
-        <Textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
-          placeholder="הערות נוספות"
-          rows={2}
-        />
-      </div>
-
-      {/* Judgment Fields */}
-      <div className="p-4 border rounded-lg bg-amber-50 border-amber-200 space-y-3">
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="was_judged"
-            checked={formData.was_judged}
-            onChange={(e) => setFormData(p => ({ ...p, was_judged: e.target.checked }))}
-            className="w-5 h-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
-          />
-          <Label htmlFor="was_judged" className="text-amber-800 font-medium">האם החייל נשפט?</Label>
-        </div>
-        {formData.was_judged && (
-          <div className="space-y-2">
-            <Label className="text-amber-800">תוצאת השיפוט</Label>
-            <Input
-              value={formData.judgment_result}
-              onChange={(e) => setFormData(p => ({ ...p, judgment_result: e.target.value }))}
-              placeholder="מה קיבל החייל (לדוגמה: מאסר, קנס...)"
-              className="bg-white"
-            />
-          </div>
-        )}
-      </div>
-
       <Button type="submit" className="w-full" disabled={addMutation.isPending || updateMutation.isPending}>
-        {editingAccident ? 'עדכן תאונה' : 'הוסף תאונה'}
+        {editingEvent ? 'עדכון אירוע' : 'הוסף אירוע'}
       </Button>
     </form>
   );
@@ -549,7 +560,7 @@ const AccidentsTracking = () => {
         <PageHeader
           icon={Car}
           title="מעקב תאונות"
-          subtitle="ניהול ומעקב תאונות נהגים"
+          subtitle="ניהול ומעקב אירועי בטיחות בגזרה"
           badge="מעקב תאונות"
         />
         
@@ -563,11 +574,11 @@ const AccidentsTracking = () => {
             </Button>
             <Dialog open={isAddDialogOpen} onOpenChange={(open) => { setIsAddDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
-                <Button className="flex-shrink-0"><Plus className="ml-2 h-4 w-4" /> הוסף תאונה</Button>
+                <Button className="flex-shrink-0"><Plus className="ml-2 h-4 w-4" /> הוסף אירוע</Button>
               </DialogTrigger>
               <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>הוספת תאונה חדשה</DialogTitle>
+                  <DialogTitle>הוספת אירוע חדש</DialogTitle>
                 </DialogHeader>
                 {formContent}
               </DialogContent>
@@ -606,7 +617,7 @@ const AccidentsTracking = () => {
                     <SelectContent className="bg-white border border-slate-200">
                       <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
                       <SelectItem value="security" className="text-slate-700">נהגי בט"ש</SelectItem>
-                      <SelectItem value="combat" className="text-slate-700">נהגי לוחמים</SelectItem>
+                      <SelectItem value="combat" className="text-slate-700">נהגי גדוד</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -654,10 +665,7 @@ const AccidentsTracking = () => {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => setSecurityAccidentsDialogOpen(true)}
-          >
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">נהגי בט"ש</CardTitle>
               <Shield className="h-5 w-5 text-blue-500" />
@@ -667,12 +675,9 @@ const AccidentsTracking = () => {
             </CardContent>
           </Card>
 
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => setCombatAccidentsDialogOpen(true)}
-          >
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">נהגי לוחמים</CardTitle>
+              <CardTitle className="text-sm font-medium">נהגי גדוד</CardTitle>
               <Car className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
@@ -695,7 +700,7 @@ const AccidentsTracking = () => {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            <CardTitle>מגמות תאונות חודשיות (12 חודשים אחרונים)</CardTitle>
+            <CardTitle>מגמות חודשיות (12 חודשים אחרונים)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-80">
@@ -707,7 +712,7 @@ const AccidentsTracking = () => {
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="security" name='נהגי בט"ש' stroke="#3b82f6" strokeWidth={2} />
-                  <Line type="monotone" dataKey="combat" name="נהגי לוחמים" stroke="#22c55e" strokeWidth={2} />
+                  <Line type="monotone" dataKey="combat" name="נהגי גדוד" stroke="#22c55e" strokeWidth={2} />
                   <Line type="monotone" dataKey="total" name="סה״כ" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" />
                 </LineChart>
               </ResponsiveContainer>
@@ -715,61 +720,84 @@ const AccidentsTracking = () => {
           </CardContent>
         </Card>
 
-        {/* Accidents Table */}
+        {/* Events Table */}
         <Card>
           <CardHeader>
-            <CardTitle>רשימת תאונות ({filteredAccidents.length})</CardTitle>
+            <CardTitle>רשימת אירועים ({filteredEvents.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <p className="text-center py-8 text-muted-foreground">טוען...</p>
-            ) : filteredAccidents.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">לא נמצאו תאונות</p>
+            ) : filteredEvents.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">לא נמצאו אירועים</p>
             ) : (
               <div className="max-h-[65vh] overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>תאריך</TableHead>
-                      <TableHead>נהג</TableHead>
-                      <TableHead>סוג אירוע</TableHead>
+                      <TableHead>שם נהג</TableHead>
                       <TableHead>סוג נהג</TableHead>
+                      <TableHead>סוג אירוע</TableHead>
                       <TableHead>חומרה</TableHead>
+                      <TableHead>תיאור</TableHead>
                       <TableHead>פעולות</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredAccidents.map((accident) => (
-                      <TableRow key={accident.id}>
-                        <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
-                        <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
+                    {filteredEvents.map((event) => (
+                      <TableRow key={event.id}>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${incidentTypeColors[accident.incident_type || 'accident']}`}>
-                            {incidentTypeLabels[accident.incident_type || 'accident']}
+                          {event.event_date ? format(parseISO(event.event_date), 'dd/MM/yyyy') : '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">{getDriverName(event)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs ${event.driver_type === 'security' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                            {event.driver_type ? driverTypeLabels[event.driver_type as DriverType] : 'לא הוזן'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            accident.driver_type === 'security' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {driverTypeLabels[accident.driver_type]}
+                          <span className={`px-2 py-1 rounded-full text-xs ${incidentTypeColors[event.event_type || 'other']}`}>
+                            {incidentTypeLabels[(event.event_type as IncidentType) || 'other']}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
-                            {severityLabels[accident.severity]}
+                          <span className={`px-2 py-1 rounded-full text-xs ${severityColors[event.severity || 'minor']}`}>
+                            {severityLabels[event.severity || 'minor']}
                           </span>
                         </TableCell>
+                        <TableCell className="max-w-[200px] truncate">{event.title}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button 
                               variant="ghost" 
-                              size="icon" 
-                              onClick={() => { setSelectedAccident(accident); setAccidentDetailOpen(true); }}
-                              title="פרטי אירוע וצ'קליסט"
+                              size="icon"
+                              onClick={() => setViewDetailEvent(event)}
+                              title="צפייה"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => openEditDialog(event)}
+                              title="עריכה"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {canDelete && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => {
+                                  setEventToDelete(event.id);
+                                  setDeleteConfirmOpen(true);
+                                }}
+                                title="מחיקה"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -782,12 +810,119 @@ const AccidentsTracking = () => {
         </Card>
 
         {/* Edit Dialog */}
-        <Dialog open={!!editingAccident} onOpenChange={(open) => { if (!open) { setEditingAccident(null); resetForm(); } }}>
+        <Dialog open={!!editingEvent} onOpenChange={(open) => { if (!open) { setEditingEvent(null); resetForm(); } }}>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>עריכת תאונה</DialogTitle>
+              <DialogTitle>עריכת אירוע</DialogTitle>
             </DialogHeader>
             {formContent}
+          </DialogContent>
+        </Dialog>
+
+        {/* View Detail Dialog */}
+        <Dialog open={!!viewDetailEvent} onOpenChange={(open) => { if (!open) setViewDetailEvent(null); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            {viewDetailEvent && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    {viewDetailEvent.title}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">תאריך</p>
+                      <p className="font-medium">
+                        {viewDetailEvent.event_date ? format(parseISO(viewDetailEvent.event_date), 'dd/MM/yyyy') : 'לא הוזן'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">שם נהג</p>
+                      <p className="font-medium">{getDriverName(viewDetailEvent)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">סוג אירוע</p>
+                      <span className={`px-2 py-1 rounded-full text-xs ${incidentTypeColors[viewDetailEvent.event_type || 'other']}`}>
+                        {incidentTypeLabels[(viewDetailEvent.event_type as IncidentType) || 'other']}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">חומרה</p>
+                      <span className={`px-2 py-1 rounded-full text-xs ${severityColors[viewDetailEvent.severity || 'minor']}`}>
+                        {severityLabels[viewDetailEvent.severity || 'minor']}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">סוג נהג</p>
+                      <p className="font-medium">
+                        {viewDetailEvent.driver_type ? driverTypeLabels[viewDetailEvent.driver_type as DriverType] : 'לא הוזן'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">מספר רכב</p>
+                      <p className="font-medium">{viewDetailEvent.vehicle_number || 'לא הוזן'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">גזרה</p>
+                      <p className="font-medium">{viewDetailEvent.region || 'לא הוזן'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">מוצב</p>
+                      <p className="font-medium">{viewDetailEvent.outpost || 'לא הוזן'}</p>
+                    </div>
+                  </div>
+                  
+                  {viewDetailEvent.description && (
+                    <div>
+                      <p className="text-muted-foreground text-sm mb-1">תיאור מפורט</p>
+                      <p className="text-sm whitespace-pre-wrap bg-muted/50 p-3 rounded-lg">
+                        {viewDetailEvent.description}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {viewDetailEvent.image_url && (
+                    <div>
+                      <p className="text-muted-foreground text-sm mb-2">תמונה</p>
+                      <StorageImage
+                        src={viewDetailEvent.image_url}
+                        alt={viewDetailEvent.title}
+                        className="w-full rounded-lg max-h-64 object-cover"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2 pt-4">
+                    <Button 
+                      onClick={() => {
+                        openEditDialog(viewDetailEvent);
+                        setViewDetailEvent(null);
+                      }}
+                      className="flex-1"
+                    >
+                      <Edit className="ml-2 h-4 w-4" />
+                      עריכה
+                    </Button>
+                    {canDelete && (
+                      <Button 
+                        variant="destructive"
+                        onClick={() => {
+                          setEventToDelete(viewDetailEvent.id);
+                          setDeleteConfirmOpen(true);
+                          setViewDetailEvent(null);
+                        }}
+                        className="flex-1"
+                      >
+                        <Trash2 className="ml-2 h-4 w-4" />
+                        מחיקה
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
 
@@ -795,183 +930,17 @@ const AccidentsTracking = () => {
         <DeleteConfirmDialog
           open={deleteConfirmOpen}
           onOpenChange={setDeleteConfirmOpen}
-          title="מחיקת תאונה"
-          description="האם אתה בטוח שברצונך למחוק תאונה זו? פעולה זו אינה ניתנת לביטול."
+          title="מחיקת אירוע"
+          description="האם אתה בטוח שברצונך למחוק אירוע זה? פעולה זו אינה ניתנת לביטול."
           onConfirm={() => {
-            if (accidentToDelete) {
-              deleteMutation.mutate(accidentToDelete);
+            if (eventToDelete) {
+              deleteMutation.mutate(eventToDelete);
             }
             setDeleteConfirmOpen(false);
-            setAccidentToDelete(null);
+            setEventToDelete(null);
             return Promise.resolve();
           }}
         />
-
-        {/* Security Accidents Dialog */}
-        <Dialog open={securityAccidentsDialogOpen} onOpenChange={setSecurityAccidentsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh]" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-blue-800">
-                <Shield className="w-5 h-5" />
-                תאונות נהגי בט"ש ({accidents.filter(a => a.driver_type === 'security').length})
-              </DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>תאריך</TableHead>
-                    <TableHead>נהג</TableHead>
-                    <TableHead>מספר רכב</TableHead>
-                    <TableHead>חומרה</TableHead>
-                    <TableHead>מיקום</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accidents.filter(a => a.driver_type === 'security').map(accident => (
-                    <TableRow key={accident.id}>
-                      <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
-                      <TableCell>{accident.vehicle_number || '-'}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
-                          {severityLabels[accident.severity]}
-                        </span>
-                      </TableCell>
-                      <TableCell>{accident.location || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {accidents.filter(a => a.driver_type === 'security').length === 0 && (
-                <p className="text-center py-8 text-muted-foreground">אין תאונות של נהגי בט"ש</p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Combat Accidents Dialog */}
-        <Dialog open={combatAccidentsDialogOpen} onOpenChange={setCombatAccidentsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh]" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-green-800">
-                <Car className="w-5 h-5" />
-                תאונות נהגי לוחמים ({accidents.filter(a => a.driver_type === 'combat').length})
-              </DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>תאריך</TableHead>
-                    <TableHead>נהג</TableHead>
-                    <TableHead>מספר רכב</TableHead>
-                    <TableHead>חומרה</TableHead>
-                    <TableHead>מיקום</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accidents.filter(a => a.driver_type === 'combat').map(accident => (
-                    <TableRow key={accident.id}>
-                      <TableCell>{format(parseISO(accident.accident_date), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell className="font-medium">{getDriverName(accident)}</TableCell>
-                      <TableCell>{accident.vehicle_number || '-'}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${severityColors[accident.severity]}`}>
-                          {severityLabels[accident.severity]}
-                        </span>
-                      </TableCell>
-                      <TableCell>{accident.location || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {accidents.filter(a => a.driver_type === 'combat').length === 0 && (
-                <p className="text-center py-8 text-muted-foreground">אין תאונות של נהגי לוחמים</p>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Accident Detail Dialog with Checklist */}
-        <Dialog open={accidentDetailOpen} onOpenChange={setAccidentDetailOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
-            {selectedAccident && (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                    פרטי תאונה
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className="space-y-4">
-                  {/* Basic Info */}
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl">
-                    <div>
-                      <p className="text-xs text-slate-500">תאריך</p>
-                      <p className="font-bold text-slate-800">{format(parseISO(selectedAccident.accident_date), 'dd/MM/yyyy')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">נהג</p>
-                      <p className="font-bold text-slate-800">{getDriverName(selectedAccident)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">סוג נהג</p>
-                      <p className="font-bold text-slate-800">{driverTypeLabels[selectedAccident.driver_type]}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">חומרה</p>
-                      <span className={`px-2 py-1 rounded-full text-xs ${severityColors[selectedAccident.severity]}`}>
-                        {severityLabels[selectedAccident.severity]}
-                      </span>
-                    </div>
-                    {selectedAccident.vehicle_number && (
-                      <div>
-                        <p className="text-xs text-slate-500">מספר רכב</p>
-                        <p className="font-bold text-slate-800">{selectedAccident.vehicle_number}</p>
-                      </div>
-                    )}
-                    {selectedAccident.location && (
-                      <div>
-                        <p className="text-xs text-slate-500">מיקום</p>
-                        <p className="font-bold text-slate-800">{selectedAccident.location}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedAccident.description && (
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                      <p className="text-xs text-slate-500 mb-1">תיאור</p>
-                      <p className="text-sm text-slate-700">{selectedAccident.description}</p>
-                    </div>
-                  )}
-
-                  {/* Judgment Info */}
-                  <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl">
-                    <p className="text-sm font-bold text-slate-700 mb-2">האם נשפט?</p>
-                    <span className={`px-3 py-1.5 rounded-full text-sm font-bold ${selectedAccident.was_judged ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
-                      {selectedAccident.was_judged ? 'כן' : 'לא'}
-                    </span>
-                    {selectedAccident.was_judged && selectedAccident.judgment_result && (
-                      <div className="mt-3">
-                        <p className="text-xs text-slate-500 mb-1">תוצאת השיפוט</p>
-                        <p className="text-sm font-medium text-slate-700">{selectedAccident.judgment_result}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedAccident.notes && (
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                      <p className="text-xs text-slate-500 mb-1">הערות</p>
-                      <p className="text-sm text-slate-700">{selectedAccident.notes}</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </AppLayout>
   );

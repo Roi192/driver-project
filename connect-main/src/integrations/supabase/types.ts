@@ -1530,6 +1530,7 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          driver_name: string | null
           driver_type: string | null
           event_date: string | null
           event_type: string | null
@@ -1540,14 +1541,18 @@ export type Database = {
           longitude: number | null
           outpost: string | null
           region: string | null
+          severity: string | null
+          soldier_id: string | null
           title: string
           updated_at: string
+          vehicle_number: string | null
           video_url: string | null
         }
         Insert: {
           category: string
           created_at?: string
           description?: string | null
+          driver_name?: string | null
           driver_type?: string | null
           event_date?: string | null
           event_type?: string | null
@@ -1558,14 +1563,18 @@ export type Database = {
           longitude?: number | null
           outpost?: string | null
           region?: string | null
+          severity?: string | null
+          soldier_id?: string | null
           title: string
           updated_at?: string
+          vehicle_number?: string | null
           video_url?: string | null
         }
         Update: {
           category?: string
           created_at?: string
           description?: string | null
+          driver_name?: string | null
           driver_type?: string | null
           event_date?: string | null
           event_type?: string | null
@@ -1576,11 +1585,29 @@ export type Database = {
           longitude?: number | null
           outpost?: string | null
           region?: string | null
+          severity?: string | null
+          soldier_id?: string | null
           title?: string
           updated_at?: string
+          vehicle_number?: string | null
           video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "safety_content_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_content_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       safety_events: {
         Row: {

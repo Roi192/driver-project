@@ -32,6 +32,10 @@ interface SafetyContent {
   driver_type: string | null;
   region: string | null;
   outpost: string | null;
+  soldier_id: string | null;
+  driver_name: string | null;
+  vehicle_number: string | null;
+  severity: string | null;
 }
 
 const categories = [
@@ -266,6 +270,10 @@ export default function SafetyEvents() {
       driver_type: driverType,
       region: data.region || null,
       outpost: data.outpost || null,
+      soldier_id: driverType === "security" ? data.soldier_id : null,
+      driver_name: driverType === "combat" ? (data.driver_name || null) : null,
+      vehicle_number: data.vehicle_number || null,
+      severity: data.severity || 'minor',
     };
 
     const { error } = await supabase.from("safety_content").insert([insertData]);
@@ -275,31 +283,6 @@ export default function SafetyEvents() {
       console.error(error);
     } else {
       toast.success("התוכן נוסף בהצלחה");
-      
-      // If it's a sector event with accident or stuck type, sync to accidents table
-      if (selectedCategory === "sector_events" && driverType && (eventType === "accident" || eventType === "stuck")) {
-        // Map driver_type: security stays security, combat (גדוד) maps to combat (לוחם)
-        const accidentDriverType = driverType === "security" ? "security" : "combat";
-        
-        // Get driver name - from soldier selection or manual input
-        let driverName = data.driver_name || null;
-        if (driverType === "security" && data.soldier_id) {
-          const selectedSoldier = soldiers.find(s => s.id === data.soldier_id);
-          driverName = selectedSoldier?.full_name || null;
-        }
-        
-        await supabase.from("accidents").insert([{
-          accident_date: data.event_date || new Date().toISOString().split('T')[0],
-          driver_type: accidentDriverType,
-          soldier_id: driverType === "security" ? data.soldier_id : null,
-          driver_name: driverName,
-          vehicle_number: data.vehicle_number || null,
-          description: data.description || data.title,
-          location: latitude && longitude ? `${latitude}, ${longitude}` : null,
-          incident_type: eventType, // 'accident' or 'stuck'
-          severity: data.severity || 'minor',
-        }]);
-      }
       
       // Sync to safety_events table for map display in "Know The Area"
       // For sector_events and neighbor_events - sync if it has location
@@ -357,6 +340,10 @@ export default function SafetyEvents() {
       driver_type: data.driver_type || null,
       region: data.region || null,
       outpost: data.outpost || null,
+      soldier_id: data.driver_type === "security" ? data.soldier_id : null,
+      driver_name: data.driver_type === "combat" ? (data.driver_name || null) : null,
+      vehicle_number: data.vehicle_number || null,
+      severity: data.severity || 'minor',
     };
 
     const { error } = await supabase
