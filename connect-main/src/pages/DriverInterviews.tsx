@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -21,16 +22,21 @@ import {
   Loader2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   User,
   Car,
   Shield,
   FileText,
   Check,
   Gauge,
-  AlertTriangle
+  AlertTriangle,
+  MapPin,
+  Calendar,
+  Truck
 } from "lucide-react";
 import { OUTPOSTS, REGIONS } from "@/lib/constants";
 import unitLogo from "@/assets/unit-logo.png";
+import { StorageImage } from "@/components/shared/StorageImage";
 
 interface Soldier {
   id: string;
@@ -45,13 +51,20 @@ interface Soldier {
   qualified_date: string | null;
 }
 
-interface Accident {
+interface SafetyIncident {
   id: string;
   soldier_id: string | null;
   driver_name: string | null;
-  accident_date: string;
+  event_date: string | null;
+  title: string;
   description: string | null;
   severity: string | null;
+  event_type: string | null;
+  vehicle_number: string | null;
+  driver_type: string | null;
+  outpost: string | null;
+  region: string | null;
+  image_url: string | null;
 }
 
 interface Interview {
@@ -90,6 +103,104 @@ interface SafetyScore {
   notes: string | null;
 }
 
+// Severity label mapping
+const severityLabels: Record<string, string> = {
+  minor: 'קל',
+  moderate: 'בינוני',
+  severe: 'חמור'
+};
+
+const severityColors: Record<string, string> = {
+  minor: 'bg-yellow-500/20 text-yellow-400',
+  moderate: 'bg-orange-500/20 text-orange-400',
+  severe: 'bg-red-500/20 text-red-400'
+};
+
+// Expandable incident card component
+function IncidentCard({ incident }: { incident: SafetyIncident }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <div className="p-3 rounded-xl bg-slate-700/50 border border-slate-600 cursor-pointer hover:bg-slate-600/50 transition-colors">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              <div>
+                <p className="font-medium text-white text-sm">{incident.title || 'ללא כותרת'}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-slate-400">
+                    {incident.event_date ? format(parseISO(incident.event_date), 'dd/MM/yyyy') : 'לא צוין'}
+                  </span>
+                  {incident.severity && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${severityColors[incident.severity] || 'bg-slate-500/20 text-slate-300'}`}>
+                      {severityLabels[incident.severity] || incident.severity}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 p-4 rounded-xl bg-slate-800/70 border border-slate-600 space-y-3">
+          {/* Description */}
+          {incident.description && (
+            <div>
+              <Label className="text-xs text-slate-400 mb-1 block">תיאור</Label>
+              <p className="text-sm text-slate-200">{incident.description}</p>
+            </div>
+          )}
+          
+          {/* Details Grid */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {incident.vehicle_number && (
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-300">רכב: {incident.vehicle_number}</span>
+              </div>
+            )}
+            {incident.outpost && (
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-300">מוצב: {incident.outpost}</span>
+              </div>
+            )}
+            {incident.region && (
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-300">גזרה: {incident.region}</span>
+              </div>
+            )}
+            {incident.driver_type && (
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-300">
+                  סוג נהג: {incident.driver_type === 'security' ? 'נהג בט"ש' : 'נהג גדוד'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Image */}
+          {incident.image_url && (
+            <div className="mt-3">
+              <Label className="text-xs text-slate-400 mb-2 block">תמונה</Label>
+              <StorageImage
+                src={incident.image_url}
+                alt={incident.title}
+                className="w-full max-h-48 object-cover rounded-lg"
+              />
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 const INTERVIEW_GUIDELINES = [
   "ערנות - יש לשמור על שעות שינה טרם עלייה להגה - נהג עייף - לא נוהג! עייפות = שכרות",
   "שמירת מרחק - יש לשמור מרחק לרכב לפנים ולזה שלפניו, בשעה שהרכב מלפנים בולם יש להוריד מיידית את הרגל מהגז ולהאט",
@@ -113,7 +224,8 @@ export default function DriverInterviews() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [soldiers, setSoldiers] = useState<Soldier[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
-  const [accidents, setAccidents] = useState<Accident[]>([]);
+  const [safetyIncidents, setSafetyIncidents] = useState<SafetyIncident[]>([]);
+  const [selectedIncidents, setSelectedIncidents] = useState<SafetyIncident[]>([]);
   const [safetyScores, setSafetyScores] = useState<SafetyScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -232,7 +344,7 @@ export default function DriverInterviews() {
   const fetchData = async () => {
     setLoading(true);
     
-    const [soldiersRes, interviewsRes, accidentsRes] = await Promise.all([
+    const [soldiersRes, interviewsRes, incidentsRes] = await Promise.all([
       supabase
         .from("soldiers")
         .select("id, personal_number, full_name, outpost, civilian_license_expiry, military_license_expiry, defensive_driving_passed, license_type, permits, qualified_date")
@@ -245,14 +357,16 @@ export default function DriverInterviews() {
         .order("interview_date", { ascending: false })
         .limit(20),
       supabase
-        .from("accidents")
-        .select("id, soldier_id, driver_name, accident_date, description, severity")
-        .order("accident_date", { ascending: false })
+        .from("safety_content")
+        .select("id, soldier_id, driver_name, event_date, title, description, severity, event_type, vehicle_number, driver_type, outpost, region, image_url")
+        .eq("category", "sector_events")
+        .in("event_type", ["accident", "stuck"])
+        .order("event_date", { ascending: false })
     ]);
 
     if (soldiersRes.data) setSoldiers(soldiersRes.data);
     if (interviewsRes.data) setInterviews(interviewsRes.data as Interview[]);
-    if (accidentsRes.data) setAccidents(accidentsRes.data);
+    if (incidentsRes.data) setSafetyIncidents(incidentsRes.data as SafetyIncident[]);
     
     setLoading(false);
   };
@@ -260,15 +374,19 @@ export default function DriverInterviews() {
   const handleSoldierSelect = async (soldierId: string) => {
     const soldier = soldiers.find(s => s.id === soldierId);
     if (soldier) {
-      // Get accidents for this soldier from the accidents tracking table
-      const soldierAccidents = accidents.filter(a => 
+      // Get incidents for this soldier from safety_content table
+      const soldierIncidents = safetyIncidents.filter(a => 
         a.soldier_id === soldierId || 
         (a.driver_name && a.driver_name.toLowerCase() === soldier.full_name.toLowerCase())
       );
       
-      const accidentsText = soldierAccidents.length > 0
-        ? soldierAccidents.map(a => 
-            `${format(new Date(a.accident_date), "dd/MM/yyyy")} - ${a.description || 'ללא תיאור'} (${a.severity || 'לא צוין'})`
+      // Store incidents for display as cards
+      setSelectedIncidents(soldierIncidents);
+      
+      // Keep text for backward compatibility with saved interviews
+      const incidentsText = soldierIncidents.length > 0
+        ? soldierIncidents.map(a => 
+            `${a.event_date ? format(new Date(a.event_date), "dd/MM/yyyy") : 'לא צוין'} - ${a.title || 'ללא תיאור'} (${a.severity || 'לא צוין'})`
           ).join('\n')
         : "";
 
@@ -279,7 +397,7 @@ export default function DriverInterviews() {
         civilian_license_expiry: soldier.civilian_license_expiry || "",
         military_license_expiry: soldier.military_license_expiry || "",
         defensive_driving_passed: soldier.defensive_driving_passed || false,
-        military_accidents: accidentsText,
+        military_accidents: incidentsText,
         license_type: soldier.license_type || "",
         permits: soldier.permits?.join(", ") || "",
         qualified_date: soldier.qualified_date || "",
@@ -453,6 +571,7 @@ export default function DriverInterviews() {
     setCurrentStep(1);
     clearSignature();
     setSafetyScores([]);
+    setSelectedIncidents([]);
     setEditingInterviewId(null);
     setExistingSignature(null);
   };
@@ -607,15 +726,38 @@ export default function DriverInterviews() {
                 </span>
               </div>
 
-              <div className="mt-3">
-                <Label className="text-xs text-slate-300">תאונות במסגרת הצבא</Label>
-                <Textarea
-                  value={formData.military_accidents}
-                  onChange={(e) => setFormData({ ...formData, military_accidents: e.target.value })}
-                  placeholder="פרט תאונות אם היו..."
-                  className="rounded-xl text-sm bg-slate-700 text-white border-slate-600"
-                  rows={2}
-                />
+              {/* Accidents Section - Expandable Cards */}
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <Label className="text-sm font-bold text-red-400">תאונות במסגרת הצבא</Label>
+                </div>
+                {selectedIncidents.filter(i => i.event_type === 'accident').length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedIncidents.filter(i => i.event_type === 'accident').map(incident => (
+                      <IncidentCard key={incident.id} incident={incident} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">אין תאונות רשומות</p>
+                )}
+              </div>
+
+              {/* Stuck Incidents Section - Expandable Cards */}
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Car className="w-4 h-4 text-amber-400" />
+                  <Label className="text-sm font-bold text-amber-400">אירועי התחפרות</Label>
+                </div>
+                {selectedIncidents.filter(i => i.event_type === 'stuck').length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedIncidents.filter(i => i.event_type === 'stuck').map(incident => (
+                      <IncidentCard key={incident.id} incident={incident} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">אין אירועי התחפרות רשומים</p>
+                )}
               </div>
             </div>
           </div>
