@@ -5,9 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { FileSignature, Users, CheckCircle2, XCircle, ChevronLeft, Search, Loader2 } from "lucide-react";
+import { FileSignature, Users, CheckCircle2, XCircle, ChevronLeft, Search, Loader2, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { he } from "date-fns/locale";
 
 interface Soldier {
   id: string;
@@ -88,16 +90,24 @@ export function ProcedureSignaturesComplianceCard() {
   };
 
   // Match by normalized name instead of user_id since soldiers table uses different IDs
-  const getSignedNames = (procedureType: string): Set<string> => {
-    const signedNames = new Set<string>();
+  // Returns a map with normalized name -> signature date
+  const getSignedNamesWithDate = (procedureType: string): Map<string, string> => {
+    const signedMap = new Map<string, string>();
     signatures
       .filter(s => s.procedure_type === procedureType)
       .forEach(sig => {
         // Normalize name for comparison
         const normalizedName = sig.full_name.trim().toLowerCase();
-        signedNames.add(normalizedName);
+        // Only keep the first (most recent) signature date for each name
+        if (!signedMap.has(normalizedName)) {
+          signedMap.set(normalizedName, sig.created_at);
+        }
       });
-    return signedNames;
+    return signedMap;
+  };
+
+  const getSignedNames = (procedureType: string): Set<string> => {
+    return new Set(getSignedNamesWithDate(procedureType).keys());
   };
 
   const getComplianceStats = () => {
@@ -121,12 +131,17 @@ export function ProcedureSignaturesComplianceCard() {
   const getFilteredSoldiers = () => {
     if (!selectedProcedure) return [];
     
-    const signedNames = getSignedNames(selectedProcedure);
+    const signedMap = getSignedNamesWithDate(selectedProcedure);
     
-    let filtered = soldiers.map(soldier => ({
-      ...soldier,
-      isSigned: signedNames.has(soldier.full_name.trim().toLowerCase())
-    }));
+    let filtered = soldiers.map(soldier => {
+      const normalizedName = soldier.full_name.trim().toLowerCase();
+      const signedDate = signedMap.get(normalizedName);
+      return {
+        ...soldier,
+        isSigned: !!signedDate,
+        signedDate: signedDate || null
+      };
+    });
     
     if (filterType === "signed") {
       filtered = filtered.filter(s => s.isSigned);
@@ -321,6 +336,14 @@ export function ProcedureSignaturesComplianceCard() {
                           <p className="font-medium text-slate-800 truncate">{soldier.full_name}</p>
                           {soldier.outpost && (
                             <p className="text-xs text-slate-500">{soldier.outpost}</p>
+                          )}
+                          {soldier.isSigned && soldier.signedDate && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Calendar className="w-3 h-3 text-emerald-500" />
+                              <p className="text-xs text-emerald-600">
+                                חתם ב-{format(new Date(soldier.signedDate), "dd/MM/yyyy", { locale: he })}
+                              </p>
+                            </div>
                           )}
                         </div>
                         <Badge 
