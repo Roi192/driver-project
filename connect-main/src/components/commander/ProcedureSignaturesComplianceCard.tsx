@@ -45,6 +45,18 @@ export function ProcedureSignaturesComplianceCard() {
 
   useEffect(() => {
     fetchData();
+    
+    // Refetch when tab becomes visible (user returns to page)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const fetchData = async () => {
