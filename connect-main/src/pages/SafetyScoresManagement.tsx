@@ -730,34 +730,39 @@ export default function SafetyScoresManagement() {
       return;
     }
     
-    const monthStr = `${excellenceYear}-${String(excellenceMonth).padStart(2, '0')}-01`;
-    
-    const { error } = await supabase
-      .from("monthly_excellence")
-      .insert({
-        soldier_id: candidate.soldier.id,
-        excellence_month: monthStr,
-        safety_score: candidate.safetyScore,
-        kilometers: candidate.kilometers,
-        calculated_score: candidate.calculatedScore,
-        speed_violations: candidate.speedViolations,
-        accidents_count: candidate.accidentsCount,
-        punishments_count: candidate.punishmentsCount,
-        cleaning_parades_on_time: candidate.cleaningOnTime,
-        avg_inspection_score: candidate.avgInspectionScore,
-        selected_by: user?.id,
-      });
-    
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("כבר נבחר מצטיין לחודש זה");
+    try {
+      const monthStr = `${excellenceYear}-${String(excellenceMonth).padStart(2, '0')}-01`;
+      
+      const { error } = await supabase
+        .from("monthly_excellence")
+        .insert({
+          soldier_id: candidate.soldier.id,
+          excellence_month: monthStr,
+          safety_score: candidate.safetyScore,
+          kilometers: candidate.kilometers,
+          calculated_score: candidate.calculatedScore,
+          speed_violations: candidate.speedViolations,
+          accidents_count: candidate.accidentsCount,
+          punishments_count: candidate.punishmentsCount,
+          cleaning_parades_on_time: candidate.cleaningOnTime,
+          avg_inspection_score: candidate.avgInspectionScore,
+          selected_by: user?.id,
+        });
+      
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("כבר נבחר מצטיין לחודש זה");
+        } else {
+          toast.error("שגיאה בבחירת מצטיין");
+        }
       } else {
-        toast.error("שגיאה בבחירת מצטיין");
+        toast.success(`${candidate.soldier.full_name} נבחר כמצטיין החודש! 🏆`);
+        fetchData();
+        setExcellenceDialogOpen(false);
       }
-    } else {
-      toast.success(`${candidate.soldier.full_name} נבחר כמצטיין החודש! 🏆`);
-      fetchData();
-      setExcellenceDialogOpen(false);
+    } catch (error) {
+      console.error("Unexpected error selecting excellence winner:", error);
+      toast.error("אירעה שגיאה בלתי צפויה");
     }
   };
   
@@ -772,42 +777,47 @@ export default function SafetyScoresManagement() {
       return;
     }
     
-    const monthStr = `${manualExcellenceData.excellence_year}-${String(manualExcellenceData.excellence_month).padStart(2, '0')}-01`;
-    
-    const { error } = await supabase
-      .from("monthly_excellence")
-      .insert({
-        soldier_id: manualExcellenceData.soldier_id,
-        excellence_month: monthStr,
-        safety_score: manualExcellenceData.safety_score,
-        kilometers: manualExcellenceData.kilometers,
-        calculated_score: 0, // External winner - no calculated score
-        speed_violations: 0,
-        accidents_count: 0,
-        punishments_count: 0,
-        cleaning_parades_on_time: true,
-        avg_inspection_score: null,
-        selected_by: user?.id,
-      });
-    
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("כבר נבחר מצטיין לחודש זה");
+    try {
+      const monthStr = `${manualExcellenceData.excellence_year}-${String(manualExcellenceData.excellence_month).padStart(2, '0')}-01`;
+      
+      const { error } = await supabase
+        .from("monthly_excellence")
+        .insert({
+          soldier_id: manualExcellenceData.soldier_id,
+          excellence_month: monthStr,
+          safety_score: manualExcellenceData.safety_score,
+          kilometers: manualExcellenceData.kilometers,
+          calculated_score: 0, // External winner - no calculated score
+          speed_violations: 0,
+          accidents_count: 0,
+          punishments_count: 0,
+          cleaning_parades_on_time: true,
+          avg_inspection_score: null,
+          selected_by: user?.id,
+        });
+      
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("כבר נבחר מצטיין לחודש זה");
+        } else {
+          toast.error("שגיאה בהוספת מצטיין");
+        }
       } else {
-        toast.error("שגיאה בהוספת מצטיין");
+        toast.success("מצטיין חיצוני נוסף בהצלחה! 🏆");
+        fetchData();
+        setManualExcellenceDialogOpen(false);
+        setManualExcellenceData({
+          soldier_id: "",
+          excellence_month: defaultFormDate.month,
+          excellence_year: defaultFormDate.year,
+          safety_score: 100,
+          kilometers: 0,
+          notes: "",
+        });
       }
-    } else {
-      toast.success("מצטיין חיצוני נוסף בהצלחה! 🏆");
-      fetchData();
-      setManualExcellenceDialogOpen(false);
-      setManualExcellenceData({
-        soldier_id: "",
-        excellence_month: defaultFormDate.month,
-        excellence_year: defaultFormDate.year,
-        safety_score: 100,
-        kilometers: 0,
-        notes: "",
-      });
+    } catch (error) {
+      console.error("Unexpected error adding manual excellence:", error);
+      toast.error("אירעה שגיאה בלתי צפויה");
     }
   };
 
