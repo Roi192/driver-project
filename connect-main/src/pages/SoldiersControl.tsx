@@ -647,7 +647,7 @@ export default function SoldiersControl() {
                                         className="bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 text-xs font-bold flex items-center gap-1 shadow-md"
                                       >
                                         <Crown className="w-3 h-3" />
-                                        {format(parseISO(excellence.excellence_month + "-01"), "MM/yyyy")}
+                                        {format(parseISO(excellence.excellence_month), "MM/yyyy")}
                                       </Badge>
                                     ))}
                                   </div>
