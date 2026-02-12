@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-// Updated roles: admin (מ"פ), platoon_commander (מ"מ), battalion_admin (גדוד), driver (נהג)
-export type AppRole = 'driver' | 'admin' | 'platoon_commander' | 'battalion_admin';
+// Updated roles: super_admin (מנהל ראשי), admin (מ"פ), platoon_commander (מ"מ), battalion_admin (גדוד), hagmar_admin (מנהל הגמ"ר), driver (נהג)
+export type AppRole = 'driver' | 'admin' | 'platoon_commander' | 'battalion_admin' | 'super_admin' | 'hagmar_admin' | 'ravshatz';
 
 interface SignUpData {
   email: string;
@@ -15,6 +15,9 @@ interface SignUpData {
   militaryRole?: string;
   platoon?: string;
   personalNumber?: string;
+  department?: string;
+  settlement?: string;
+  idNumber?: string;
 }
 
 interface AuthContextType {
@@ -27,9 +30,11 @@ interface AuthContextType {
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  isSuperAdmin: boolean;
   isAdmin: boolean;
   isPlatoonCommander: boolean;
   isBattalionAdmin: boolean;
+  isHagmarAdmin: boolean;
   canDelete: boolean;
   canEdit: boolean;
   canEditDrillLocations: boolean;
@@ -54,6 +59,9 @@ interface AuthContextType {
   canAccessAdminDashboard: boolean;
   canAccessWorkSchedule: boolean;
   canAccessWeeklyMeeting: boolean;
+  canAccessEquipmentTracking: boolean;
+  isRavshatz: boolean;
+  canAccessHagmarSoldiers: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,18 +74,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let mounted = true;
+    let initialLoadDone = false;
+
+    const fetchRoleAndType = async (userId: string) => {
+      const [roleResult, typeResult] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+        supabase.from('profiles').select('user_type').eq('user_id', userId).maybeSingle(),
+      ]);
+      
+      if (!mounted) return;
+      
+      if (!roleResult.error && roleResult.data) {
+        setRole(roleResult.data.role as AppRole);
+      }
+      if (!typeResult.error && typeResult.data) {
+        setUserType(typeResult.data.user_type);
+      }
+    };
+
+    // Set up auth state listener FIRST - MUST be synchronous per Supabase docs
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer role fetching with setTimeout to prevent deadlock
         if (session?.user) {
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-            fetchUserType(session.user.id);
-          }, 0);
+          // Fire-and-forget role fetch (don't await - keeps callback synchronous)
+          fetchRoleAndType(session.user.id);
         } else {
           setRole(null);
           setUserType(null);
@@ -85,19 +109,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // THEN check for existing session - this controls loading state
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserRole(session.user.id);
-        fetchUserType(session.user.id);
+        await fetchRoleAndType(session.user.id);
       }
-      setLoading(false);
+      if (mounted && !initialLoadDone) {
+        initialLoadDone = true;
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserRole = async (userId: string) => {
@@ -140,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: data.password,
       options: {
         emailRedirectTo: redirectUrl,
-        data: {
+          data: {
           full_name: data.fullName,
           user_type: data.userType,
           outpost: data.outpost || null,
@@ -148,6 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           military_role: data.militaryRole || null,
           platoon: data.platoon || null,
           personal_number: data.personalNumber || null,
+          department: data.department || 'planag',
+          settlement: data.settlement || null,
+          id_number: data.idNumber || null,
         },
       },
     });
@@ -174,78 +207,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserType(null);
   };
 
-  // Permission calculations
-  const isAdmin = role === 'admin';
+  // Permission calculations - super_admin gets all admin permissions
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin' || role === 'super_admin';
   const isPlatoonCommander = role === 'platoon_commander';
   const isBattalionAdmin = role === 'battalion_admin';
+  const isHagmarAdmin = role === 'hagmar_admin' || role === 'super_admin';
   
-  // Only admin (מ"פ) can delete
-  const canDelete = role === 'admin';
+  // Only admin/super_admin can delete
+  const canDelete = role === 'admin' || role === 'super_admin';
   
-  // Admin (מ"פ), platoon_commander (מ"מ), and battalion_admin (גדוד) can add/edit
-  // Battalion admin can edit drill locations, safety files, safety events
-  const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  // Admin, platoon_commander, battalion_admin, and super_admin can add/edit
+  const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
   
-  // Battalion admin specific permissions - can edit these specific sections
-  const canEditDrillLocations = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditSafetyFiles = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditSafetyEvents = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  // Battalion admin cannot edit training videos or procedures
-  const canEditTrainingVideos = role === 'admin' || role === 'platoon_commander';
-  const canEditProcedures = role === 'admin' || role === 'platoon_commander';
+  const canEditDrillLocations = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditSafetyFiles = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditSafetyEvents = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditTrainingVideos = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canEditProcedures = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
   
-  // Only admin (מ"פ) can access users management
-  const canAccessUsersManagement = role === 'admin';
-  
-  // Only admin (מ"פ) can access BOM report
-  const canAccessBomReport = role === 'admin';
-  
-  // Only admin (מ"פ) and platoon_commander (מ"מ) can access annual work plan
-  // battalion_admin cannot
-  const canAccessAnnualWorkPlan = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin and platoon_commander can access soldiers control
-  // battalion_admin can see soldier data in dropdowns but not access the page
-  const canAccessSoldiersControl = role === 'admin' || role === 'platoon_commander';
-  
-  // Only admin and platoon_commander can access attendance tracking
-  const canAccessAttendance = role === 'admin' || role === 'platoon_commander';
-  
-  // Only admin and platoon_commander can access punishments tracking
-  const canAccessPunishments = role === 'admin' || role === 'platoon_commander';
-  
-  // Only admin and platoon_commander can access inspections
-  const canAccessInspections = role === 'admin' || role === 'platoon_commander';
-  
-  // Only admin can access holidays management
-  const canAccessHolidays = role === 'admin';
-  
-  // Only admin can access fitness report
-  const canAccessFitnessReport = role === 'admin';
-  
-  // Admin and platoon_commander can access accidents tracking
-  const canAccessAccidents = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin and platoon_commander can access courses management
-  const canAccessCourses = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin and platoon_commander can access cleaning management
-  const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin and platoon_commander can access safety scores
-  const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin, platoon_commander, and battalion_admin can access driver interviews
-  const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  
-  // Battalion admin can access admin dashboard
-  const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  
-  // Admin and platoon_commander can access work schedule
-  const canAccessWorkSchedule = role === 'admin' || role === 'platoon_commander';
-  
-  // Admin and platoon_commander can access weekly meeting
-  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander';
+  const canAccessUsersManagement = role === 'admin' || role === 'super_admin' || role === 'hagmar_admin';
+  const canAccessBomReport = role === 'admin' || role === 'super_admin';
+  const canAccessAnnualWorkPlan = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessSoldiersControl = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessAttendance = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessPunishments = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessInspections = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessHolidays = role === 'admin' || role === 'super_admin';
+  const canAccessFitnessReport = role === 'admin' || role === 'super_admin';
+  const canAccessAccidents = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessCourses = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canAccessWorkSchedule = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin';
+  const isRavshatz = role === 'ravshatz';
+  const canAccessHagmarSoldiers = role === 'hagmar_admin' || role === 'super_admin' || role === 'ravshatz';
 
   const value = {
     user,
@@ -257,9 +257,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signInWithGoogle,
     signOut,
+    isSuperAdmin,
     isAdmin,
     isPlatoonCommander,
     isBattalionAdmin,
+    isHagmarAdmin,
     canDelete,
     canEdit,
     canEditDrillLocations,
@@ -284,6 +286,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAccessAdminDashboard,
     canAccessWorkSchedule,
     canAccessWeeklyMeeting,
+    canAccessEquipmentTracking,
+    isRavshatz,
+    canAccessHagmarSoldiers,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

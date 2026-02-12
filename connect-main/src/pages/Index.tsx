@@ -4,15 +4,56 @@ import { CommanderDashboard } from "@/components/commander/CommanderDashboard";
 import { HeroSection } from "@/components/home/HeroSection";
 import { QuickActions } from "@/components/home/QuickActions";
 import { DriverHomeContent } from "@/components/home/DriverHomeContent";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
-  const { user, isAdmin, isPlatoonCommander, isBattalionAdmin, loading } = useAuth();
+  const { user, isAdmin, isPlatoonCommander, isBattalionAdmin, isSuperAdmin, loading, role } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [departmentChecked, setDepartmentChecked] = useState(false);
+  const [isHagmarUser, setIsHagmarUser] = useState(false);
+  
+  // Only redirect from "/" root path, not from "/planag"
+  const isRootPath = location.pathname === '/';
 
-  // Check if user has any admin-level role that should see commander dashboard
+  useEffect(() => {
+    const checkDepartment = async () => {
+      if (!user || !isRootPath) { setDepartmentChecked(true); return; }
+      
+      if (isSuperAdmin) {
+        navigate('/department-selector', { replace: true });
+        return;
+      }
+      if (role === 'hagmar_admin' || role === 'ravshatz') {
+        navigate('/hagmar', { replace: true });
+        return;
+      }
+      
+      // Check department for regular hagmar users (who have 'driver' role)
+      const { data } = await supabase
+        .from('profiles')
+        .select('department')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data?.department === 'hagmar') {
+        setIsHagmarUser(true);
+        navigate('/hagmar', { replace: true });
+        return;
+      }
+      
+      setDepartmentChecked(true);
+    };
+    
+    if (!loading && user) checkDepartment();
+    else if (!loading) setDepartmentChecked(true);
+  }, [user, isSuperAdmin, role, loading, navigate, isRootPath]);
+
   const hasAdminAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
 
-  // Show loading while checking role
-  if (loading) {
+  if (loading || !departmentChecked || (isRootPath && (isSuperAdmin || role === 'hagmar_admin' || role === 'ravshatz' || isHagmarUser))) {
     return (
       <AppLayout>
         <div className="min-h-screen flex items-center justify-center">
@@ -25,7 +66,6 @@ const Index = () => {
     );
   }
 
-  // Show commander dashboard for admins and platoon commanders
   if (user && hasAdminAccess) {
     return (
       <AppLayout>
@@ -34,7 +74,6 @@ const Index = () => {
     );
   }
 
-  // Show driver home page with organized tasks
   return (
     <AppLayout>
       <HeroSection />

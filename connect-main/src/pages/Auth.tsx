@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Shield, Loader2, Car, Users } from 'lucide-react';
+import { Shield, Loader2, Car, Users, Building2 } from 'lucide-react';
 import unitLogo from '@/assets/unit-logo.png';
 import bgVehicles from '@/assets/bg-vehicles.png';
 import { OUTPOSTS } from '@/lib/constants';
@@ -474,10 +474,24 @@ export default function Auth() {
             </TabsContent>
           </Tabs>
 
-          <div className="flex items-center justify-center gap-3 pt-6 mt-6 border-t border-border/30 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
-              <Shield className="w-5 h-5 text-primary" />
-              <span className="text-primary font-black">פלנ"ג בנימין</span>
+          <div className="space-y-4 pt-6 mt-6 border-t border-border/30 animate-slide-up" style={{ animationDelay: '0.4s' }}>
+            <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
+                <Shield className="w-5 h-5 text-primary" />
+                <span className="text-primary font-black">פלנ"ג בנימין</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-sm text-slate-600">משתמש הגמ"ר?</span>
+              <Button
+                onClick={() => navigate('/auth/hagmar')}
+                variant="outline"
+                className="w-full border-amber-500/40 hover:border-amber-500 hover:bg-amber-50 text-amber-700 font-semibold rounded-xl transition-all duration-300"
+              >
+                <Building2 className="w-4 h-4 ml-2" />
+                הרשמה למחלקת הגמ"ר
+              </Button>
             </div>
           </div>
         </CardContent>

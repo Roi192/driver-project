@@ -7,7 +7,8 @@ import {
   ChevronLeft,
   Sparkles,
   Shield,
-  Activity
+  Activity,
+  Crosshair
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ interface ActionItem {
   bgGlow: string;
 }
 
-const getActions = (canAccessFitnessReport: boolean) => {
+const getActions = (canAccessFitnessReport: boolean, canAccessEquipmentTracking: boolean) => {
   const actions: ActionItem[] = [
     {
       to: "/soldiers-control",
@@ -113,12 +114,23 @@ const getActions = (canAccessFitnessReport: boolean) => {
     }
   );
   
+  if (canAccessEquipmentTracking) {
+    actions.push({
+      to: "/equipment-tracking",
+      icon: Crosshair,
+      label: 'מעקב צל"ם',
+      description: "ניהול ציוד לחימה מרוכז",
+      gradient: "from-rose-500 to-rose-700",
+      bgGlow: "bg-rose-400/20"
+    });
+  }
+  
   return actions;
 };
 
 export function CommanderQuickActions() {
-  const { canAccessFitnessReport } = useAuth();
-  const actions = getActions(canAccessFitnessReport);
+  const { canAccessFitnessReport, canAccessEquipmentTracking } = useAuth();
+  const actions = getActions(canAccessFitnessReport, canAccessEquipmentTracking);
   
   return (
     <div className="space-y-4">

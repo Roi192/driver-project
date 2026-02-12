@@ -69,7 +69,15 @@ interface Soldier {
   id: string;
   full_name: string;
   personal_number: string;
+  rotation_group: string | null;
 }
+
+const ROTATION_GROUPS = [
+  { value: "a_sunday", label: "סבב א' (ראשון)" },
+  { value: "a_monday", label: "סבב א' (שני)" },
+  { value: "b_sunday", label: "סבב ב' (ראשון)" },
+  { value: "b_monday", label: "סבב ב' (שני)" },
+];
 
 interface EventAttendance {
   id: string;
@@ -193,7 +201,7 @@ export default function AnnualWorkPlan() {
     const [eventsRes, holidaysRes, soldiersRes, attendanceRes] = await Promise.all([
       supabase.from("work_plan_events").select("*").order("event_date", { ascending: true }),
       supabase.from("calendar_holidays").select("*"),
-      supabase.from("soldiers").select("id, full_name, personal_number").eq("is_active", true).order("full_name"),
+      supabase.from("soldiers").select("id, full_name, personal_number, rotation_group").eq("is_active", true).order("full_name"),
       supabase.from("event_attendance").select("*"),
     ]);
 
@@ -1204,9 +1212,40 @@ export default function AnnualWorkPlan() {
               </div>
             )}
 
-            <div className="flex gap-2 my-2">
+            <div className="flex flex-wrap gap-2 my-2">
               <Button variant="outline" size="sm" onClick={selectAllExpected}>בחר הכל</Button>
               <Button variant="outline" size="sm" onClick={clearAllExpected}>נקה הכל</Button>
+            </div>
+
+            {/* Quick rotation group select */}
+            <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
+              <p className="text-xs font-bold text-violet-700 mb-2">בחר לפי סבב:</p>
+              <div className="flex flex-wrap gap-2">
+                {ROTATION_GROUPS.map(group => {
+                  const groupSoldiers = soldiers.filter(s => (s as any).rotation_group === group.value);
+                  const allSelected = groupSoldiers.length > 0 && groupSoldiers.every(s => selectedExpectedSoldiers.includes(s.id));
+                  return (
+                    <Button
+                      key={group.value}
+                      variant={allSelected ? "default" : "outline"}
+                      size="sm"
+                      className={`text-xs ${allSelected ? "bg-violet-600 hover:bg-violet-700" : ""}`}
+                      onClick={() => {
+                        if (allSelected) {
+                          // Remove this group's soldiers
+                          setSelectedExpectedSoldiers(prev => prev.filter(id => !groupSoldiers.some(s => s.id === id)));
+                        } else {
+                          // Add this group's soldiers
+                          const newIds = groupSoldiers.map(s => s.id).filter(id => !selectedExpectedSoldiers.includes(id));
+                          setSelectedExpectedSoldiers(prev => [...prev, ...newIds]);
+                        }
+                      }}
+                    >
+                      {group.label} ({groupSoldiers.length})
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto max-h-[60vh] pr-1 overscroll-contain">
@@ -1229,9 +1268,16 @@ export default function AnnualWorkPlan() {
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox checked={selectedExpectedSoldiers.includes(soldier.id)} />
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-slate-800">{soldier.full_name}</p>
-                        <p className="text-xs text-slate-500">{soldier.personal_number}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-500">{soldier.personal_number}</p>
+                          {(soldier as any).rotation_group && (
+                            <Badge className="bg-violet-100 text-violet-700 text-[10px] px-1.5 py-0">
+                              {ROTATION_GROUPS.find(r => r.value === (soldier as any).rotation_group)?.label || (soldier as any).rotation_group}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -29,7 +29,8 @@ import {
   Car,
   CheckCircle,
   Gauge,
-  Crown
+  Crown,
+  Crosshair
 } from "lucide-react";
 import { OUTPOSTS } from "@/lib/constants";
 import * as XLSX from "xlsx";
@@ -54,6 +55,8 @@ interface Soldier {
   safety_status: string | null;
   license_type: string | null;
   permits: string[] | null;
+  last_shooting_range_date: string | null;
+  rotation_group: string | null;
 }
 
 interface MonthlyExcellence {
@@ -64,6 +67,13 @@ interface MonthlyExcellence {
 // Available permits
 const PERMITS_LIST = ["דויד", "סוואנה", "טיגריס", "פנתר"];
 const LICENSE_TYPES = ["B", "C1", "C"];
+
+const ROTATION_GROUPS = [
+  { value: "a_sunday", label: "סבב א' (ראשון-ראשון)" },
+  { value: "a_monday", label: "סבב א' (שני-שני)" },
+  { value: "b_sunday", label: "סבב ב' (ראשון-ראשון)" },
+  { value: "b_monday", label: "סבב ב' (שני-שני)" },
+];
 
 // פונקציית כשירות אוטומטית - נהג כשיר = רשיון צבאי ואזרחי בתוקף (לא קשור לנהיגה מונעת)
 const getFitnessStatus = (soldier: Soldier) => {
@@ -102,6 +112,24 @@ const getCorrectDrivingStatus = (soldier: Soldier) => {
   return { status: "valid", label: "תקף", color: "bg-emerald-500", isValid: true };
 };
 
+// פונקציה לבדיקת תוקף מטווח (נדרש אחת לחצי שנה - 180 יום)
+const getShootingRangeStatus = (soldier: Soldier) => {
+  if (!soldier.last_shooting_range_date) {
+    return { status: "unknown", label: "לא הוזן", color: "bg-slate-400" };
+  }
+  
+  const today = new Date();
+  const rangeDate = parseISO(soldier.last_shooting_range_date);
+  const daysSince = differenceInDays(today, rangeDate);
+  
+  if (daysSince > 180) {
+    return { status: "expired", label: "חייב מטווח", color: "bg-red-500" };
+  } else if (daysSince > 150) {
+    return { status: "warning", label: `${180 - daysSince} ימים`, color: "bg-amber-500" };
+  }
+  return { status: "valid", label: "תקף", color: "bg-emerald-500" };
+};
+
 export default function SoldiersControl() {
   const { isAdmin, isPlatoonCommander, canAccessSoldiersControl, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -123,6 +151,8 @@ export default function SoldiersControl() {
   const [defensiveDrivingFilter, setDefensiveDrivingFilter] = useState<string>("all");
   const [licenseTypeFilter, setLicenseTypeFilter] = useState<string>("all");
   const [permitFilter, setPermitFilter] = useState<string>("all");
+  const [shootingRangeFilter, setShootingRangeFilter] = useState<string>("all");
+  const [rotationGroupFilter, setRotationGroupFilter] = useState<string>("all");
 
   const [formData, setFormData] = useState({
     personal_number: "",
@@ -136,6 +166,8 @@ export default function SoldiersControl() {
     correct_driving_in_service_date: "",
     license_type: "",
     permits: [] as string[],
+    last_shooting_range_date: "",
+    rotation_group: "",
   });
 
   useEffect(() => {
@@ -214,6 +246,8 @@ export default function SoldiersControl() {
       correct_driving_in_service_date: formData.correct_driving_in_service_date || null,
       license_type: formData.license_type || null,
       permits: formData.permits.length > 0 ? formData.permits : null,
+      last_shooting_range_date: formData.last_shooting_range_date || null,
+      rotation_group: formData.rotation_group || null,
     };
 
     if (editingSoldier) {
@@ -280,6 +314,8 @@ export default function SoldiersControl() {
       correct_driving_in_service_date: "",
       license_type: "",
       permits: [],
+      last_shooting_range_date: "",
+      rotation_group: "",
     });
     setEditingSoldier(null);
   };
@@ -298,6 +334,8 @@ export default function SoldiersControl() {
       correct_driving_in_service_date: soldier.correct_driving_in_service_date || "",
       license_type: soldier.license_type || "",
       permits: soldier.permits || [],
+      last_shooting_range_date: soldier.last_shooting_range_date || "",
+      rotation_group: (soldier as any).rotation_group || "",
     });
     setDialogOpen(true);
   };
@@ -341,6 +379,9 @@ export default function SoldiersControl() {
       "ציון בטיחות": soldier.current_safety_score ?? "-",
       "חודשים ברציפות מתחת ל-75": soldier.consecutive_low_months ?? 0,
       "סטטוס בטיחות": getSafetyScoreStatus(soldier).label,
+      "תאריך מטווח אחרון": soldier.last_shooting_range_date ? format(parseISO(soldier.last_shooting_range_date), "dd/MM/yyyy") : "-",
+      "סטטוס מטווח": getShootingRangeStatus(soldier).label,
+      "סבב": ROTATION_GROUPS.find(r => r.value === (soldier as any).rotation_group)?.label || "לא הוגדר",
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -390,6 +431,21 @@ export default function SoldiersControl() {
       if (!soldier.permits || !soldier.permits.includes(permitFilter)) return false;
     }
     
+    // Shooting range filter
+    if (shootingRangeFilter !== "all") {
+      const status = getShootingRangeStatus(soldier).status;
+      if (shootingRangeFilter === "expired" && status !== "expired") return false;
+      if (shootingRangeFilter === "warning" && status !== "warning") return false;
+      if (shootingRangeFilter === "valid" && status !== "valid") return false;
+      if (shootingRangeFilter === "unknown" && status !== "unknown") return false;
+    }
+    
+    // Rotation group filter
+    if (rotationGroupFilter !== "all") {
+      if (rotationGroupFilter === "none" && (soldier as any).rotation_group) return false;
+      if (rotationGroupFilter !== "none" && (soldier as any).rotation_group !== rotationGroupFilter) return false;
+    }
+    
     return true;
   });
 
@@ -398,6 +454,12 @@ export default function SoldiersControl() {
     const civilianStatus = getLicenseStatus(soldier.civilian_license_expiry);
     return militaryStatus.status === "expired" || militaryStatus.status === "warning" ||
            civilianStatus.status === "expired" || civilianStatus.status === "warning";
+  });
+
+  // Soldiers needing shooting range (over 180 days or never done)
+  const needsShootingRange = soldiers.filter(soldier => {
+    const status = getShootingRangeStatus(soldier).status;
+    return status === "expired" || status === "warning";
   });
 
   if (authLoading || loading) {
@@ -488,6 +550,40 @@ export default function SoldiersControl() {
                                 </Badge>
                               )}
                             </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Shooting Range Alerts */}
+          {needsShootingRange.length > 0 && (
+            <Card className="border-0 bg-gradient-to-br from-orange-50 to-red-50 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-orange-800">
+                  <Crosshair className="w-5 h-5" />
+                  התראות מטווח ({needsShootingRange.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="w-full">
+                  <div className="space-y-2 min-w-[300px]">
+                    {needsShootingRange.map(soldier => {
+                      const rangeStatus = getShootingRangeStatus(soldier);
+                      const daysSince = soldier.last_shooting_range_date 
+                        ? differenceInDays(new Date(), parseISO(soldier.last_shooting_range_date))
+                        : null;
+                      return (
+                        <div key={soldier.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/80 border border-orange-200">
+                          <div className="flex-1">
+                            <p className="font-bold text-slate-800">{soldier.full_name}</p>
+                            <Badge className={`${rangeStatus.color} text-white text-xs mt-1`}>
+                              {daysSince !== null ? `${daysSince} ימים מהמטווח האחרון` : "לא בוצע מטווח"}
+                            </Badge>
                           </div>
                         </div>
                       );
@@ -600,6 +696,36 @@ export default function SoldiersControl() {
                       {PERMITS_LIST.map(permit => (
                         <SelectItem key={permit} value={permit} className="text-slate-700">{permit}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">מטווח</Label>
+                  <Select value={shootingRangeFilter} onValueChange={setShootingRangeFilter}>
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="valid" className="text-slate-700">תקף</SelectItem>
+                      <SelectItem value="warning" className="text-slate-700">עומד לפוג (30 יום)</SelectItem>
+                      <SelectItem value="expired" className="text-slate-700">חייב מטווח</SelectItem>
+                      <SelectItem value="unknown" className="text-slate-700">לא הוזן</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">סבב</Label>
+                  <Select value={rotationGroupFilter} onValueChange={setRotationGroupFilter}>
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      {ROTATION_GROUPS.map(group => (
+                        <SelectItem key={group.value} value={group.value} className="text-slate-700">{group.label}</SelectItem>
+                      ))}
+                      <SelectItem value="none" className="text-slate-700">לא הוגדר</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -727,14 +853,34 @@ export default function SoldiersControl() {
                                 </Badge>
                               </div>
                               
+                              {/* Shooting Range Status */}
+                              <div className="flex items-center gap-1 mt-2">
+                                <Crosshair className="w-3 h-3 text-slate-400" />
+                                <span className="text-xs text-slate-500">מטווח אחרון:</span>
+                                <Badge className={`${getShootingRangeStatus(soldier).color} text-white text-xs`}>
+                                  {soldier.last_shooting_range_date 
+                                    ? format(parseISO(soldier.last_shooting_range_date), "dd/MM/yy")
+                                    : "לא הוזן"}
+                                </Badge>
+                              </div>
+                              
                               {/* License Type & Permits */}
                               <div className="flex flex-wrap items-center gap-2 mt-2">
                                 {soldier.license_type && (
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-slate-500">סוג רשיון:</span>
                                     <Badge className="bg-indigo-500 text-white text-xs">{soldier.license_type}</Badge>
-                                  </div>
-                                )}
+                                </div>
+                              )}
+                              
+                              {/* Rotation Group Badge */}
+                              {(soldier as any).rotation_group && (
+                                <div className="flex items-center gap-1 mt-2">
+                                  <Badge className="bg-violet-500 text-white text-xs">
+                                    🔄 {ROTATION_GROUPS.find(r => r.value === (soldier as any).rotation_group)?.label || (soldier as any).rotation_group}
+                                  </Badge>
+                                </div>
+                              )}
                                 {soldier.permits && soldier.permits.length > 0 && (
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-slate-500">היתרים:</span>
@@ -890,6 +1036,36 @@ export default function SoldiersControl() {
                   onChange={(e) => setFormData({ ...formData, correct_driving_in_service_date: e.target.value })}
                   className="bg-white"
                 />
+              </div>
+
+              <div className="p-3 rounded-xl bg-orange-50 border border-orange-200">
+                <Label className="text-orange-700 font-bold">תאריך מטווח אחרון</Label>
+                <p className="text-xs text-orange-600 mb-2">נדרש אחת לחצי שנה (180 ימים)</p>
+                <Input
+                  type="date"
+                  value={formData.last_shooting_range_date}
+                  onChange={(e) => setFormData({ ...formData, last_shooting_range_date: e.target.value })}
+                  className="bg-white"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
+                <Label className="text-violet-700 font-bold">סבב שבוע-שבוע</Label>
+                <p className="text-xs text-violet-600 mb-2">הגדר לאיזה סבב החייל שייך</p>
+                <Select 
+                  value={formData.rotation_group || "none"} 
+                  onValueChange={(value) => setFormData({ ...formData, rotation_group: value === "none" ? "" : value })}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="בחר סבב" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">לא הוגדר</SelectItem>
+                    {ROTATION_GROUPS.map(group => (
+                      <SelectItem key={group.value} value={group.value}>{group.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-export type AppRole = 'admin' | 'driver' | 'platoon_commander' | 'battalion_admin';
+export type AppRole = 'admin' | 'driver' | 'platoon_commander' | 'battalion_admin' | 'super_admin' | 'hagmar_admin' | 'ravshatz';
 
 export function useUserRole() {
   const { user } = useAuth();
@@ -41,42 +41,47 @@ export function useUserRole() {
     fetchRole();
   }, [user]);
 
-  const isAdmin = role === 'admin';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin' || role === 'super_admin';
   const isDriver = role === 'driver';
   const isPlatoonCommander = role === 'platoon_commander';
   const isBattalionAdmin = role === 'battalion_admin';
+  const isHagmarAdmin = role === 'hagmar_admin' || role === 'super_admin';
   
   // Permission helpers
-  const canDelete = role === 'admin';
-  const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditDrillLocations = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditSafetyFiles = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditSafetyEvents = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canEditTrainingVideos = role === 'admin' || role === 'platoon_commander';
-  const canEditProcedures = role === 'admin' || role === 'platoon_commander';
-  const canAccessUsersManagement = role === 'admin'; // Only admin
-  const canAccessBomReport = role === 'admin';
-  const canAccessAnnualWorkPlan = role === 'admin' || role === 'platoon_commander';
-  const canAccessSoldiersControl = role === 'admin' || role === 'platoon_commander';
-  const canAccessAttendance = role === 'admin' || role === 'platoon_commander';
-  const canAccessPunishments = role === 'admin' || role === 'platoon_commander';
-  const canAccessInspections = role === 'admin' || role === 'platoon_commander';
-  const canAccessHolidays = role === 'admin'; // Only admin
-  const canAccessFitnessReport = role === 'admin'; // Only admin
-  const canAccessAccidents = role === 'admin' || role === 'platoon_commander';
-  const canAccessCourses = role === 'admin' || role === 'platoon_commander';
-  const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander';
-  const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander';
-  const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
-  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander';
-  const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin';
+  const canDelete = role === 'admin' || role === 'super_admin';
+  const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditDrillLocations = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditSafetyFiles = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditSafetyEvents = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canEditTrainingVideos = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canEditProcedures = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessUsersManagement = role === 'admin' || role === 'super_admin' || role === 'hagmar_admin';
+  const canAccessBomReport = role === 'admin' || role === 'super_admin';
+  const canAccessAnnualWorkPlan = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessSoldiersControl = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessAttendance = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessPunishments = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessInspections = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessHolidays = role === 'admin' || role === 'super_admin';
+  const canAccessFitnessReport = role === 'admin' || role === 'super_admin';
+  const canAccessAccidents = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessCourses = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessCleaningManagement = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessSafetyScores = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
+  const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
+  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin';
 
   return {
     role,
+    isSuperAdmin,
     isAdmin,
     isDriver,
     isPlatoonCommander,
     isBattalionAdmin,
+    isHagmarAdmin,
     isLoading,
     canDelete,
     canEdit,
@@ -101,5 +106,6 @@ export function useUserRole() {
     canAccessDriverInterviews,
     canAccessWeeklyMeeting,
     canAccessAdminDashboard,
+    canAccessEquipmentTracking,
   };
 }

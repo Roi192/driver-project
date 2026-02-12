@@ -861,6 +861,48 @@ export type Database = {
           },
         ]
       }
+      equipment_tracking: {
+        Row: {
+          actual_quantity: number
+          created_at: string
+          created_by: string | null
+          expected_quantity: number
+          id: string
+          item_type: string
+          notes: string | null
+          outpost: string
+          serial_numbers: string[] | null
+          tracking_date: string
+          updated_at: string
+        }
+        Insert: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          expected_quantity?: number
+          id?: string
+          item_type: string
+          notes?: string | null
+          outpost: string
+          serial_numbers?: string[] | null
+          tracking_date?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          expected_quantity?: number
+          id?: string
+          item_type?: string
+          notes?: string | null
+          outpost?: string
+          serial_numbers?: string[] | null
+          tracking_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       event_attendance: {
         Row: {
           absence_reason: string | null
@@ -918,6 +960,287 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      hagmar_certifications: {
+        Row: {
+          cert_type: string
+          certified_date: string | null
+          created_at: string
+          id: string
+          last_refresh_date: string | null
+          soldier_id: string
+          updated_at: string
+        }
+        Insert: {
+          cert_type: string
+          certified_date?: string | null
+          created_at?: string
+          id?: string
+          last_refresh_date?: string | null
+          soldier_id: string
+          updated_at?: string
+        }
+        Update: {
+          cert_type?: string
+          certified_date?: string | null
+          created_at?: string
+          id?: string
+          last_refresh_date?: string | null
+          soldier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hagmar_certifications_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hagmar_equipment: {
+        Row: {
+          actual_quantity: number
+          created_at: string
+          created_by: string | null
+          expected_quantity: number
+          id: string
+          item_name: string
+          item_type: string
+          notes: string | null
+          serial_numbers: string[] | null
+          settlement: string
+          updated_at: string
+        }
+        Insert: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          expected_quantity?: number
+          id?: string
+          item_name: string
+          item_type: string
+          notes?: string | null
+          serial_numbers?: string[] | null
+          settlement: string
+          updated_at?: string
+        }
+        Update: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          expected_quantity?: number
+          id?: string
+          item_name?: string
+          item_type?: string
+          notes?: string | null
+          serial_numbers?: string[] | null
+          settlement?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hagmar_security_incidents: {
+        Row: {
+          company: string | null
+          created_at: string
+          description: string | null
+          id: string
+          incident_date: string
+          incident_type: string
+          location_details: string | null
+          photos: string[] | null
+          region: string | null
+          reported_by: string | null
+          reported_by_user_id: string | null
+          resolution: string | null
+          settlement: string
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          location_details?: string | null
+          photos?: string[] | null
+          region?: string | null
+          reported_by?: string | null
+          reported_by_user_id?: string | null
+          resolution?: string | null
+          settlement: string
+          severity?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          location_details?: string | null
+          photos?: string[] | null
+          region?: string | null
+          reported_by?: string | null
+          reported_by_user_id?: string | null
+          resolution?: string | null
+          settlement?: string
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hagmar_soldiers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          full_name: string
+          id: string
+          id_number: string
+          is_active: boolean
+          last_shooting_range_date: string | null
+          notes: string | null
+          phone: string | null
+          settlement: string
+          shoe_size: string | null
+          uniform_size_bottom: string | null
+          uniform_size_top: string | null
+          updated_at: string
+          weapon_serial: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          full_name: string
+          id?: string
+          id_number: string
+          is_active?: boolean
+          last_shooting_range_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          settlement: string
+          shoe_size?: string | null
+          uniform_size_bottom?: string | null
+          uniform_size_top?: string | null
+          updated_at?: string
+          weapon_serial?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          full_name?: string
+          id?: string
+          id_number?: string
+          is_active?: boolean
+          last_shooting_range_date?: string | null
+          notes?: string | null
+          phone?: string | null
+          settlement?: string
+          shoe_size?: string | null
+          uniform_size_bottom?: string | null
+          uniform_size_top?: string | null
+          updated_at?: string
+          weapon_serial?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_training_attendance: {
+        Row: {
+          attended: boolean | null
+          created_at: string
+          event_id: string
+          id: string
+          notes: string | null
+          soldier_id: string
+        }
+        Insert: {
+          attended?: boolean | null
+          created_at?: string
+          event_id: string
+          id?: string
+          notes?: string | null
+          soldier_id: string
+        }
+        Update: {
+          attended?: boolean | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          notes?: string | null
+          soldier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hagmar_training_attendance_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_training_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hagmar_training_attendance_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hagmar_training_events: {
+        Row: {
+          company: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          event_date: string
+          event_time: string | null
+          event_type: string
+          id: string
+          region: string | null
+          settlement: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date: string
+          event_time?: string | null
+          event_type: string
+          id?: string
+          region?: string | null
+          settlement?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          event_time?: string | null
+          event_type?: string
+          id?: string
+          region?: string | null
+          settlement?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       inspections: {
         Row: {
@@ -1333,39 +1656,48 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          department: string | null
           full_name: string
           id: string
+          id_number: string | null
           military_role: string | null
           outpost: string | null
           personal_number: string | null
           platoon: string | null
           region: string | null
+          settlement: string | null
           updated_at: string
           user_id: string
           user_type: string | null
         }
         Insert: {
           created_at?: string
+          department?: string | null
           full_name: string
           id?: string
+          id_number?: string | null
           military_role?: string | null
           outpost?: string | null
           personal_number?: string | null
           platoon?: string | null
           region?: string | null
+          settlement?: string | null
           updated_at?: string
           user_id: string
           user_type?: string | null
         }
         Update: {
           created_at?: string
+          department?: string | null
           full_name?: string
           id?: string
+          id_number?: string | null
           military_role?: string | null
           outpost?: string | null
           personal_number?: string | null
           platoon?: string | null
           region?: string | null
+          settlement?: string | null
           updated_at?: string
           user_id?: string
           user_type?: string | null
@@ -2011,6 +2343,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean | null
+          last_shooting_range_date: string | null
           license_type: string | null
           military_license_expiry: string | null
           outpost: string | null
@@ -2019,6 +2352,7 @@ export type Database = {
           phone: string | null
           qualified_date: string | null
           release_date: string | null
+          rotation_group: string | null
           safety_status: string | null
           updated_at: string
         }
@@ -2032,6 +2366,7 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean | null
+          last_shooting_range_date?: string | null
           license_type?: string | null
           military_license_expiry?: string | null
           outpost?: string | null
@@ -2040,6 +2375,7 @@ export type Database = {
           phone?: string | null
           qualified_date?: string | null
           release_date?: string | null
+          rotation_group?: string | null
           safety_status?: string | null
           updated_at?: string
         }
@@ -2053,6 +2389,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean | null
+          last_shooting_range_date?: string | null
           license_type?: string | null
           military_license_expiry?: string | null
           outpost?: string | null
@@ -2061,6 +2398,7 @@ export type Database = {
           phone?: string | null
           qualified_date?: string | null
           release_date?: string | null
+          rotation_group?: string | null
           safety_status?: string | null
           updated_at?: string
         }
@@ -2165,6 +2503,42 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      weekend_weapon_holders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_holding_weapon: boolean
+          notes: string | null
+          settlement: string
+          soldier_id: string
+          updated_at: string
+          weekend_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_holding_weapon?: boolean
+          notes?: string | null
+          settlement: string
+          soldier_id: string
+          updated_at?: string
+          weekend_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_holding_weapon?: boolean
+          notes?: string | null
+          settlement?: string
+          soldier_id?: string
+          updated_at?: string
+          weekend_date?: string
         }
         Relationships: []
       }
@@ -2680,7 +3054,14 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "driver" | "admin" | "platoon_commander" | "battalion_admin"
+      app_role:
+        | "driver"
+        | "admin"
+        | "platoon_commander"
+        | "battalion_admin"
+        | "super_admin"
+        | "hagmar_admin"
+        | "ravshatz"
       drill_type: "descent" | "rollover" | "fire"
       safety_category: "vardim" | "vulnerability" | "parsa"
       safety_event_category:
@@ -2817,7 +3198,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["driver", "admin", "platoon_commander", "battalion_admin"],
+      app_role: [
+        "driver",
+        "admin",
+        "platoon_commander",
+        "battalion_admin",
+        "super_admin",
+        "hagmar_admin",
+        "ravshatz",
+      ],
       drill_type: ["descent", "rollover", "fire"],
       safety_category: ["vardim", "vulnerability", "parsa"],
       safety_event_category: ["fire", "accident", "weapon", "vehicle", "other"],

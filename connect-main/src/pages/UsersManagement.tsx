@@ -77,9 +77,12 @@ interface Soldier {
 
 // Role display names in Hebrew
 const ROLE_LABELS: Record<AppRole, string> = {
+  super_admin: "מנהל ראשי",
   admin: "מנהל מ\"פ נהגים",
   platoon_commander: "מנהל מ\"מ נהגים",
   battalion_admin: "מנהל גדוד תע\"ם",
+  hagmar_admin: "מנהל הגמ\"ר",
+  ravshatz: 'רבש"צ',
   driver: "נהג",
 };
 
@@ -132,7 +135,7 @@ const UsersManagement = () => {
       setLoading(true);
       
       const [profilesRes, rolesRes, soldiersRes] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").neq("department", "hagmar").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("soldiers").select("id, personal_number"),
       ]);
