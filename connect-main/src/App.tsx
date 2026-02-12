@@ -37,6 +37,18 @@ import CoursesManagement from "./pages/CoursesManagement";
 import WorkSchedule from "./pages/WorkSchedule";
 import ProcedureSignaturesTracking from "./pages/ProcedureSignaturesTracking";
 import WeeklyMeeting from "./pages/WeeklyMeeting";
+import EquipmentTracking from "./pages/EquipmentTracking";
+import DepartmentSelector from "./pages/DepartmentSelector";
+import HagmarAuth from "./pages/HagmarAuth";
+import HagmarHome from "./pages/HagmarHome";
+import HagmarUsersManagement from "./pages/HagmarUsersManagement";
+import WeaponHoldersTracking from "./pages/WeaponHoldersTracking";
+import HagmarSoldiers from "./pages/HagmarSoldiers";
+import HagmarTrainingEvents from "./pages/HagmarTrainingEvents";
+import HagmarEquipment from "./pages/HagmarEquipment";
+import HagmarSecurityIncidents from "./pages/HagmarSecurityIncidents";
+import HagmarDashboard from "./pages/HagmarDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -53,6 +65,87 @@ const App = () => (
           <Routes>
             <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/hagmar" element={<HagmarAuth />} />
+            <Route
+              path="/department-selector"
+              element={
+                <ProtectedRoute>
+                  <DepartmentSelector />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar"
+              element={
+                <ProtectedRoute>
+                  <HagmarHome />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/users-management"
+              element={
+                <ProtectedRoute>
+                  <HagmarUsersManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/weapon-holders"
+              element={
+                <ProtectedRoute>
+                  <WeaponHoldersTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/soldiers"
+              element={
+                <ProtectedRoute>
+                  <HagmarSoldiers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/training-events"
+              element={
+                <ProtectedRoute>
+                  <HagmarTrainingEvents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/equipment"
+              element={
+                <ProtectedRoute>
+                  <HagmarEquipment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/security-incidents"
+              element={
+                <ProtectedRoute>
+                  <HagmarSecurityIncidents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/dashboard"
+              element={
+                <ProtectedRoute>
+                  <HagmarDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/planag"
+              element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/"
               element={
@@ -290,6 +383,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ProcedureSignaturesTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/equipment-tracking"
+              element={
+                <ProtectedRoute>
+                  <EquipmentTracking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin-dashboard"
+              element={
+                <ProtectedRoute>
+                  <SuperAdminDashboard />
                 </ProtectedRoute>
               }
             />

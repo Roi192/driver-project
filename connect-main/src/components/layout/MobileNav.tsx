@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useLocation } from "react-router-dom";
 import { 
   Home, 
   FileText, 
@@ -28,7 +29,11 @@ import {
   UserCog,
   Gauge,
   GraduationCap,
-  CalendarDays
+  CalendarDays,
+  Crosshair,
+  Target,
+  Package,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -67,13 +72,19 @@ const getNavItems = (userType: string | null, isBattalionAdmin: boolean) => {
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [userDepartment, setUserDepartment] = useState<string | null>(null);
+  const location = useLocation();
+  const isInHagmar = location.pathname.startsWith('/hagmar');
   const { 
     signOut, 
     isAdmin, 
     isPlatoonCommander, 
     isBattalionAdmin,
+    isSuperAdmin,
+    isHagmarAdmin,
     user, 
     userType,
+    role,
     canAccessUsersManagement,
     canAccessBomReport,
     canAccessAnnualWorkPlan,
@@ -90,6 +101,7 @@ export function MobileNav() {
     canAccessDriverInterviews,
     canAccessWorkSchedule,
     canAccessWeeklyMeeting,
+    canAccessEquipmentTracking,
   } = useAuth();
   const navigate = useNavigate();
   
@@ -97,13 +109,30 @@ export function MobileNav() {
 
   // Check if user has any admin-level role
   const hasAdminAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
+  
+  // Check if super_admin is on the department selector (neutral context)
+  const isOnDepartmentSelector = location.pathname === '/department-selector';
+  
+  // Detect HAGMAR fighters (role=driver but department=hagmar)
+  const isHagmarFighter = userDepartment === 'hagmar' && !isHagmarAdmin && !isSuperAdmin && role !== 'ravshatz';
+  // Check if currently in HAGMAR department context
+  const showHagmarMenu = isInHagmar && (isSuperAdmin || isHagmarAdmin || role === 'ravshatz');
+  // Show minimal hagmar menu for fighters
+  const showHagmarFighterMenu = isHagmarFighter;
+  // Only show planag menu when NOT in hagmar AND NOT on department selector (for super_admin) AND NOT a hagmar fighter
+  const showPlanagMenu = !isInHagmar && !isHagmarFighter && !(isSuperAdmin && isOnDepartmentSelector);
+  // Hide driver nav items when in hagmar OR when super_admin is on department selector OR hagmar fighter
+  const showDriverNavItems = !showHagmarMenu && !showHagmarFighterMenu && !(isSuperAdmin && isOnDepartmentSelector);
+  
+  // Department label for header
+  const departmentLabel = isOnDepartmentSelector ? 'מנהל ראשי' : (isInHagmar || isHagmarFighter) ? 'הגמ"ר' : 'פלנ"ג בנימין';
 
   useEffect(() => {
     const fetchUserName = async () => {
       if (user?.id) {
         const { data } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, department')
           .eq('user_id', user.id)
           .maybeSingle();
         
@@ -111,6 +140,9 @@ export function MobileNav() {
           setUserName(data.full_name);
         } else if (user.user_metadata?.full_name) {
           setUserName(user.user_metadata.full_name);
+        }
+        if (data?.department) {
+          setUserDepartment(data.department);
         }
       }
     };
@@ -160,7 +192,7 @@ export function MobileNav() {
           <div className="flex items-center gap-3">
             <div className="text-left">
               <span className="font-bold text-sm text-white block drop-shadow-lg">{displayName}</span>
-              <span className="text-xs bg-gradient-to-r from-gold via-gold-light to-gold bg-clip-text text-transparent font-bold">פלנ"ג בנימין</span>
+              <span className="text-xs bg-gradient-to-r from-gold via-gold-light to-gold bg-clip-text text-transparent font-bold">{departmentLabel}</span>
             </div>
             <div className="relative flex-shrink-0">
               {/* Static glow ring - removed animation */}
@@ -240,8 +272,248 @@ export function MobileNav() {
         </div>
 
         <div className="p-4 space-y-2 relative z-10">
-          {/* Admin Links - Show for any admin-level role */}
-          {hasAdminAccess && (
+          {/* Super Admin Menu - shown on department selector */}
+          {isSuperAdmin && isOnDepartmentSelector && (
+            <>
+              <NavLink
+                to="/department-selector"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Home className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דף הבית</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/super-admin-dashboard"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-gold via-gold-dark to-gold text-slate-900 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <LayoutDashboard className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דשבורד מנהל ראשי</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-gold group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+            </>
+          )}
+
+          {/* Switch Department Button - shown when inside a department */}
+          {isSuperAdmin && !isOnDepartmentSelector && (
+            <NavLink
+              to="/department-selector"
+              onClick={() => setIsOpen(false)}
+              className={cn(
+                "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border-2 border-amber-500/40",
+                "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+              )}
+              activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Home className="w-6 h-6" />
+              </div>
+              <span className="font-bold text-base relative z-10 flex-1">החלפת מחלקה</span>
+              <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+            </NavLink>
+          )}
+
+          {/* HAGMAR Menu - shown when in /hagmar routes */}
+          {showHagmarMenu && (
+            <>
+              <NavLink
+                to="/hagmar"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Home className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דף הבית הגמ"ר</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/users-management"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <UserCog className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">ניהול משתמשים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-pink-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/soldiers"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">לוחמי הגמ"ר</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/weapon-holders"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Crosshair className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב אוחזי נשק</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/training-events"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Target className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">אירועי אימונים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/equipment"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Package className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">ניהול ציוד</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-purple-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/security-incidents"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-rose-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">אירועים ביטחוניים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-red-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              {(isHagmarAdmin || isSuperAdmin) && (
+                <NavLink
+                  to="/hagmar/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-gold via-gold-dark to-gold text-slate-900 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <LayoutDashboard className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">דשבורד מנהל</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-gold group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
+            </>
+          )}
+
+          {/* HAGMAR Fighter Menu - minimal: only home + weapon holders */}
+          {showHagmarFighterMenu && (
+            <>
+              <NavLink
+                to="/hagmar"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Home className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">דף הבית</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink
+                to="/hagmar/weapon-holders"
+                onClick={() => setIsOpen(false)}
+                className={cn(
+                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                  "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60"
+                )}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מעקב אוחזי נשק</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+            </>
+          )}
+
+          {hasAdminAccess && showPlanagMenu && (
             <>
               <NavLink
                 to="/admin"
@@ -434,8 +706,8 @@ export function MobileNav() {
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
 
-              {/* Users Management - Admin only */}
-              {canAccessUsersManagement && (
+              {/* Users Management - Admin only (exclude pure hagmar_admin in planag) */}
+              {canAccessUsersManagement && !(role === 'hagmar_admin') && (
                 <NavLink
                   to="/users-management"
                   onClick={() => setIsOpen(false)}
@@ -613,6 +885,26 @@ export function MobileNav() {
                   <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-yellow-400 group-hover:-translate-x-1 transition-all duration-300" />
                 </NavLink>
               )}
+
+              {/* Equipment Tracking - Admin only */}
+              {canAccessEquipmentTracking && (
+                <NavLink
+                  to="/equipment-tracking"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-rose-500 to-rose-700 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Crosshair className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">מעקב צל"ם</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-rose-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
             </>
           )}
 
@@ -655,7 +947,7 @@ export function MobileNav() {
             </>
           )}
 
-          {navItems.map((item, index) => (
+          {showDriverNavItems && navItems.map((item, index) => (
             <NavLink
               key={item.to}
               to={item.to}
