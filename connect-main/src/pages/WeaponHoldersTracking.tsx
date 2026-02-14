@@ -430,10 +430,10 @@ export default function WeaponHoldersTracking() {
 
           {/* Weekend Navigation */}
           <Card className="p-4 bg-card/90 backdrop-blur-sm border-border">
-            <Label className="text-sm font-bold mb-2 block text-foreground flex items-center gap-1.5">
-              <CalendarDays className="w-4 h-4" />
-              סוף שבוע
-            </Label>
+             <Label className="text-sm font-bold mb-2 block text-slate-800 flex items-center gap-1.5">
+               <CalendarDays className="w-4 h-4 text-slate-600" />
+               סוף שבוע
+             </Label>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={goToPrevWeekend}>←</Button>
               <Input
@@ -598,20 +598,20 @@ export default function WeaponHoldersTracking() {
               {/* Per-settlement summary table - only for full admin when viewing all */}
               {isFullAdmin && filterSettlement === "all" && summaryBySettlement.size > 0 && (
                 <Card className="p-3 border-border overflow-hidden">
-                  <h3 className="font-black text-sm mb-2 text-foreground flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" />
-                    סיכום לפי יישוב
-                  </h3>
+                   <h3 className="font-black text-sm mb-2 text-slate-800 flex items-center gap-1.5">
+                     <MapPin className="w-4 h-4 text-slate-600" />
+                     סיכום לפי יישוב
+                   </h3>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {Array.from(summaryBySettlement.entries())
                       .sort((a, b) => b[1].present - a[1].present)
                       .map(([settlement, data]) => (
                         <div key={settlement} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/30 text-sm">
-                          <span className="font-bold text-foreground">{settlement}</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-emerald-600 font-bold">{data.present} סוגרים</span>
-                            <span className="text-muted-foreground">{data.total - data.present} לא</span>
-                            <Badge variant="outline" className="text-xs">{data.total}</Badge>
+                          <span className="font-bold text-slate-800">{settlement}</span>
+                           <div className="flex items-center gap-3">
+                             <span className="text-emerald-600 font-bold">{data.present} סוגרים</span>
+                             <span className="text-slate-500">{data.total - data.present} לא</span>
+                             <Badge variant="outline" className="text-xs text-slate-700">{data.total}</Badge>
                           </div>
                         </div>
                       ))}
@@ -668,7 +668,7 @@ export default function WeaponHoldersTracking() {
                                 <MapPin className="w-5 h-5" />
                               </div>
                               <div className="text-right">
-                                <p className="font-black text-base text-foreground">{settlement}</p>
+                                <p className="font-black text-base text-slate-800">{settlement}</p>
                                 <div className="flex items-center gap-3 text-xs mt-0.5">
                                   <span className="text-emerald-600 font-bold flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3" />
@@ -678,10 +678,10 @@ export default function WeaponHoldersTracking() {
                                     <XCircle className="w-3 h-3" />
                                     {group.notReported.length} לא דיווחו
                                   </span>
-                                  <span className="text-muted-foreground flex items-center gap-1">
-                                    <Users className="w-3 h-3" />
-                                    {total}
-                                  </span>
+                                   <span className="text-slate-500 flex items-center gap-1">
+                                     <Users className="w-3 h-3" />
+                                     {total}
+                                   </span>
                                 </div>
                               </div>
                             </div>

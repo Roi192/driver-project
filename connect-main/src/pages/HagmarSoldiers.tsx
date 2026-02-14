@@ -494,10 +494,10 @@ const HagmarSoldiers = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Shield className="w-5 h-5 text-amber-600" />
-                          <CardTitle className="text-lg font-bold">{region.name}</CardTitle>
-                          <Badge variant="secondary" className="text-xs">
-                            {filteredSoldiers.filter(s => getRegionFromSettlement(s.settlement) === region.name).length} לוחמים
-                          </Badge>
+                          <CardTitle className="text-lg font-bold text-slate-800">{region.name}</CardTitle>
+                          <Badge variant="secondary" className="text-xs text-slate-700">
+                             {filteredSoldiers.filter(s => getRegionFromSettlement(s.settlement) === region.name).length} לוחמים
+                           </Badge>
                         </div>
                         {openRegions[region.name] !== false ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
@@ -511,16 +511,16 @@ const HagmarSoldiers = () => {
                         return (
                           <div key={company.name} className="border-t border-border">
                             <div className="px-4 py-2 bg-muted/30 flex items-center gap-2">
-                              <span className="font-semibold text-sm text-foreground">{company.name}</span>
-                              <Badge variant="outline" className="text-xs">{companySoldiers.length}</Badge>
+                              <span className="font-semibold text-sm text-slate-800">{company.name}</span>
+                               <Badge variant="outline" className="text-xs text-slate-700">{companySoldiers.length}</Badge>
                             </div>
                             {company.settlements.filter(s => selectedSettlement === "all" || s === selectedSettlement).map(settlement => {
                               const settlementSoldiers = soldiersBySettlement[settlement] || [];
                               return (
                                 <div key={settlement} className="px-4 py-2 border-t border-border/50">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-medium text-amber-700">🏘️ {settlement}</span>
-                                    <Badge variant="outline" className="text-xs">{settlementSoldiers.length}</Badge>
+                                   <span className="text-sm font-medium text-amber-700">🏘️ {settlement}</span>
+                                     <Badge variant="outline" className="text-xs text-slate-700">{settlementSoldiers.length}</Badge>
                                   </div>
                                   {settlementSoldiers.length > 0 ? (
                                     <div className="overflow-x-auto">

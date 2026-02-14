@@ -13,11 +13,10 @@ import unitLogo from "@/assets/unit-logo.png";
 import bgVehicles from "@/assets/bg-vehicles.png";
 
 const HAGMAR_ROLES = [
-  "קב\"ט",
-  "רכז הגמ\"ר",
-  "מתנדב",
-  "כוננות",
-  "אחר",
+  "לוחם",
+  "רבש\"צ",
+  "מ\"מ מחלקת הגנה",
+  "קצין הגמ\"ר",
 ] as const;
 
 const SETTLEMENTS = [
