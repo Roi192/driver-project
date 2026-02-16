@@ -201,8 +201,8 @@ export default function AnnualWorkPlan() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     
     const [eventsRes, holidaysRes, soldiersRes, attendanceRes, overridesRes] = await Promise.all([
       supabase.from("work_plan_events").select("*").order("event_date", { ascending: true }),
@@ -287,7 +287,7 @@ export default function AnnualWorkPlan() {
         toast.error("שגיאה בעדכון המופע");
       } else {
         toast.success("המופע עודכן בהצלחה");
-        fetchData();
+        fetchData(false);
       }
     } else {
       // אירוע בודד - כבר לא צריך את האופציה של אירועים חוזרים אוטומטית
@@ -303,7 +303,7 @@ export default function AnnualWorkPlan() {
         } else {
           toast.success("המופע נוצר בהצלחה");
         }
-        fetchData();
+        fetchData(false);
       }
     }
 
@@ -319,7 +319,7 @@ export default function AnnualWorkPlan() {
       toast.error("שגיאה במחיקת המופע");
     } else {
       toast.success("המופע נמחק בהצלחה");
-      fetchData();
+      fetchData(false);
       setDetailDialogOpen(false);
       setDateEventsDialogOpen(false);
     }
@@ -438,7 +438,7 @@ export default function AnnualWorkPlan() {
         toast.error("שגיאה בשמירת החיילים המצופים");
       } else {
         toast.success("רשימת החיילים המצופים נשמרה לכל האירועים בסדרה");
-        fetchData();
+        fetchData(false);
         setExpectedSoldiersDialogOpen(false);
       }
     } else {
@@ -452,7 +452,7 @@ export default function AnnualWorkPlan() {
         toast.error("שגיאה בשמירת החיילים המצופים");
       } else {
         toast.success("רשימת החיילים המצופים נשמרה");
-        fetchData();
+        fetchData(false);
         setExpectedSoldiersDialogOpen(false);
       }
     }
@@ -518,7 +518,7 @@ export default function AnnualWorkPlan() {
     }
 
     toast.success("הנוכחות נשמרה בהצלחה");
-    fetchData();
+    fetchData(false);
     setAttendanceDialogOpen(false);
   };
 
