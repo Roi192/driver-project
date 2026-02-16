@@ -208,7 +208,7 @@ export default function AnnualWorkPlan() {
       supabase.from("work_plan_events").select("*").order("event_date", { ascending: true }),
       supabase.from("calendar_holidays").select("*"),
       supabase.from("soldiers").select("id, full_name, personal_number, rotation_group, qualified_date").eq("is_active", true).order("full_name"),
-      supabase.from("event_attendance").select("*"),
+      supabase.from("event_attendance").select("*").limit(10000),
       supabase.from("content_cycle_overrides").select("*"),
     ]);
 
