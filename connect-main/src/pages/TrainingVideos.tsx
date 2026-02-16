@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import trainingVideoThumbnail from "@/assets/training-video-thumbnail.jpg";
+import trainingVideoThumbnail from "@/assets/training-video-thumbnail.png";
 
 interface TrainingVideo {
   id: string;
