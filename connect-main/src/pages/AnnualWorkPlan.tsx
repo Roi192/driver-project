@@ -40,6 +40,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import unitLogo from "@/assets/unit-logo.png";
+import { ContentCycleTracker } from "@/components/admin/ContentCycleTracker";
 
 interface WorkPlanEvent {
   id: string;
@@ -173,6 +174,8 @@ export default function AnnualWorkPlan() {
   const [selectedSoldierAttendance, setSelectedSoldierAttendance] = useState<Record<string, { status: AttendanceStatus; reason: string; completed: boolean }>>({});
   const [selectedExpectedSoldiers, setSelectedExpectedSoldiers] = useState<string[]>([]);
   const [dateEventsDialogOpen, setDateEventsDialogOpen] = useState(false);
+  const [attendanceRotationFilter, setAttendanceRotationFilter] = useState<string>("expected");
+  const [manualAddSoldierId, setManualAddSoldierId] = useState<string>("");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -182,7 +185,8 @@ export default function AnnualWorkPlan() {
     status: "pending" as "pending" | "in_progress" | "completed",
     category: "platoon",
     is_recurring: false,
-    recurring_count: 6, // כמה אירועים ליצור (כברירת מחדל 6 = 3 חודשים)
+    recurring_count: 6,
+    content_cycle: "",
   });
 
   useEffect(() => {
@@ -266,6 +270,7 @@ export default function AnnualWorkPlan() {
       color: formData.category === "platoon" ? "blue" : formData.category === "brigade" ? "purple" : "amber",
       attendees: [],
       expected_soldiers: editingEvent?.expected_soldiers || copiedExpectedSoldiers,
+      content_cycle: formData.content_cycle || null,
     };
 
     if (editingEvent) {
@@ -326,6 +331,7 @@ export default function AnnualWorkPlan() {
       category: "platoon",
       is_recurring: false,
       recurring_count: 6,
+      content_cycle: "",
     });
     setEditingEvent(null);
   };
@@ -341,6 +347,7 @@ export default function AnnualWorkPlan() {
       category: event.category || "platoon",
       is_recurring: event.is_series || false,
       recurring_count: 6,
+      content_cycle: (event as any).content_cycle || "",
     });
     setDialogOpen(true);
     setDetailDialogOpen(false);
@@ -474,6 +481,8 @@ export default function AnnualWorkPlan() {
     });
     
     setSelectedSoldierAttendance(existingAttendance);
+    setAttendanceRotationFilter("expected");
+    setManualAddSoldierId("");
     setAttendanceDialogOpen(true);
   };
 
@@ -903,6 +912,13 @@ export default function AnnualWorkPlan() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Content Cycle Tracker */}
+          <ContentCycleTracker
+            events={events as any}
+            attendance={attendance}
+            soldiers={soldiers}
+          />
         </div>
 
         {/* Add/Edit Event Dialog */}
@@ -985,7 +1001,17 @@ export default function AnnualWorkPlan() {
                 </div>
               </div>
 
-              {/* אירוע חוזר - רק בהוספה חדשה */}
+              {/* מחזור תוכן דו-שבועי */}
+              <div>
+                <Label>מחזור תוכן (דו-שבועי)</Label>
+                <Input
+                  value={formData.content_cycle}
+                  onChange={(e) => setFormData({ ...formData, content_cycle: e.target.value })}
+                  placeholder="לדוגמא: נהיגת שטח - מחזור 1"
+                />
+                <p className="text-xs text-slate-500 mt-1">אירועים עם אותו מחזור תוכן יקובצו יחד למעקב</p>
+              </div>
+
               {!editingEvent && (
                 <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-3">
                   <div className="flex items-center gap-3">
@@ -1294,7 +1320,7 @@ export default function AnnualWorkPlan() {
           </DialogContent>
         </Dialog>
 
-        {/* Attendance Dialog with 4 Statuses */}
+        {/* Attendance Dialog with Rotation Filter */}
         <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col min-h-0" dir="rtl">
             <DialogHeader>
@@ -1310,11 +1336,99 @@ export default function AnnualWorkPlan() {
               ))}
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto max-h-[60vh] pr-1 overscroll-contain">
+            {/* Rotation Filter */}
+            <div className="p-3 rounded-xl bg-violet-50 border border-violet-200 space-y-2">
+              <p className="text-xs font-bold text-violet-700">סנן לפי סבב:</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setAttendanceRotationFilter("expected")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    attendanceRotationFilter === "expected" ? "bg-violet-600 text-white" : "bg-white text-violet-700 border border-violet-200"
+                  }`}
+                >
+                  מצופים ({selectedEvent?.expected_soldiers?.length || 0})
+                </button>
+                {ROTATION_GROUPS.map(group => {
+                  const count = soldiers.filter(s => s.rotation_group === group.value).length;
+                  return (
+                    <button
+                      key={group.value}
+                      onClick={() => setAttendanceRotationFilter(group.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        attendanceRotationFilter === group.value ? "bg-violet-600 text-white" : "bg-white text-violet-700 border border-violet-200"
+                      }`}
+                    >
+                      {group.label} ({count})
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setAttendanceRotationFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    attendanceRotationFilter === "all" ? "bg-violet-600 text-white" : "bg-white text-violet-700 border border-violet-200"
+                  }`}
+                >
+                  הכל ({soldiers.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Manual Add Soldier */}
+            <div className="flex gap-2">
+              <Select value={manualAddSoldierId} onValueChange={setManualAddSoldierId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="הוסף חייל ידנית..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {soldiers
+                    .filter(s => {
+                      // Only show soldiers not already in the filtered list
+                      const expectedSoldiers = selectedEvent?.expected_soldiers || [];
+                      return !expectedSoldiers.includes(s.id);
+                    })
+                    .map(s => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name} ({ROTATION_GROUPS.find(r => r.value === s.rotation_group)?.label || "ללא סבב"})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!manualAddSoldierId}
+                onClick={() => {
+                  if (manualAddSoldierId) {
+                    setSelectedSoldierAttendance(prev => ({
+                      ...prev,
+                      [manualAddSoldierId]: { status: "attended", reason: "", completed: false }
+                    }));
+                    setManualAddSoldierId("");
+                    toast.success("חייל נוסף");
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto max-h-[50vh] pr-1 overscroll-contain">
               <div className="space-y-3 p-1">
-                {soldiers.map(soldier => {
+                {soldiers
+                  .filter(soldier => {
+                    const expectedSoldiers = selectedEvent?.expected_soldiers || [];
+                    const hasAttendanceRecord = selectedSoldierAttendance[soldier.id]?.status === "attended" || selectedSoldierAttendance[soldier.id]?.status === "absent";
+                    
+                    if (attendanceRotationFilter === "expected") {
+                      return expectedSoldiers.includes(soldier.id) || hasAttendanceRecord;
+                    }
+                    if (attendanceRotationFilter === "all") return true;
+                    return soldier.rotation_group === attendanceRotationFilter || hasAttendanceRecord;
+                  })
+                  .map(soldier => {
                   const soldierData = selectedSoldierAttendance[soldier.id] || { status: "not_updated" as AttendanceStatus, reason: "", completed: false };
                   const isExpected = selectedEvent?.expected_soldiers?.includes(soldier.id);
+                  const rotationLabel = ROTATION_GROUPS.find(r => r.value === soldier.rotation_group)?.label;
 
                   return (
                     <div
@@ -1326,6 +1440,7 @@ export default function AnnualWorkPlan() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           {isExpected && <Badge className="bg-blue-100 text-blue-700 text-xs">מצופה</Badge>}
+                          {rotationLabel && <Badge className="bg-violet-100 text-violet-700 text-[10px] px-1.5 py-0">{rotationLabel}</Badge>}
                           <div>
                             <p className="font-medium text-slate-800">{soldier.full_name}</p>
                             <p className="text-xs text-slate-500">{soldier.personal_number}</p>
