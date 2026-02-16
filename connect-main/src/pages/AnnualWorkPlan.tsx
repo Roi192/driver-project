@@ -201,26 +201,50 @@ export default function AnnualWorkPlan() {
     fetchData();
   }, []);
 
+  const fetchAllAttendance = async () => {
+    const allData: any[] = [];
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("event_attendance")
+        .select("*")
+        .range(offset, offset + batchSize - 1);
+
+      if (error) {
+        console.error("Error fetching attendance batch:", error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData.push(...data);
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+    console.log("All attendance fetched, total count:", allData.length);
+    return allData;
+  };
+
   const fetchData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     
-    const [eventsRes, holidaysRes, soldiersRes, attendanceRes, overridesRes] = await Promise.all([
+    const [eventsRes, holidaysRes, soldiersRes, overridesRes, allAttendance] = await Promise.all([
       supabase.from("work_plan_events").select("*").order("event_date", { ascending: true }),
       supabase.from("calendar_holidays").select("*"),
       supabase.from("soldiers").select("id, full_name, personal_number, rotation_group, qualified_date").eq("is_active", true).order("full_name"),
-      supabase.from("event_attendance").select("*").limit(10000),
       supabase.from("content_cycle_overrides").select("*"),
+      fetchAllAttendance(),
     ]);
 
     if (!eventsRes.error) setEvents((eventsRes.data || []) as WorkPlanEvent[]);
     if (!holidaysRes.error) setHolidays(holidaysRes.data || []);
     if (!soldiersRes.error) setSoldiers(soldiersRes.data || []);
-    if (!attendanceRes.error) {
-      console.log("Attendance fetched successfully, count:", attendanceRes.data?.length);
-      setAttendance(attendanceRes.data || []);
-    } else {
-      console.error("Attendance fetch error:", attendanceRes.error);
-    }
+    setAttendance(allAttendance);
     if (!overridesRes.error) setContentCycleOverrides(overridesRes.data || []);
 
     setLoading(false);
