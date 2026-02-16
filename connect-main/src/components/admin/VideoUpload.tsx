@@ -2,8 +2,8 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X, Video, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { resumableUpload } from "@/lib/resumable-upload";
 import { cn } from "@/lib/utils";
 
 interface VideoUploadProps {
@@ -20,6 +20,7 @@ export function VideoUpload({
   folder = "videos" 
 }: VideoUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [preview, setPreview] = useState<string>(value || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,40 +37,25 @@ export function VideoUpload({
 
 
     setUploading(true);
+    setUploadProgress(0);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const result = await resumableUpload({
+        bucket,
+        folder,
+        file,
+        onProgress: (percentage) => setUploadProgress(percentage),
+      });
 
-      const { error: uploadError, data } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Use signed URL for private bucket access (48 hours validity for security)
-      // Shorter validity reduces risk if URL is shared/leaked
-      const { data: signedUrlData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
-
-      if (signedError || !signedUrlData?.signedUrl) {
-        throw signedError || new Error('Failed to generate signed URL');
-      }
-
-      setPreview(signedUrlData.signedUrl);
-      onChange(signedUrlData.signedUrl);
+      setPreview(result.signedUrl);
+      onChange(result.signedUrl);
       toast.success("הסרטון הועלה בהצלחה");
     } catch (error) {
       console.error('Error uploading video:', error);
       toast.error("שגיאה בהעלאת הסרטון");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -162,7 +148,7 @@ export function VideoUpload({
         {uploading ? (
           <>
             <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-            מעלה סרטון...
+            {uploadProgress > 0 ? `מעלה סרטון... ${uploadProgress}%` : "מעלה סרטון..."}
           </>
         ) : (
           <>

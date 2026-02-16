@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getSignedUrl } from "@/lib/storage-utils";
+import { resumableUpload } from "@/lib/resumable-upload";
 
 interface ImageUploadProps {
   value?: string;
@@ -60,31 +60,15 @@ export function ImageUpload({
     setUploading(true);
 
     try {
-      // Create unique filename
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const result = await resumableUpload({
+        bucket,
+        folder,
+        file,
+      });
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get signed URL for immediate preview
-      const { data: signedUrlData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(fileName, 60 * 60 * 24);
-
-      if (signedError || !signedUrlData?.signedUrl) {
-        throw signedError || new Error('Failed to generate signed URL');
-      }
-
-      setPreview(signedUrlData.signedUrl);
+      setPreview(result.signedUrl);
       // Store the file path (not the signed URL) so we can regenerate URLs later
-      onChange(fileName);
+      onChange(result.path);
       toast.success("התמונה הועלתה בהצלחה");
     } catch (error: any) {
       console.error("Upload error:", error);

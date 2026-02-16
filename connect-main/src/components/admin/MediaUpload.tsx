@@ -2,10 +2,10 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X, Video, FileText, Link2, Loader2, Youtube, File } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { resumableUpload } from "@/lib/resumable-upload";
 
 interface MediaUploadProps {
   value: string;
@@ -25,6 +25,7 @@ export function MediaUpload({
   label = "העלאת מדיה"
 }: MediaUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [preview, setPreview] = useState<string>(value || "");
   const [urlInput, setUrlInput] = useState<string>(value?.includes("youtube") || value?.includes("youtu.be") ? value : "");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,40 +50,25 @@ export function MediaUpload({
 
 
     setUploading(true);
+    setUploadProgress(0);
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const result = await resumableUpload({
+        bucket,
+        folder,
+        file,
+        onProgress: (percentage) => setUploadProgress(percentage),
+      });
 
-      const { error: uploadError, data } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Use signed URL for private bucket access (48 hours validity for security)
-      // Shorter validity reduces risk if URL is shared/leaked
-      const { data: signedUrlData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(fileName, 60 * 60 * 24 * 2);
-
-      if (signedError || !signedUrlData?.signedUrl) {
-        throw signedError || new Error('Failed to generate signed URL');
-      }
-
-      setPreview(signedUrlData.signedUrl);
-      onChange(signedUrlData.signedUrl);
+      setPreview(result.signedUrl);
+      onChange(result.signedUrl);
       toast.success("הקובץ הועלה בהצלחה");
     } catch (error) {
       console.error('Error uploading file:', error);
       toast.error("שגיאה בהעלאת הקובץ");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -302,7 +288,7 @@ export function MediaUpload({
           {uploading ? (
             <>
               <Loader2 className="w-5 h-5 ml-2 animate-spin" />
-              מעלה קובץ...
+              {uploadProgress > 0 ? `מעלה קובץ... ${uploadProgress}%` : "מעלה קובץ..."}
             </>
           ) : (
             <>

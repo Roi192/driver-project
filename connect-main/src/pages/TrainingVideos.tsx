@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
-import trainingVideoThumbnail from "@/assets/training-video-thumbnail.png";
+import trainingVideoThumbnail from "@/assets/training-video-thumbnail.jpg";
 
 interface TrainingVideo {
   id: string;
@@ -98,20 +98,26 @@ export default function TrainingVideos() {
   const handleDeleteVideo = async () => {
     if (!selectedVideo) return;
     setIsSubmitting(true);
-    const { error } = await supabase
+    
+    const { error, count } = await supabase
       .from("training_videos")
-      .delete()
+      .delete({ count: 'exact' })
       .eq("id", selectedVideo.id);
 
     if (error) {
       toast.error("שגיאה במחיקת הסרטון");
-      console.error(error);
+      console.error("Delete error:", error);
+    } else if (count === 0) {
+      toast.error("לא ניתן למחוק - אין הרשאות מתאימות");
+      console.error("Delete blocked by RLS - 0 rows affected");
     } else {
       toast.success("הסרטון נמחק בהצלחה");
-      setDeleteDialogOpen(false);
-      setSelectedVideo(null);
-      fetchVideos();
+      // Remove from local state immediately
+      setVideos(prev => prev.filter(v => v.id !== selectedVideo.id));
     }
+    
+    setDeleteDialogOpen(false);
+    setSelectedVideo(null);
     setIsSubmitting(false);
   };
 
