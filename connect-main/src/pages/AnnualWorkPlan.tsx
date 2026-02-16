@@ -71,6 +71,7 @@ interface Soldier {
   full_name: string;
   personal_number: string;
   rotation_group: string | null;
+  qualified_date: string | null;
 }
 
 const ROTATION_GROUPS = [
@@ -205,7 +206,7 @@ export default function AnnualWorkPlan() {
     const [eventsRes, holidaysRes, soldiersRes, attendanceRes] = await Promise.all([
       supabase.from("work_plan_events").select("*").order("event_date", { ascending: true }),
       supabase.from("calendar_holidays").select("*"),
-      supabase.from("soldiers").select("id, full_name, personal_number, rotation_group").eq("is_active", true).order("full_name"),
+      supabase.from("soldiers").select("id, full_name, personal_number, rotation_group, qualified_date").eq("is_active", true).order("full_name"),
       supabase.from("event_attendance").select("*"),
     ]);
 

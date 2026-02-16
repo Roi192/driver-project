@@ -1,15 +1,8 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle, XCircle, ChevronDown, ChevronUp, Layers } from "lucide-react";
-
-const ROTATION_GROUPS = [
-  { value: "a_sunday", label: "סבב א' (ראשון)" },
-  { value: "a_monday", label: "סבב א' (שני)" },
-  { value: "b_sunday", label: "סבב ב' (ראשון)" },
-  { value: "b_monday", label: "סבב ב' (שני)" },
-];
 
 interface WorkPlanEvent {
   id: string;
@@ -34,6 +27,7 @@ interface Soldier {
   full_name: string;
   personal_number: string;
   rotation_group: string | null;
+  qualified_date: string | null;
 }
 
 interface ContentCycleTrackerProps {
@@ -45,58 +39,55 @@ interface ContentCycleTrackerProps {
 export function ContentCycleTracker({ events, attendance, soldiers }: ContentCycleTrackerProps) {
   const [expandedCycle, setExpandedCycle] = useState<string | null>(null);
 
-  // Group events by content_cycle
   const contentCycles = useMemo(() => {
     const cycleMap = new Map<string, WorkPlanEvent[]>();
     
     events.forEach(event => {
       const cycle = (event as any).content_cycle;
       if (cycle) {
-        if (!cycleMap.has(cycle)) {
-          cycleMap.set(cycle, []);
-        }
+        if (!cycleMap.has(cycle)) cycleMap.set(cycle, []);
         cycleMap.get(cycle)!.push(event);
       }
     });
 
     return Array.from(cycleMap.entries()).map(([cycleName, cycleEvents]) => {
-      // For each soldier, check if they attended ANY event in this cycle
-      const soldierCompletion = new Map<string, boolean>();
-      
-      soldiers.forEach(soldier => {
-        const attended = cycleEvents.some(event => {
+      // Find the earliest event date in this cycle to determine which soldiers were qualified
+      const earliestDate = cycleEvents.reduce((min, e) => e.event_date < min ? e.event_date : min, cycleEvents[0].event_date);
+
+      // Only include soldiers who were qualified before or on the earliest event date
+      const eligibleSoldiers = soldiers.filter(s => {
+        if (!s.qualified_date) return true; // no date = assume qualified
+        return s.qualified_date <= earliestDate;
+      });
+
+      // For each eligible soldier, check if they attended ANY event in this cycle
+      const attended: Soldier[] = [];
+      const missing: Soldier[] = [];
+
+      eligibleSoldiers.forEach(soldier => {
+        const didAttend = cycleEvents.some(event => {
           const att = attendance.find(
             a => a.event_id === event.id && a.soldier_id === soldier.id
           );
           return att && (att.status === "attended" || att.completed);
         });
-        soldierCompletion.set(soldier.id, attended);
+        if (didAttend) attended.push(soldier);
+        else missing.push(soldier);
       });
 
-      // Group completion by rotation
-      const rotationStats = ROTATION_GROUPS.map(group => {
-        const groupSoldiers = soldiers.filter(s => s.rotation_group === group.value);
-        const completed = groupSoldiers.filter(s => soldierCompletion.get(s.id)).length;
-        return {
-          ...group,
-          soldiers: groupSoldiers,
-          completed,
-          total: groupSoldiers.length,
-          percentage: groupSoldiers.length > 0 ? Math.round((completed / groupSoldiers.length) * 100) : 0,
-        };
-      });
-
-      const totalSoldiers = soldiers.length;
-      const totalCompleted = soldiers.filter(s => soldierCompletion.get(s.id)).length;
+      const total = eligibleSoldiers.length;
+      const completedCount = attended.length;
+      const percentage = total > 0 ? Math.round((completedCount / total) * 100) : 0;
 
       return {
         name: cycleName,
         events: cycleEvents,
-        rotationStats,
-        totalSoldiers,
-        totalCompleted,
-        percentage: totalSoldiers > 0 ? Math.round((totalCompleted / totalSoldiers) * 100) : 0,
-        soldierCompletion,
+        eligibleSoldiers,
+        attended,
+        missing,
+        total,
+        completedCount,
+        percentage,
       };
     });
   }, [events, attendance, soldiers]);
@@ -105,9 +96,9 @@ export function ContentCycleTracker({ events, attendance, soldiers }: ContentCyc
     return (
       <Card className="border-0 shadow-lg">
         <CardContent className="p-6 text-center">
-          <Layers className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="font-bold text-slate-700">אין מחזורי תוכן</p>
-          <p className="text-sm text-slate-500 mt-1">הוסף שדה "מחזור תוכן" למופעים כדי לעקוב אחרי העברת תוכן דו-שבועית</p>
+          <Layers className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="font-bold text-foreground">אין מחזורי תוכן</p>
+          <p className="text-sm text-muted-foreground mt-1">הוסף שדה "מחזור תוכן" למופעים כדי לעקוב אחרי העברת תוכן דו-שבועית</p>
         </CardContent>
       </Card>
     );
@@ -115,7 +106,7 @@ export function ContentCycleTracker({ events, attendance, soldiers }: ContentCyc
 
   return (
     <div className="space-y-3">
-      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+      <h3 className="font-bold text-foreground flex items-center gap-2">
         <Layers className="w-5 h-5" />
         מעקב תוכן דו-שבועי
       </h3>
@@ -126,12 +117,12 @@ export function ContentCycleTracker({ events, attendance, soldiers }: ContentCyc
         return (
           <Card key={cycle.name} className="border-0 shadow-md overflow-hidden">
             <div 
-              className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+              className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setExpandedCycle(isExpanded ? null : cycle.name)}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-slate-800">{cycle.name}</h4>
+                  <h4 className="font-bold text-foreground">{cycle.name}</h4>
                   <Badge variant="outline" className="text-xs">
                     {cycle.events.length} מופעים
                   </Badge>
@@ -142,85 +133,59 @@ export function ContentCycleTracker({ events, attendance, soldiers }: ContentCyc
                     cycle.percentage >= 50 ? "bg-amber-100 text-amber-700" :
                     "bg-red-100 text-red-700"
                   }`}>
-                    {cycle.totalCompleted}/{cycle.totalSoldiers}
+                    {cycle.completedCount}/{cycle.total}
                   </Badge>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                  {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                 </div>
               </div>
               
               <Progress value={cycle.percentage} className="h-2" />
-              <p className="text-xs text-slate-500 mt-1">{cycle.percentage}% מהחיילים עברו את התוכן</p>
+              <p className="text-xs text-muted-foreground mt-1">{cycle.percentage}% מהחיילים עברו את התוכן</p>
 
-              {/* Rotation groups summary */}
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                {cycle.rotationStats.map(rs => (
-                  <div key={rs.value} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-xs font-medium text-slate-700">{rs.label}</span>
-                    <Badge className={`text-[10px] ${
-                      rs.percentage >= 80 ? "bg-emerald-500 text-white" :
-                      rs.percentage >= 50 ? "bg-amber-500 text-white" :
-                      "bg-red-500 text-white"
-                    }`}>
-                      {rs.completed}/{rs.total}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+              {cycle.missing.length > 0 && (
+                <p className="text-xs text-red-600 font-medium mt-2">
+                  חסר להשלים: {cycle.missing.length} חיילים
+                </p>
+              )}
             </div>
 
             {isExpanded && (
-              <div className="border-t border-slate-100 p-4 space-y-3 bg-slate-50/50">
-                {ROTATION_GROUPS.map(group => {
-                  const groupSoldiers = soldiers.filter(s => s.rotation_group === group.value);
-                  if (groupSoldiers.length === 0) return null;
-                  
-                  return (
-                    <div key={group.value}>
-                      <p className="text-sm font-bold text-slate-700 mb-2">{group.label}</p>
-                      <div className="space-y-1">
-                        {groupSoldiers.map(soldier => {
-                          const completed = cycle.soldierCompletion.get(soldier.id);
-                          return (
-                            <div key={soldier.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-white border border-slate-200">
-                              <span className="text-sm text-slate-800">{soldier.full_name}</span>
-                              {completed ? (
-                                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                              ) : (
-                                <XCircle className="w-5 h-5 text-red-400" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+              <div className="border-t border-border p-4 space-y-4 bg-muted/30">
+                {/* Missing soldiers - who needs completion */}
+                {cycle.missing.length > 0 && (
+                  <div>
+                    <p className="text-sm font-bold text-red-700 mb-2 flex items-center gap-1.5">
+                      <XCircle className="w-4 h-4" />
+                      צריכים להשלים ({cycle.missing.length})
+                    </p>
+                    <div className="space-y-1">
+                      {cycle.missing.map(soldier => (
+                        <div key={soldier.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-background border border-border">
+                          <span className="text-sm text-foreground">{soldier.full_name}</span>
+                          <XCircle className="w-5 h-5 text-red-400" />
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
 
-                {/* Soldiers without rotation group */}
-                {(() => {
-                  const noGroup = soldiers.filter(s => !s.rotation_group);
-                  if (noGroup.length === 0) return null;
-                  return (
-                    <div>
-                      <p className="text-sm font-bold text-slate-700 mb-2">ללא סבב</p>
-                      <div className="space-y-1">
-                        {noGroup.map(soldier => {
-                          const completed = cycle.soldierCompletion.get(soldier.id);
-                          return (
-                            <div key={soldier.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-white border border-slate-200">
-                              <span className="text-sm text-slate-800">{soldier.full_name}</span>
-                              {completed ? (
-                                <CheckCircle className="w-5 h-5 text-emerald-500" />
-                              ) : (
-                                <XCircle className="w-5 h-5 text-red-400" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                {/* Attended soldiers */}
+                {cycle.attended.length > 0 && (
+                  <div>
+                    <p className="text-sm font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4" />
+                      עברו את התוכן ({cycle.attended.length})
+                    </p>
+                    <div className="space-y-1">
+                      {cycle.attended.map(soldier => (
+                        <div key={soldier.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-background border border-border">
+                          <span className="text-sm text-foreground">{soldier.full_name}</span>
+                          <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        </div>
+                      ))}
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
               </div>
             )}
           </Card>
