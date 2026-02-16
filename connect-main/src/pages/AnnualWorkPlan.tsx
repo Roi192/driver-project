@@ -215,7 +215,12 @@ export default function AnnualWorkPlan() {
     if (!eventsRes.error) setEvents((eventsRes.data || []) as WorkPlanEvent[]);
     if (!holidaysRes.error) setHolidays(holidaysRes.data || []);
     if (!soldiersRes.error) setSoldiers(soldiersRes.data || []);
-    if (!attendanceRes.error) setAttendance(attendanceRes.data || []);
+    if (!attendanceRes.error) {
+      console.log("Attendance fetched successfully, count:", attendanceRes.data?.length);
+      setAttendance(attendanceRes.data || []);
+    } else {
+      console.error("Attendance fetch error:", attendanceRes.error);
+    }
     if (!overridesRes.error) setContentCycleOverrides(overridesRes.data || []);
 
     setLoading(false);
@@ -493,32 +498,50 @@ export default function AnnualWorkPlan() {
   const saveAttendance = async () => {
     if (!selectedEvent) return;
 
-    // Delete existing attendance for this event
-    const { error: deleteError } = await supabase.from("event_attendance").delete().eq("event_id", selectedEvent.id);
+    // Build records - deduplicate by soldier_id
+    const recordsMap = new Map<string, any>();
+    Object.entries(selectedSoldierAttendance)
+      .filter(([_, data]) => data.status !== "not_updated")
+      .forEach(([soldierId, data]) => {
+        recordsMap.set(soldierId, {
+          event_id: selectedEvent.id,
+          soldier_id: soldierId,
+          attended: data.status === "attended" || (data.status === "absent" && data.completed),
+          absence_reason: data.status === "absent" ? data.reason : null,
+          status: data.status,
+          completed: data.status === "absent" && data.completed,
+        });
+      });
+    
+    const records = Array.from(recordsMap.values());
+    console.log("Saving attendance - event:", selectedEvent.id, "records count:", records.length, "records:", records);
+
+    // First delete all existing records for this event
+    const { error: deleteError, count: deleteCount } = await supabase
+      .from("event_attendance")
+      .delete()
+      .eq("event_id", selectedEvent.id)
+      .select();
+    
+    console.log("Delete result - error:", deleteError, "deleted count:", deleteCount);
+    
     if (deleteError) {
       console.error("Delete error:", deleteError);
-      toast.error("שגיאה במחיקת נוכחות קיימת");
+      toast.error("שגיאה במחיקת נוכחות קיימת: " + deleteError.message);
       return;
     }
 
-    // Insert new attendance records - use upsert to handle any edge cases
-    const records = Object.entries(selectedSoldierAttendance)
-      .filter(([_, data]) => data.status !== "not_updated") // לא שומרים "לא עודכן"
-      .map(([soldierId, data]) => ({
-        event_id: selectedEvent.id,
-        soldier_id: soldierId,
-        attended: data.status === "attended" || (data.status === "absent" && data.completed),
-        absence_reason: data.status === "absent" ? data.reason : null,
-        status: data.status,
-        completed: data.status === "absent" && data.completed,
-      }));
-
     if (records.length > 0) {
-      const { error } = await supabase.from("event_attendance").insert(records);
+      const { data: insertedData, error: insertError } = await supabase
+        .from("event_attendance")
+        .upsert(records, { onConflict: "event_id,soldier_id" })
+        .select();
 
-      if (error) {
-        console.error("Insert error:", error);
-        toast.error("שגיאה בשמירת הנוכחות: " + error.message);
+      console.log("Upsert result - error:", insertError, "inserted:", insertedData?.length);
+
+      if (insertError) {
+        console.error("Upsert error:", insertError);
+        toast.error("שגיאה בשמירת הנוכחות: " + insertError.message);
         return;
       }
     }
