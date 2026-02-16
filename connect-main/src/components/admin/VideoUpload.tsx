@@ -34,11 +34,6 @@ export function VideoUpload({
       return;
     }
 
-    // Validate file size (max 100MB)
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error("גודל הקובץ המקסימלי הוא 100MB");
-      return;
-    }
 
     setUploading(true);
 
@@ -151,7 +146,7 @@ export function VideoUpload({
               לחץ להעלאת קובץ וידאו
             </p>
             <p className="text-xs text-muted-foreground/70">
-              MP4, WebM, MOV • עד 100MB
+              MP4, WebM, MOV
             </p>
           </div>
         </div>

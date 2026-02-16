@@ -56,11 +56,6 @@ export function ImageUpload({
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("גודל הקובץ חייב להיות עד 5MB");
-      return;
-    }
 
     setUploading(true);
 
@@ -150,7 +145,7 @@ export function ImageUpload({
                 <ImageIcon className="h-6 w-6 text-primary" />
               </div>
               <span className="text-sm font-medium">לחץ להעלאת תמונה</span>
-              <span className="text-xs text-muted-foreground">PNG, JPG עד 5MB</span>
+              <span className="text-xs text-muted-foreground">PNG, JPG</span>
             </div>
           )}
         </div>

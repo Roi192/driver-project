@@ -47,12 +47,6 @@ export function MediaUpload({
       return;
     }
 
-    // Validate file size (max 100MB for video, 20MB for PDF)
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 20 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast.error(`גודל הקובץ המקסימלי הוא ${isVideo ? "100MB" : "20MB"}`);
-      return;
-    }
 
     setUploading(true);
 
@@ -261,8 +255,7 @@ export function MediaUpload({
                     <p className="font-bold text-foreground mb-1">לחץ להעלאת קובץ</p>
                     <p className="text-sm text-muted-foreground">
                       {allowedTypes.includes("video") && "MP4, WebM, MOV • "}
-                      {allowedTypes.includes("pdf") && "PDF • "}
-                      עד {allowedTypes.includes("video") ? "100MB" : "20MB"}
+                      {allowedTypes.includes("pdf") && "PDF"}
                     </p>
                   </div>
                 </div>
