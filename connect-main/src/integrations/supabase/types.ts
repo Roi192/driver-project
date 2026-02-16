@@ -657,6 +657,54 @@ export type Database = {
         }
         Relationships: []
       }
+      content_cycle_overrides: {
+        Row: {
+          absence_reason: string | null
+          completion_date: string | null
+          content_cycle: string
+          created_at: string
+          created_by: string | null
+          id: string
+          override_type: string
+          soldier_id: string
+        }
+        Insert: {
+          absence_reason?: string | null
+          completion_date?: string | null
+          content_cycle: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          override_type: string
+          soldier_id: string
+        }
+        Update: {
+          absence_reason?: string | null
+          completion_date?: string | null
+          content_cycle?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          override_type?: string
+          soldier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_cycle_overrides_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_cycle_overrides_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "soldiers_basic"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           category: string | null
