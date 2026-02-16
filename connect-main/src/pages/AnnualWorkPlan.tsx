@@ -494,9 +494,14 @@ export default function AnnualWorkPlan() {
     if (!selectedEvent) return;
 
     // Delete existing attendance for this event
-    await supabase.from("event_attendance").delete().eq("event_id", selectedEvent.id);
+    const { error: deleteError } = await supabase.from("event_attendance").delete().eq("event_id", selectedEvent.id);
+    if (deleteError) {
+      console.error("Delete error:", deleteError);
+      toast.error("שגיאה במחיקת נוכחות קיימת");
+      return;
+    }
 
-    // Insert new attendance records
+    // Insert new attendance records - use upsert to handle any edge cases
     const records = Object.entries(selectedSoldierAttendance)
       .filter(([_, data]) => data.status !== "not_updated") // לא שומרים "לא עודכן"
       .map(([soldierId, data]) => ({
@@ -512,13 +517,14 @@ export default function AnnualWorkPlan() {
       const { error } = await supabase.from("event_attendance").insert(records);
 
       if (error) {
-        toast.error("שגיאה בשמירת הנוכחות");
+        console.error("Insert error:", error);
+        toast.error("שגיאה בשמירת הנוכחות: " + error.message);
         return;
       }
     }
 
     toast.success("הנוכחות נשמרה בהצלחה");
-    fetchData(false);
+    await fetchData(false);
     setAttendanceDialogOpen(false);
   };
 
