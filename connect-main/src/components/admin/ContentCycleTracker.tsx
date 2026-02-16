@@ -54,12 +54,11 @@ interface ContentCycleTrackerProps {
 }
 
 const ABSENCE_REASONS = [
+  "גימלים",
+  "מיוחדת",
+  "כלא",
+  "נפקד",
   "קורס",
-  "חופשה",
-  "מחלה",
-  "תורנות",
-  "משימה אחרת",
-  "חל\"ת",
   "אחר",
 ];
 
@@ -69,6 +68,7 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
   const [absenceDialog, setAbsenceDialog] = useState<{ soldier: Soldier; cycleName: string } | null>(null);
   const [completionDate, setCompletionDate] = useState("");
   const [absenceReason, setAbsenceReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
   const [saving, setSaving] = useState(false);
 
   const contentCycles = useMemo(() => {
@@ -160,14 +160,15 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
   };
 
   const handleMarkAbsent = async () => {
-    if (!absenceDialog || !absenceReason) return;
+    const finalReason = absenceReason === "אחר" ? customReason : absenceReason;
+    if (!absenceDialog || !finalReason) return;
     setSaving(true);
     try {
       const { error } = await supabase.from("content_cycle_overrides").upsert({
         soldier_id: absenceDialog.soldier.id,
         content_cycle: absenceDialog.cycleName,
         override_type: "absent",
-        absence_reason: absenceReason,
+        absence_reason: finalReason,
         completion_date: null,
       }, { onConflict: "soldier_id,content_cycle" });
       if (error) throw error;
@@ -175,6 +176,7 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
       onOverrideChange();
       setAbsenceDialog(null);
       setAbsenceReason("");
+      setCustomReason("");
     } catch (e: any) {
       toast.error("שגיאה בשמירה: " + e.message);
     } finally {
@@ -392,7 +394,7 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
       </Dialog>
 
       {/* Absence Reason Dialog */}
-      <Dialog open={!!absenceDialog} onOpenChange={() => { setAbsenceDialog(null); setAbsenceReason(""); }}>
+      <Dialog open={!!absenceDialog} onOpenChange={() => { setAbsenceDialog(null); setAbsenceReason(""); setCustomReason(""); }}>
         <DialogContent className="max-w-sm" dir="rtl">
           <DialogHeader>
             <DialogTitle className="text-slate-800">סיבת היעדרות</DialogTitle>
@@ -402,7 +404,7 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
           </p>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">סיבה</label>
-            <Select value={absenceReason} onValueChange={setAbsenceReason}>
+            <Select value={absenceReason} onValueChange={(val) => { setAbsenceReason(val); if (val !== "אחר") setCustomReason(""); }}>
               <SelectTrigger className="bg-white text-slate-800">
                 <SelectValue placeholder="בחר סיבה..." />
               </SelectTrigger>
@@ -413,8 +415,19 @@ export function ContentCycleTracker({ events, attendance, soldiers, overrides, o
               </SelectContent>
             </Select>
           </div>
+          {absenceReason === "אחר" && (
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-1 block">פרט סיבה</label>
+              <Input
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                placeholder="הזן סיבה..."
+                className="bg-white text-slate-800"
+              />
+            </div>
+          )}
           <DialogFooter>
-            <Button onClick={handleMarkAbsent} disabled={!absenceReason || saving} className="w-full">
+            <Button onClick={handleMarkAbsent} disabled={(!absenceReason || (absenceReason === "אחר" && !customReason)) || saving} className="w-full">
               {saving ? "שומר..." : "שמור סיבה"}
             </Button>
           </DialogFooter>
