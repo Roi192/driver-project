@@ -498,7 +498,11 @@ export default function AnnualWorkPlan() {
   const saveAttendance = async () => {
     if (!selectedEvent) return;
 
-    // Build records - deduplicate by soldier_id
+    // Log all current attendance state for debugging
+    const allStatuses = Object.entries(selectedSoldierAttendance).map(([id, d]) => `${id.slice(0,8)}:${d.status}`);
+    console.log("All soldier statuses:", allStatuses);
+
+    // Build records - include ALL statuses except "not_updated"
     const recordsMap = new Map<string, any>();
     Object.entries(selectedSoldierAttendance)
       .filter(([_, data]) => data.status !== "not_updated")
@@ -514,16 +518,21 @@ export default function AnnualWorkPlan() {
       });
     
     const records = Array.from(recordsMap.values());
-    console.log("Saving attendance - event:", selectedEvent.id, "records count:", records.length, "records:", records);
+    console.log("Records to save:", records.length, "out of", Object.keys(selectedSoldierAttendance).length, "total soldiers");
+
+    if (records.length === 0) {
+      toast.error("אין נתוני נוכחות לשמירה - יש לסמן סטטוס לפחות לחייל אחד");
+      return;
+    }
 
     // First delete all existing records for this event
-    const { error: deleteError, count: deleteCount } = await supabase
+    const { data: deletedRows, error: deleteError } = await supabase
       .from("event_attendance")
       .delete()
       .eq("event_id", selectedEvent.id)
       .select();
     
-    console.log("Delete result - error:", deleteError, "deleted count:", deleteCount);
+    console.log("Deleted rows:", deletedRows?.length || 0, "error:", deleteError);
     
     if (deleteError) {
       console.error("Delete error:", deleteError);
@@ -531,22 +540,21 @@ export default function AnnualWorkPlan() {
       return;
     }
 
-    if (records.length > 0) {
-      const { data: insertedData, error: insertError } = await supabase
-        .from("event_attendance")
-        .upsert(records, { onConflict: "event_id,soldier_id" })
-        .select();
+    // Insert all records
+    const { data: insertedData, error: insertError } = await supabase
+      .from("event_attendance")
+      .insert(records)
+      .select();
 
-      console.log("Upsert result - error:", insertError, "inserted:", insertedData?.length);
+    console.log("Insert result - inserted:", insertedData?.length, "error:", insertError);
 
-      if (insertError) {
-        console.error("Upsert error:", insertError);
-        toast.error("שגיאה בשמירת הנוכחות: " + insertError.message);
-        return;
-      }
+    if (insertError) {
+      console.error("Insert error:", insertError);
+      toast.error("שגיאה בשמירת הנוכחות: " + insertError.message);
+      return;
     }
 
-    toast.success("הנוכחות נשמרה בהצלחה");
+    toast.success(`הנוכחות נשמרה בהצלחה (${insertedData?.length || 0} רשומות)`);
     await fetchData(false);
     setAttendanceDialogOpen(false);
   };
