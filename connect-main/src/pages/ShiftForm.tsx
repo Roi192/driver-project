@@ -24,7 +24,10 @@ const steps = [
 ];
 
 export default function ShiftForm() {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    const saved = sessionStorage.getItem('shiftFormStep');
+    return saved ? parseInt(saved, 10) : 1;
+  });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
   const { submitReport, isSubmitting } = useShiftReport();
@@ -53,15 +56,21 @@ export default function ShiftForm() {
 
   const CurrentStepComponent = steps[currentStep - 1];
 
+  // Persist currentStep to sessionStorage so mobile camera doesn't lose progress
+  const updateStep = (step: number) => {
+    setCurrentStep(step);
+    sessionStorage.setItem('shiftFormStep', String(step));
+  };
+
   const goToNextStep = () => {
     if (currentStep < steps.length) {
-      setCurrentStep(currentStep + 1);
+      updateStep(currentStep + 1);
     }
   };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      updateStep(currentStep - 1);
     }
   };
 
@@ -132,6 +141,7 @@ export default function ShiftForm() {
     
     if (success) {
       setIsSubmitted(true);
+      sessionStorage.removeItem('shiftFormStep');
       toast({
         title: "הדיווח נשלח בהצלחה!",
         description: "הטופס שלך נשמר במערכת",

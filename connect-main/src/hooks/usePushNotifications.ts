@@ -78,10 +78,14 @@ export function usePushNotifications(soldierId?: string) {
       const registration = await navigator.serviceWorker.register('/sw-push.js');
       await navigator.serviceWorker.ready;
 
+      // Get current user for user_id association
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       // Create a simple subscription record (without VAPID for now)
-      // In production, you'd generate proper VAPID keys
       const subscriptionData = {
         soldier_id: soldierId,
+        user_id: user.id,
         endpoint: `${window.location.origin}/push/${soldierId}`,
         p256dh: 'placeholder-key',
         auth: 'placeholder-auth',

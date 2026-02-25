@@ -8,18 +8,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Shield, Loader2, Car, Users, Building2 } from 'lucide-react';
+import { Shield, Loader2, Users, Building2 } from 'lucide-react';
 import unitLogo from '@/assets/unit-logo.png';
 import bgVehicles from '@/assets/bg-vehicles.png';
 import { OUTPOSTS } from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
-export default function Auth() {
+
+const REGIONS = [
+  "ארץ בנימין",
+  "גבעת בנימין", 
+  "טלמונים",
+  "מכבים"
+] as const;
+
+const MILITARY_ROLES = [
+  "מג\"ד",
+  "סמג\"ד",
+  "מ\"פ",
+  "סמ\"פ",
+  "מ\"מ",
+  "מ\"כ",
+  "אחר"
+] as const;
+
+const PLATOONS = [
+  "גדודי",
+  ...OUTPOSTS
+] as const;
+
+export default function AuthBattalion() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [outpost, setOutpost] = useState('');
   const [personalNumber, setPersonalNumber] = useState('');
+  const [region, setRegion] = useState('');
+  const [militaryRole, setMilitaryRole] = useState('');
+  const [platoon, setPlatoon] = useState('');
   
   const { signIn, signUp, signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -47,7 +72,7 @@ export default function Auth() {
       });
       return;
     }
-    // Verify department matches this login page (BT"SH drivers only)
+    // Verify department matches (battalion users only)
     const { data: { user: loggedInUser } } = await supabase.auth.getUser();
     if (loggedInUser) {
       const { data: profile } = await supabase
@@ -62,14 +87,13 @@ export default function Auth() {
         .eq('user_id', loggedInUser.id)
         .maybeSingle();
       
-      // Allow super_admin to login from anywhere
       if (roleData?.role !== 'super_admin') {
-        if (profile?.department === 'hagmar' || profile?.user_type === 'battalion') {
+        if (profile?.department === 'hagmar' || profile?.user_type !== 'battalion') {
           await signOut();
           setIsLoading(false);
           toast({
             title: 'שגיאה בהתחברות',
-            description: 'משתמש זה לא רשום כנהג בט"ש. יש להשתמש בלינק ההתחברות המתאים למחלקה שלך.',
+            description: 'משתמש זה לא רשום כגדודי תע"ם. יש להשתמש בלינק ההתחברות המתאים למחלקה שלך.',
             variant: 'destructive',
           });
           return;
@@ -82,7 +106,7 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !fullName) {
+    if (!email || !password || !fullName || !region || !militaryRole || !platoon) {
       toast({ title: 'שגיאה', description: 'נא למלא את כל השדות הנדרשים', variant: 'destructive' });
       return;
     }
@@ -106,8 +130,10 @@ export default function Auth() {
       email,
       password,
       fullName,
-      userType: 'driver',
-      outpost: outpost || undefined,
+      userType: 'battalion',
+      region,
+      militaryRole,
+      platoon,
       personalNumber: personalNumber || undefined,
     });
     setIsLoading(false);
@@ -131,9 +157,6 @@ export default function Auth() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,hsl(var(--accent)/0.1),transparent_50%)]" />
       <div className="absolute top-20 right-10 w-72 h-72 bg-gradient-to-br from-primary/20 to-accent/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-20 left-10 w-56 h-56 bg-gradient-to-br from-accent/15 to-primary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-primary/40 rounded-full animate-float" />
-      <div className="absolute top-1/3 right-1/3 w-3 h-3 bg-accent/30 rounded-full animate-float" style={{ animationDelay: '0.5s' }} />
-      <div className="absolute bottom-1/3 left-1/2 w-2 h-2 bg-primary/30 rounded-full animate-float" style={{ animationDelay: '1s' }} />
 
       <Card className="w-full max-w-md relative z-10 premium-card border-primary/30 backdrop-blur-xl bg-card/80 animate-scale-in overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
@@ -149,11 +172,11 @@ export default function Auth() {
           
           <div className="space-y-3 animate-slide-up" style={{ animationDelay: '0.2s' }}>
             <CardTitle className="text-3xl font-black bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
-              מערכת נהגי בט"ש
+              הרשמה גדודי תע"ם
             </CardTitle>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30">
-              <Car className="w-4 h-4 text-primary" />
-              <span className="text-primary font-black text-sm">נהג מוביל - פלוגה מנצחת</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/30">
+              <Users className="w-4 h-4 text-purple-600" />
+              <span className="text-purple-700 font-black text-sm">גדודי תע"ם</span>
             </div>
             <CardDescription className="text-muted-foreground text-base">
               התחבר או הירשם כדי להמשיך
@@ -190,10 +213,10 @@ export default function Auth() {
 
             <TabsContent value="signup" className="animate-fade-in">
               <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="p-3 rounded-xl text-center mb-4 bg-blue-50 border border-blue-200">
+                <div className="p-3 rounded-xl text-center mb-4 bg-purple-50 border border-purple-200">
                   <div className="flex items-center justify-center gap-2">
-                    <Car className="w-5 h-5 text-blue-600" />
-                    <span className="font-bold text-blue-800">הרשמה כנהג בט"ש</span>
+                    <Users className="w-5 h-5 text-purple-600" />
+                    <span className="font-bold text-purple-800">הרשמה כגדודי תע"ם</span>
                   </div>
                 </div>
 
@@ -208,13 +231,37 @@ export default function Auth() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-800 font-semibold">מוצב</Label>
-                  <Select value={outpost} onValueChange={setOutpost}>
+                  <Label className="text-slate-800 font-semibold">גזרה *</Label>
+                  <Select value={region} onValueChange={setRegion}>
                     <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
-                      <SelectValue placeholder="בחר מוצב" />
+                      <SelectValue placeholder="בחר גזרה" />
                     </SelectTrigger>
                     <SelectContent>
-                      {OUTPOSTS.map(o => (<SelectItem key={o} value={o}>{o}</SelectItem>))}
+                      {REGIONS.map(r => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-800 font-semibold">תפקיד *</Label>
+                  <Select value={militaryRole} onValueChange={setMilitaryRole}>
+                    <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                      <SelectValue placeholder="בחר תפקיד" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MILITARY_ROLES.map(r => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-800 font-semibold">פלוגה *</Label>
+                  <Select value={platoon} onValueChange={setPlatoon}>
+                    <SelectTrigger className="bg-white border-slate-300 text-slate-900 h-12 rounded-xl">
+                      <SelectValue placeholder="בחר פלוגה" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLATOONS.map(p => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -236,9 +283,9 @@ export default function Auth() {
 
           <div className="pt-6 mt-6 border-t border-border/30 animate-slide-up" style={{ animationDelay: '0.4s' }}>
             <div className="flex items-center justify-center gap-3">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="text-primary font-black">פלנ"ג בנימין</span>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/20">
+                <Shield className="w-5 h-5 text-purple-600" />
+                <span className="text-purple-700 font-black">גדוד תע"ם</span>
               </div>
             </div>
           </div>

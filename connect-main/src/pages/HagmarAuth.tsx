@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Building2, Loader2, Shield } from "lucide-react";
+import { supabase } from '@/integrations/supabase/client';
 import unitLogo from "@/assets/unit-logo.png";
 import bgVehicles from "@/assets/bg-vehicles.png";
 
@@ -46,7 +47,7 @@ export default function HagmarAuth() {
   const [settlement, setSettlement] = useState("");
   const [hagmarRole, setHagmarRole] = useState("");
 
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, signOut, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,14 +64,44 @@ export default function HagmarAuth() {
     }
     setIsLoading(true);
     const { error } = await signIn(email, password);
-    setIsLoading(false);
     if (error) {
+      setIsLoading(false);
       toast({
         title: "שגיאה בהתחברות",
         description: error.message === "Invalid login credentials" ? "אימייל או סיסמה שגויים" : error.message,
         variant: "destructive",
       });
+      return;
     }
+    // Verify department matches (hagmar users only)
+    const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+    if (loggedInUser) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('department')
+        .eq('user_id', loggedInUser.id)
+        .maybeSingle();
+      
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', loggedInUser.id)
+        .maybeSingle();
+      
+      if (roleData?.role !== 'super_admin') {
+        if (profile?.department !== 'hagmar') {
+          await signOut();
+          setIsLoading(false);
+          toast({
+            title: "שגיאה בהתחברות",
+            description: 'משתמש זה לא רשום במחלקת הגמ"ר. יש להשתמש בלינק ההתחברות המתאים למחלקה שלך.',
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+    setIsLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

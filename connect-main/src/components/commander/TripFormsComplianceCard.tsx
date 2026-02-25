@@ -5,8 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, CheckCircle2, XCircle, ChevronLeft, Loader2, Calendar, MapPin } from "lucide-react";
-import { format, parseISO, addDays, startOfDay, endOfDay, getDay } from "date-fns";
+import { Home, Users, CheckCircle2, XCircle, ChevronLeft, Loader2, Calendar, MapPin, RefreshCw } from "lucide-react";
+import { format, startOfWeek, endOfWeek, getDay, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -14,129 +14,105 @@ interface Soldier {
   id: string;
   full_name: string;
   outpost: string | null;
+  rotation_group: string | null;
 }
 
-interface ExpectedSoldierInfo {
+interface SoldierComplianceInfo {
   soldier: Soldier;
-  expectedDate: string; // The date they were expected at an event (e.g., Sunday the 17th)
-  departureDate: string; // The date they should leave (7 days later, e.g., Sunday the 24th)
   hasSubmittedForm: boolean;
-  eventTitle: string;
+  rotationLabel: string;
+}
+
+const ROTATION_LABELS: Record<string, string> = {
+  a_sunday: "סבב א׳ - ראשון",
+  a_monday: "סבב א׳ - שני",
+  b_sunday: "סבב ב׳ - ראשון",
+  b_monday: "סבב ב׳ - שני",
+};
+
+/**
+ * Determine which rotation groups are "on duty" this week.
+ * Week A and Week B alternate. We use ISO week number to determine parity.
+ * Sunday groups enter on Sunday, Monday groups enter on Monday.
+ */
+function getActiveRotationGroups(): string[] {
+  const today = new Date();
+  // Get the ISO week number to determine A vs B week
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const daysSinceStart = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+  const weekNumber = Math.ceil((daysSinceStart + startOfYear.getDay() + 1) / 7);
+  
+  const isWeekA = weekNumber % 2 === 0;
+  const weekLetter = isWeekA ? "a" : "b";
+  
+  return [`${weekLetter}_sunday`, `${weekLetter}_monday`];
 }
 
 export function TripFormsComplianceCard() {
-  const [expectedSoldiers, setExpectedSoldiers] = useState<ExpectedSoldierInfo[]>([]);
+  const [soldiers, setSoldiers] = useState<SoldierComplianceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "submitted" | "pending">("all");
 
   useEffect(() => {
-    fetchExpectedSoldiers();
+    fetchComplianceData();
   }, []);
 
-  const fetchExpectedSoldiers = async () => {
+  const fetchComplianceData = async () => {
     setLoading(true);
     try {
-      const today = startOfDay(new Date());
-      const todayDay = getDay(today); // 0 = Sunday, 1 = Monday, etc.
+      const activeGroups = getActiveRotationGroups();
       
-      // We're interested in soldiers who were expected 7 days ago (they should leave today/soon)
-      // For Sunday/Monday rotations, check events from 7 days ago
-      const sevenDaysAgo = addDays(today, -7);
-      const fourteenDaysAgo = addDays(today, -14);
-      
-      // Fetch work plan events with expected soldiers from the past 7-14 days
-      // Focus on events that were on Sunday (0) or Monday (1) as per the requirement
-      const { data: eventsData, error: eventsError } = await supabase
-        .from("work_plan_events")
-        .select("id, event_date, title, expected_soldiers")
-        .gte("event_date", format(fourteenDaysAgo, "yyyy-MM-dd"))
-        .lte("event_date", format(today, "yyyy-MM-dd"))
-        .not("expected_soldiers", "is", null)
-        .order("event_date", { ascending: false });
+      // Fetch all active soldiers in the active rotation groups
+      const { data: soldiersData, error: soldiersError } = await supabase
+        .from("soldiers")
+        .select("id, full_name, outpost, rotation_group")
+        .eq("is_active", true)
+        .in("rotation_group", activeGroups);
 
-      if (eventsError) {
-        console.error("Error fetching events:", eventsError);
+      if (soldiersError) {
+        console.error("Error fetching soldiers:", soldiersError);
         return;
       }
 
-      // Filter events that were on Sunday or Monday
-      const relevantEvents = (eventsData || []).filter(event => {
-        const eventDate = parseISO(event.event_date);
-        const dayOfWeek = getDay(eventDate);
-        return dayOfWeek === 0 || dayOfWeek === 1; // Sunday or Monday
-      });
-
-      // Collect all expected soldier IDs with their event info
-      const soldierEventMap = new Map<string, { expectedDate: string; eventTitle: string }>();
-      
-      relevantEvents.forEach(event => {
-        const expectedIds = event.expected_soldiers as string[] || [];
-        expectedIds.forEach((soldierId: string) => {
-          // Only keep the most recent event for each soldier
-          if (!soldierEventMap.has(soldierId)) {
-            soldierEventMap.set(soldierId, {
-              expectedDate: event.event_date,
-              eventTitle: event.title
-            });
-          }
-        });
-      });
-
-      if (soldierEventMap.size === 0) {
-        setExpectedSoldiers([]);
+      if (!soldiersData || soldiersData.length === 0) {
+        setSoldiers([]);
         setLoading(false);
         return;
       }
 
-      // Fetch soldier details
-      const soldierIds = Array.from(soldierEventMap.keys());
-      const { data: soldiersData } = await supabase
-        .from("soldiers")
-        .select("id, full_name, outpost")
-        .in("id", soldierIds);
+      // Get trip forms for this week (Sunday to Saturday)
+      const today = new Date();
+      const weekStart = startOfWeek(today, { weekStartsOn: 0 }); // Sunday
+      const weekEnd = endOfWeek(today, { weekStartsOn: 0 });
 
-      // Fetch trip forms submitted in the relevant period (from 7 days ago to today)
       const { data: tripFormsData } = await supabase
         .from("trip_forms")
-        .select("soldier_name, form_date, user_id")
-        .gte("form_date", format(sevenDaysAgo, "yyyy-MM-dd"));
+        .select("soldier_name, form_date")
+        .gte("form_date", format(weekStart, "yyyy-MM-dd"))
+        .lte("form_date", format(weekEnd, "yyyy-MM-dd"));
 
-      // Create a set of soldier names who submitted forms
+      // Create a set of soldier names who submitted forms (normalized)
       const submittedNames = new Set(
         (tripFormsData || []).map(form => form.soldier_name.trim().toLowerCase())
       );
 
-      // Build the expected soldiers info
-      const expectedList: ExpectedSoldierInfo[] = [];
-      
-      (soldiersData || []).forEach(soldier => {
-        const eventInfo = soldierEventMap.get(soldier.id);
-        if (!eventInfo) return;
-        
-        const departureDate = format(addDays(parseISO(eventInfo.expectedDate), 7), "yyyy-MM-dd");
-        
-        // Check if soldier submitted a trip form
-        const hasSubmitted = submittedNames.has(soldier.full_name.trim().toLowerCase());
-        
-        expectedList.push({
-          soldier,
-          expectedDate: eventInfo.expectedDate,
-          departureDate,
-          hasSubmittedForm: hasSubmitted,
-          eventTitle: eventInfo.eventTitle
-        });
-      });
+      // Build the compliance list
+      const complianceList: SoldierComplianceInfo[] = soldiersData.map(soldier => ({
+        soldier,
+        hasSubmittedForm: submittedNames.has(soldier.full_name.trim().toLowerCase()),
+        rotationLabel: ROTATION_LABELS[soldier.rotation_group || ""] || soldier.rotation_group || "לא משויך",
+      }));
 
-      // Sort: pending first, then by departure date
-      expectedList.sort((a, b) => {
+      // Sort: pending first, then alphabetically
+      complianceList.sort((a, b) => {
         if (a.hasSubmittedForm !== b.hasSubmittedForm) {
           return a.hasSubmittedForm ? 1 : -1;
         }
-        return a.departureDate.localeCompare(b.departureDate);
+        return a.soldier.full_name.localeCompare(b.soldier.full_name, "he");
       });
 
-      setExpectedSoldiers(expectedList);
+      setSoldiers(complianceList);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -145,17 +121,16 @@ export function TripFormsComplianceCard() {
   };
 
   const getFilteredSoldiers = () => {
-    if (filterType === "submitted") {
-      return expectedSoldiers.filter(s => s.hasSubmittedForm);
-    } else if (filterType === "pending") {
-      return expectedSoldiers.filter(s => !s.hasSubmittedForm);
-    }
-    return expectedSoldiers;
+    if (filterType === "submitted") return soldiers.filter(s => s.hasSubmittedForm);
+    if (filterType === "pending") return soldiers.filter(s => !s.hasSubmittedForm);
+    return soldiers;
   };
 
-  const submittedCount = expectedSoldiers.filter(s => s.hasSubmittedForm).length;
-  const pendingCount = expectedSoldiers.filter(s => !s.hasSubmittedForm).length;
-  const totalCount = expectedSoldiers.length;
+  const submittedCount = soldiers.filter(s => s.hasSubmittedForm).length;
+  const pendingCount = soldiers.filter(s => !s.hasSubmittedForm).length;
+  const totalCount = soldiers.length;
+  const activeGroups = getActiveRotationGroups();
+  const activeGroupLabels = activeGroups.map(g => ROTATION_LABELS[g] || g).join(" / ");
 
   if (loading) {
     return (
@@ -181,7 +156,13 @@ export function TripFormsComplianceCard() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg">
                 <Home className="w-5 h-5 text-white" />
               </div>
-              <span>תדריך יציאה לפי מצופים</span>
+              <div>
+                <span>תדריכי יציאה השבוע</span>
+                <div className="flex items-center gap-1 text-xs text-slate-500 font-normal mt-0.5">
+                  <RefreshCw className="w-3 h-3" />
+                  {activeGroupLabels}
+                </div>
+              </div>
             </div>
             <ChevronLeft className="w-5 h-5 text-slate-400 group-hover:text-primary group-hover:-translate-x-1 transition-all" />
           </CardTitle>
@@ -191,7 +172,7 @@ export function TripFormsComplianceCard() {
           {totalCount === 0 ? (
             <div className="text-center py-4">
               <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">אין חיילים מצופים בתקופה זו</p>
+              <p className="text-sm text-slate-500">אין חיילים בסבב פעיל השבוע</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -229,51 +210,33 @@ export function TripFormsComplianceCard() {
         </CardContent>
       </Card>
 
-      {/* Soldiers List Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md max-h-[85vh] p-0 overflow-hidden" dir="rtl">
           <DialogHeader className="p-5 bg-gradient-to-br from-teal-500 to-cyan-500 text-white">
             <DialogTitle className="text-white text-lg font-bold">
-              תדריך יציאה לפי מצופים
+              תדריכי יציאה השבוע
             </DialogTitle>
             <p className="text-white/80 text-sm">
-              חיילים שהיו מצופים בימי ראשון/שני וצריכים להזין טופס טיולים
+              סבב פעיל: {activeGroupLabels}
             </p>
           </DialogHeader>
           
-          {/* Filter */}
           <div className="p-4 border-b border-slate-100">
             <div className="flex gap-2">
-              <Button
-                variant={filterType === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("all")}
-                className="flex-1 rounded-lg"
-              >
+              <Button variant={filterType === "all" ? "default" : "outline"} size="sm" onClick={() => setFilterType("all")} className="flex-1 rounded-lg">
                 הכל ({totalCount})
               </Button>
-              <Button
-                variant={filterType === "submitted" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("submitted")}
-                className="flex-1 rounded-lg"
-              >
+              <Button variant={filterType === "submitted" ? "default" : "outline"} size="sm" onClick={() => setFilterType("submitted")} className="flex-1 rounded-lg">
                 <CheckCircle2 className="w-3 h-3 ml-1 text-emerald-500" />
                 הזינו ({submittedCount})
               </Button>
-              <Button
-                variant={filterType === "pending" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilterType("pending")}
-                className="flex-1 rounded-lg"
-              >
+              <Button variant={filterType === "pending" ? "default" : "outline"} size="sm" onClick={() => setFilterType("pending")} className="flex-1 rounded-lg">
                 <XCircle className="w-3 h-3 ml-1 text-red-500" />
                 חסר ({pendingCount})
               </Button>
             </div>
           </div>
           
-          {/* Soldiers List */}
           <ScrollArea className="max-h-[55vh]">
             <div className="p-4 space-y-2">
               {getFilteredSoldiers().length === 0 ? (
@@ -287,9 +250,7 @@ export function TripFormsComplianceCard() {
                     key={info.soldier.id}
                     className={cn(
                       "p-3 rounded-xl border transition-colors",
-                      info.hasSubmittedForm 
-                        ? "bg-emerald-50 border-emerald-200" 
-                        : "bg-red-50 border-red-200"
+                      info.hasSubmittedForm ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                     )}
                   >
                     <div className="flex items-start gap-3">
@@ -300,23 +261,16 @@ export function TripFormsComplianceCard() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800">{info.soldier.full_name}</p>
-                        {info.soldier.outpost && (
-                          <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
-                            <MapPin className="w-3 h-3" />
-                            {info.soldier.outpost}
-                          </div>
-                        )}
-                        <div className="mt-2 space-y-1">
-                          <div className="text-xs text-slate-600">
-                            <span className="font-medium">מופע:</span> {info.eventTitle}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            <span className="font-medium">תאריך מופע:</span>{" "}
-                            {format(parseISO(info.expectedDate), "EEEE dd/MM", { locale: he })}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            <span className="font-medium">יציאה צפויה:</span>{" "}
-                            {format(parseISO(info.departureDate), "EEEE dd/MM", { locale: he })}
+                        <div className="flex items-center gap-2 mt-1">
+                          {info.soldier.outpost && (
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              <MapPin className="w-3 h-3" />
+                              {info.soldier.outpost}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <RefreshCw className="w-3 h-3" />
+                            {info.rotationLabel}
                           </div>
                         </div>
                       </div>
@@ -324,9 +278,7 @@ export function TripFormsComplianceCard() {
                         variant="secondary" 
                         className={cn(
                           "text-xs",
-                          info.hasSubmittedForm 
-                            ? "bg-emerald-100 text-emerald-700" 
-                            : "bg-red-100 text-red-700"
+                          info.hasSubmittedForm ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
                         )}
                       >
                         {info.hasSubmittedForm ? "הזין" : "חסר"}
