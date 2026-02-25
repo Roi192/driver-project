@@ -49,6 +49,15 @@ import HagmarTrainingEvents from "./pages/HagmarTrainingEvents";
 import HagmarEquipment from "./pages/HagmarEquipment";
 import HagmarSecurityIncidents from "./pages/HagmarSecurityIncidents";
 import HagmarDashboard from "./pages/HagmarDashboard";
+import HagmarShootingRanges from "./pages/HagmarShootingRanges";
+import HagmarSettlementDrills from "./pages/HagmarSettlementDrills";
+import HagmarSimulatorTraining from "./pages/HagmarSimulatorTraining";
+import HagmarProfessionalDev from "./pages/HagmarProfessionalDev";
+import HagmarSafetyInvestigations from "./pages/HagmarSafetyInvestigations";
+import HagmarAmlach from "./pages/HagmarAmlach";
+import HagmarSecurityComponents from "./pages/HagmarSecurityComponents";
+import HagmarDefenseFiles from "./pages/HagmarDefenseFiles";
+import HagmarWeaponAuthorizations from "./pages/HagmarWeaponAuthorizations";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import BattalionUsersManagement from "./pages/BattalionUsersManagement";
 import NotFound from "./pages/NotFound";
@@ -138,6 +147,78 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <HagmarDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/shooting-ranges"
+              element={
+                <ProtectedRoute>
+                  <HagmarShootingRanges />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/settlement-drills"
+              element={
+                <ProtectedRoute>
+                  <HagmarSettlementDrills />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/simulator-training"
+              element={
+                <ProtectedRoute>
+                  <HagmarSimulatorTraining />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/professional-dev"
+              element={
+                <ProtectedRoute>
+                  <HagmarProfessionalDev />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/safety-investigations"
+              element={
+                <ProtectedRoute>
+                  <HagmarSafetyInvestigations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/amlach"
+              element={
+                <ProtectedRoute>
+                  <HagmarAmlach />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/security-components"
+              element={
+                <ProtectedRoute>
+                  <HagmarSecurityComponents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/defense-files"
+              element={
+                <ProtectedRoute>
+                  <HagmarDefenseFiles />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/weapon-authorizations"
+              element={
+                <ProtectedRoute>
+                  <HagmarWeaponAuthorizations />
                 </ProtectedRoute>
               }
             />

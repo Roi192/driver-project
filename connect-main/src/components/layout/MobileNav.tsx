@@ -33,7 +33,14 @@ import {
   Crosshair,
   Target,
   Package,
-  Shield
+  Shield,
+  FileCheck,
+  Siren,
+  Gamepad2,
+  Award,
+  Search,
+  Building,
+  FolderArchive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -586,6 +593,114 @@ export function MobileNav() {
                 </div>
                 <span className="font-bold text-base relative z-10 flex-1">אירועים ביטחוניים</span>
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-red-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/shooting-ranges" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Crosshair className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מטווחים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-orange-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/settlement-drills" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-cyan-500 to-teal-500 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Siren className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">תרגילי יישוב</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/simulator-training" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Gamepad2 className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">אימוני סימולטור</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/professional-dev" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-lime-500 to-green-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Award className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">השתלמויות רבש"צ</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-lime-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/weapon-authorizations" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-yellow-500 to-amber-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <FileCheck className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">הרשאות נשק</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-yellow-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/safety-investigations" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Search className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">חקירות בטיחות</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-rose-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/amlach" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Package className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">אמל"ח יישובים</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-sky-400 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/security-components" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-slate-500 to-gray-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <Building className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">מרכיבי ביטחון</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-slate-300 group-hover:-translate-x-1 transition-all duration-300" />
+              </NavLink>
+
+              <NavLink to="/hagmar/defense-files" onClick={() => setIsOpen(false)}
+                className={cn("flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30", "hover:bg-gradient-to-l hover:from-amber-500/20 hover:to-transparent hover:border-amber-500/60")}
+                activeClassName="bg-gradient-to-l from-amber-500/30 to-transparent text-amber-400 border-amber-500/60"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <FolderArchive className="w-6 h-6" />
+                </div>
+                <span className="font-bold text-base relative z-10 flex-1">תיקי הגנה</span>
+                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
 
               {(isHagmarAdmin || isSuperAdmin) && (

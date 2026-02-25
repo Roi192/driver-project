@@ -1047,6 +1047,42 @@ export type Database = {
           },
         ]
       }
+      hagmar_defense_files: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          settlement: string
+          title: string
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          settlement: string
+          title: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          settlement?: string
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       hagmar_equipment: {
         Row: {
           actual_quantity: number
@@ -1086,6 +1122,231 @@ export type Database = {
           serial_numbers?: string[] | null
           settlement?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      hagmar_equipment_expected: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          expected_quantity: number | null
+          id: string
+          item_name: string
+          settlement: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          expected_quantity?: number | null
+          id?: string
+          item_name: string
+          settlement: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          expected_quantity?: number | null
+          id?: string
+          item_name?: string
+          settlement?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_equipment_reports: {
+        Row: {
+          actual_quantity: number | null
+          created_at: string | null
+          id: string
+          is_functional: boolean | null
+          item_name: string
+          item_subtype: string | null
+          malfunction_description: string | null
+          notes: string | null
+          report_date: string | null
+          reported_by: string | null
+          reported_to: string | null
+          settlement: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_quantity?: number | null
+          created_at?: string | null
+          id?: string
+          is_functional?: boolean | null
+          item_name: string
+          item_subtype?: string | null
+          malfunction_description?: string | null
+          notes?: string | null
+          report_date?: string | null
+          reported_by?: string | null
+          reported_to?: string | null
+          settlement: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_quantity?: number | null
+          created_at?: string | null
+          id?: string
+          is_functional?: boolean | null
+          item_name?: string
+          item_subtype?: string | null
+          malfunction_description?: string | null
+          notes?: string | null
+          report_date?: string | null
+          reported_by?: string | null
+          reported_to?: string | null
+          settlement?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_professional_development: {
+        Row: {
+          attendees: string[] | null
+          content: string | null
+          created_at: string | null
+          created_by: string | null
+          dev_type: string
+          event_date: string
+          id: string
+          summary: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attendees?: string[] | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dev_type: string
+          event_date: string
+          id?: string
+          summary?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attendees?: string[] | null
+          content?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          dev_type?: string
+          event_date?: string
+          id?: string
+          summary?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_safety_investigations: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          file_url: string | null
+          findings: string | null
+          id: string
+          investigation_date: string
+          photos: string[] | null
+          recommendations: string | null
+          region: string | null
+          settlement: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_url?: string | null
+          findings?: string | null
+          id?: string
+          investigation_date: string
+          photos?: string[] | null
+          recommendations?: string | null
+          region?: string | null
+          settlement?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          file_url?: string | null
+          findings?: string | null
+          id?: string
+          investigation_date?: string
+          photos?: string[] | null
+          recommendations?: string | null
+          region?: string | null
+          settlement?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_security_components: {
+        Row: {
+          armored_vehicle: boolean | null
+          armory: boolean | null
+          cameras_data: Json | null
+          command_center_type: string | null
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          defensive_security_type: string | null
+          fence_type: string | null
+          hailkis: boolean | null
+          id: string
+          readiness_weights: Json | null
+          region: string | null
+          security_gaps: string | null
+          sensors_data: Json | null
+          settlement: string
+          updated_at: string | null
+        }
+        Insert: {
+          armored_vehicle?: boolean | null
+          armory?: boolean | null
+          cameras_data?: Json | null
+          command_center_type?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          defensive_security_type?: string | null
+          fence_type?: string | null
+          hailkis?: boolean | null
+          id?: string
+          readiness_weights?: Json | null
+          region?: string | null
+          security_gaps?: string | null
+          sensors_data?: Json | null
+          settlement: string
+          updated_at?: string | null
+        }
+        Update: {
+          armored_vehicle?: boolean | null
+          armory?: boolean | null
+          cameras_data?: Json | null
+          command_center_type?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          defensive_security_type?: string | null
+          fence_type?: string | null
+          hailkis?: boolean | null
+          id?: string
+          readiness_weights?: Json | null
+          region?: string | null
+          security_gaps?: string | null
+          sensors_data?: Json | null
+          settlement?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -1149,8 +1410,204 @@ export type Database = {
         }
         Relationships: []
       }
+      hagmar_settlement_drills: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          drill_content: string | null
+          drill_date: string
+          full_activation_drill: boolean | null
+          id: string
+          participants: string[] | null
+          region: string | null
+          regional_force_participated: boolean | null
+          settlement: string
+          settlement_command_activated: boolean | null
+          settlement_commander_name: string | null
+          summary: string | null
+          tzahi_activated: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          drill_content?: string | null
+          drill_date: string
+          full_activation_drill?: boolean | null
+          id?: string
+          participants?: string[] | null
+          region?: string | null
+          regional_force_participated?: boolean | null
+          settlement: string
+          settlement_command_activated?: boolean | null
+          settlement_commander_name?: string | null
+          summary?: string | null
+          tzahi_activated?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          drill_content?: string | null
+          drill_date?: string
+          full_activation_drill?: boolean | null
+          id?: string
+          participants?: string[] | null
+          region?: string | null
+          regional_force_participated?: boolean | null
+          settlement?: string
+          settlement_command_activated?: boolean | null
+          settlement_commander_name?: string | null
+          summary?: string | null
+          tzahi_activated?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_shooting_ranges: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          exercises: string[] | null
+          id: string
+          range_date: string
+          region: string | null
+          settlement: string
+          summary: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          exercises?: string[] | null
+          id?: string
+          range_date: string
+          region?: string | null
+          settlement: string
+          summary?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          exercises?: string[] | null
+          id?: string
+          range_date?: string
+          region?: string | null
+          settlement?: string
+          summary?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_shooting_scores: {
+        Row: {
+          attended: boolean | null
+          created_at: string | null
+          exercise_name: string | null
+          hits: number | null
+          id: string
+          notes: string | null
+          range_id: string
+          score: number | null
+          soldier_id: string
+          total_shots: number | null
+        }
+        Insert: {
+          attended?: boolean | null
+          created_at?: string | null
+          exercise_name?: string | null
+          hits?: number | null
+          id?: string
+          notes?: string | null
+          range_id: string
+          score?: number | null
+          soldier_id: string
+          total_shots?: number | null
+        }
+        Update: {
+          attended?: boolean | null
+          created_at?: string | null
+          exercise_name?: string | null
+          hits?: number | null
+          id?: string
+          notes?: string | null
+          range_id?: string
+          score?: number | null
+          soldier_id?: string
+          total_shots?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hagmar_shooting_scores_range_id_fkey"
+            columns: ["range_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_shooting_ranges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hagmar_shooting_scores_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hagmar_simulator_training: {
+        Row: {
+          commander_name: string | null
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          participants: string[] | null
+          region: string | null
+          settlement: string | null
+          summary: string | null
+          training_content: string | null
+          training_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          commander_name?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          participants?: string[] | null
+          region?: string | null
+          settlement?: string | null
+          summary?: string | null
+          training_content?: string | null
+          training_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          commander_name?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          participants?: string[] | null
+          region?: string | null
+          settlement?: string | null
+          summary?: string | null
+          training_content?: string | null
+          training_date?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       hagmar_soldiers: {
         Row: {
+          address: string | null
           created_at: string
           created_by: string | null
           full_name: string
@@ -1168,6 +1625,7 @@ export type Database = {
           weapon_serial: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
           full_name: string
@@ -1185,6 +1643,7 @@ export type Database = {
           weapon_serial?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
           created_by?: string | null
           full_name?: string
@@ -1289,6 +1748,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      hagmar_weapon_authorizations: {
+        Row: {
+          authorization_date: string
+          authorization_file_url: string | null
+          created_at: string | null
+          created_by: string | null
+          expiry_date: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          signed_by: string | null
+          soldier_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          authorization_date: string
+          authorization_file_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          signed_by?: string | null
+          soldier_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          authorization_date?: string
+          authorization_file_url?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          signed_by?: string | null
+          soldier_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hagmar_weapon_authorizations_soldier_id_fkey"
+            columns: ["soldier_id"]
+            isOneToOne: false
+            referencedRelation: "hagmar_soldiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspections: {
         Row: {
