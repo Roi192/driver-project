@@ -88,7 +88,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 
 const UsersManagement = () => {
   const navigate = useNavigate();
-  const { user, canDelete } = useAuth();
+  const { user, canDelete, isSuperAdmin } = useAuth();
   const { isAdmin, canAccessUsersManagement, isLoading: roleLoading } = useUserRole();
   
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -135,7 +135,7 @@ const UsersManagement = () => {
       setLoading(true);
       
       const [profilesRes, rolesRes, soldiersRes] = await Promise.all([
-        supabase.from("profiles").select("*").neq("department", "hagmar").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").or("department.eq.planag,department.is.null").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("soldiers").select("id, personal_number"),
       ]);
@@ -302,12 +302,12 @@ const UsersManagement = () => {
 
   const getRoleBadgeStyle = (role: AppRole) => {
     switch (role) {
+      case 'super_admin':
+        return 'bg-red-500/90 text-white';
       case 'admin':
         return 'bg-amber-500/90 text-white';
       case 'platoon_commander':
         return 'bg-blue-500/90 text-white';
-      case 'battalion_admin':
-        return 'bg-purple-500/90 text-white';
       default:
         return 'bg-slate-500/90 text-white';
     }
@@ -583,17 +583,17 @@ const UsersManagement = () => {
                   <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border">
                     <SelectValue placeholder="בחר הרשאה" />
                   </SelectTrigger>
-                  <SelectContent className="bg-popover border-border z-[10000]">
+                    <SelectContent className="bg-popover border-border z-[10000]">
+                    {isSuperAdmin && <SelectItem value="super_admin">מנהל ראשי (מח"ט)</SelectItem>}
                     <SelectItem value="admin">מנהל מ"פ נהגים (גישה מלאה)</SelectItem>
                     <SelectItem value="platoon_commander">מנהל מ"מ נהגים</SelectItem>
-                    <SelectItem value="battalion_admin">מנהל גדוד תע"ם</SelectItem>
                     <SelectItem value="driver">נהג (משתמש רגיל)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
+                  {editFormData.role === 'super_admin' && '✓ מנהל ראשי - גישה מלאה לכל המחלקות'}
                   {editFormData.role === 'admin' && '✓ גישה מלאה לכל הפיצ\'רים כולל מחיקה וניהול משתמשים'}
                   {editFormData.role === 'platoon_commander' && '✓ ללא דו"ח בו"מ, ניהול משתמשים ומחיקות'}
-                  {editFormData.role === 'battalion_admin' && '✓ גישה מוגבלת: ללא תוכנית עבודה, בו"מ, שליטה, נוכחות, עונשים, ביקורות, חגים, ניהול משתמשים ומחיקות'}
                   {editFormData.role === 'driver' && '✓ צפייה בלבד + מילוי טפסים'}
                 </p>
               </div>

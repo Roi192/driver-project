@@ -416,6 +416,7 @@ const BattalionUsersManagement = () => {
                     <SelectValue placeholder="בחר הרשאה" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border z-[10000]">
+                    <SelectItem value="super_admin">מנהל ראשי (מח"ט)</SelectItem>
                     <SelectItem value="battalion_admin">מנהל גדוד תע"ם</SelectItem>
                     <SelectItem value="driver">משתמש גדוד רגיל</SelectItem>
                   </SelectContent>
