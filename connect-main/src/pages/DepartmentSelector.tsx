@@ -82,7 +82,7 @@ const DepartmentSelector = () => {
                   } else {
                     sessionStorage.removeItem('superAdminDeptContext');
                   }
-                  navigate(dept.id === 'battalion' ? '/' : dept.route);
+                  navigate(dept.id === 'battalion' ? '/planag' : dept.route);
                 }}
                 className={`group relative p-8 rounded-3xl border-2 ${dept.borderColor} ${dept.hoverBorder} bg-slate-800/60 backdrop-blur-xl transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl text-right overflow-hidden`}
               >
