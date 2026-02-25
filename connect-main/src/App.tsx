@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthBattalion from "./pages/AuthBattalion";
 import ShiftForm from "./pages/ShiftForm";
 import DrillLocations from "./pages/DrillLocations";
 import SafetyFiles from "./pages/SafetyFiles";
@@ -65,6 +66,7 @@ const App = () => (
           <Routes>
             <Route path="/install" element={<Install />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/gdud" element={<AuthBattalion />} />
             <Route path="/auth/hagmar" element={<HagmarAuth />} />
             <Route
               path="/department-selector"
