@@ -72,7 +72,7 @@ export function useUserRole() {
   const canAccessDriverInterviews = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
   const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
   const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
-  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin';
+  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin' || role === 'battalion_admin';
 
   return {
     role,

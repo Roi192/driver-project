@@ -243,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canAccessAdminDashboard = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
   const canAccessWorkSchedule = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
   const canAccessWeeklyMeeting = role === 'admin' || role === 'platoon_commander' || role === 'super_admin';
-  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin';
+  const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin' || role === 'battalion_admin';
   const isRavshatz = role === 'ravshatz';
   const canAccessHagmarSoldiers = role === 'hagmar_admin' || role === 'super_admin' || role === 'ravshatz';
 

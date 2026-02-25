@@ -32,6 +32,18 @@ const DepartmentSelector = () => {
       glowColor: "from-amber-500/30",
       route: "/hagmar",
     },
+    {
+      id: "battalion",
+      title: 'גדוד תע"ם',
+      subtitle: "גדוד תעבורה מבצעית",
+      description: "ניהול בטיחות, ראיונות נהגים וביקורות גדודיות",
+      icon: Shield,
+      gradient: "from-indigo-500 via-blue-500 to-indigo-600",
+      borderColor: "border-indigo-500/40",
+      hoverBorder: "hover:border-indigo-500",
+      glowColor: "from-indigo-500/30",
+      route: "/planag",
+    },
   ];
 
   return (
@@ -58,7 +70,7 @@ const DepartmentSelector = () => {
         </div>
 
         {/* Department Cards */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-4xl">
           {departments.map((dept) => {
             const Icon = dept.icon;
             return (

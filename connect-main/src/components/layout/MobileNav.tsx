@@ -56,14 +56,10 @@ const getNavItems = (userType: string | null, isBattalionAdmin: boolean) => {
     { to: "/my-reports", icon: ClipboardList, label: "הדיווחים שלי" },
   ];
   
-  // Hide shift-form, trip-form, cleaning-parades, and my-reports for battalion users
+  // For battalion users, only show: home, drill-locations, safety-files, safety-events, training-videos
   if (userType === 'battalion' || isBattalionAdmin) {
-    return items.filter(item => 
-      item.to !== '/shift-form' && 
-      item.to !== '/trip-form' && 
-      item.to !== '/cleaning-parades' &&
-      item.to !== '/my-reports'
-    );
+    const allowedBattalionPaths = ['/', '/drill-locations', '/safety-files', '/safety-events', '/training-videos'];
+    return items.filter(item => allowedBattalionPaths.includes(item.to));
   }
   
   return items;
@@ -706,7 +702,26 @@ export function MobileNav() {
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
 
-              {/* Users Management - Admin only (exclude pure hagmar_admin in planag) */}
+              {/* Battalion Users Management - Super Admin only */}
+              {isSuperAdmin && (
+                <NavLink
+                  to="/battalion-users-management"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
+                    "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
+                  )}
+                  activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <span className="font-bold text-base relative z-10 flex-1">ניהול משתמשי גדוד תע"ם</span>
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 group-hover:-translate-x-1 transition-all duration-300" />
+                </NavLink>
+              )}
+
               {canAccessUsersManagement && !(role === 'hagmar_admin') && (
                 <NavLink
                   to="/users-management"
@@ -908,7 +923,7 @@ export function MobileNav() {
             </>
           )}
 
-          {/* Links for battalion users ONLY (not platoon commanders) - these are duplicated in admin section so only show for non-admin battalion users */}
+          {/* Links for battalion users ONLY (not admin) - show know-the-area */}
           {userType === 'battalion' && !hasAdminAccess && (
             <>
               <NavLink
@@ -926,23 +941,6 @@ export function MobileNav() {
                 </div>
                 <span className="font-bold text-base relative z-10 flex-1">הכר את הגזרה</span>
                 <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 group-hover:-translate-x-1 transition-all duration-300" />
-              </NavLink>
-
-              <NavLink
-                to="/driver-interviews"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-4 px-4 py-4 rounded-2xl text-slate-400 hover:text-white transition-all duration-300 relative overflow-hidden group border border-gold/30",
-                  "hover:bg-gradient-to-l hover:from-gold/20 hover:to-transparent hover:border-gold/60"
-                )}
-                activeClassName="bg-gradient-to-l from-gold/30 to-transparent text-gold border-gold/60 shadow-lg shadow-gold/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-gold/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                  <ClipboardCheck className="w-6 h-6" />
-                </div>
-                <span className="font-bold text-base relative z-10 flex-1">ראיונות נהגי קו</span>
-                <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-violet-400 group-hover:-translate-x-1 transition-all duration-300" />
               </NavLink>
             </>
           )}

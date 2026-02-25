@@ -50,6 +50,7 @@ import HagmarEquipment from "./pages/HagmarEquipment";
 import HagmarSecurityIncidents from "./pages/HagmarSecurityIncidents";
 import HagmarDashboard from "./pages/HagmarDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import BattalionUsersManagement from "./pages/BattalionUsersManagement";
 import NotFound from "./pages/NotFound";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
@@ -401,6 +402,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SuperAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/battalion-users-management"
+              element={
+                <ProtectedRoute>
+                  <BattalionUsersManagement />
                 </ProtectedRoute>
               }
             />
