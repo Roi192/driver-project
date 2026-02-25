@@ -45,6 +45,7 @@ export default function AuthBattalion() {
   const [region, setRegion] = useState('');
   const [militaryRole, setMilitaryRole] = useState('');
   const [platoon, setPlatoon] = useState('');
+  const [battalionName, setBattalionName] = useState('');
   
   const { signIn, signUp, signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -106,7 +107,7 @@ export default function AuthBattalion() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !fullName || !region || !militaryRole || !platoon) {
+    if (!email || !password || !fullName || !region || !militaryRole || !platoon || !battalionName) {
       toast({ title: 'שגיאה', description: 'נא למלא את כל השדות הנדרשים', variant: 'destructive' });
       return;
     }
@@ -135,6 +136,7 @@ export default function AuthBattalion() {
       militaryRole,
       platoon,
       personalNumber: personalNumber || undefined,
+      battalionName: battalionName || undefined,
     });
     setIsLoading(false);
 
@@ -264,6 +266,11 @@ export default function AuthBattalion() {
                       {PLATOONS.map(p => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-battalion-name" className="text-slate-800 font-semibold">שם הגדוד *</Label>
+                  <Input id="signup-battalion-name" type="text" placeholder='גדוד תע"ם 900' value={battalionName} onChange={(e) => setBattalionName(e.target.value)} className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-primary/30 transition-all duration-300 h-12 rounded-xl" />
                 </div>
 
                 <div className="space-y-2">

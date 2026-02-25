@@ -61,6 +61,7 @@ interface UserProfile {
   military_role: string | null;
   platoon: string | null;
   personal_number: string | null;
+  battalion_name: string | null;
   created_at: string;
 }
 
@@ -94,6 +95,7 @@ const BattalionUsersManagement = () => {
     military_role: "",
     platoon: "",
     personal_number: "",
+    battalion_name: "",
     role: "driver" as AppRole,
   });
   const [saving, setSaving] = useState(false);
@@ -155,6 +157,7 @@ const BattalionUsersManagement = () => {
       military_role: profile.military_role || "",
       platoon: profile.platoon || "",
       personal_number: profile.personal_number || "",
+      battalion_name: profile.battalion_name || "",
       role: getUserRole(profile.user_id),
     });
   };
@@ -175,6 +178,7 @@ const BattalionUsersManagement = () => {
             military_role: editFormData.military_role || null,
             platoon: editFormData.platoon || null,
             personal_number: editFormData.personal_number || null,
+            battalion_name: editFormData.battalion_name || null,
           },
         },
       });
@@ -326,6 +330,12 @@ const BattalionUsersManagement = () => {
                             {profile.outpost}
                           </span>
                         )}
+                        {profile.battalion_name && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {profile.battalion_name}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -412,6 +422,11 @@ const BattalionUsersManagement = () => {
                 </Select>
               </div>
               
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-foreground"><Building2 className="w-4 h-4 text-indigo-500" />שם הגדוד</Label>
+                <Input value={editFormData.battalion_name} onChange={(e) => setEditFormData(prev => ({ ...prev, battalion_name: e.target.value }))} placeholder='גדוד תע"ם 900' className="h-12 rounded-xl" />
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-foreground">מוצב</Label>
                 <Input value={editFormData.outpost} onChange={(e) => setEditFormData(prev => ({ ...prev, outpost: e.target.value }))} placeholder="מוצב" className="h-12 rounded-xl" />

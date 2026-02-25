@@ -18,6 +18,7 @@ interface SignUpData {
   department?: string;
   settlement?: string;
   idNumber?: string;
+  battalionName?: string;
 }
 
 interface AuthContextType {
@@ -181,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           department: data.department || 'planag',
           settlement: data.settlement || null,
           id_number: data.idNumber || null,
+          battalion_name: data.battalionName || null,
         },
       },
     });

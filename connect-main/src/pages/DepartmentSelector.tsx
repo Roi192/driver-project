@@ -42,7 +42,7 @@ const DepartmentSelector = () => {
       borderColor: "border-indigo-500/40",
       hoverBorder: "hover:border-indigo-500",
       glowColor: "from-indigo-500/30",
-      route: "/planag",
+      route: "/battalion-context",
     },
   ];
 
@@ -76,7 +76,14 @@ const DepartmentSelector = () => {
             return (
               <button
                 key={dept.id}
-                onClick={() => navigate(dept.route)}
+                onClick={() => {
+                  if (dept.id === 'battalion') {
+                    sessionStorage.setItem('superAdminDeptContext', 'battalion');
+                  } else {
+                    sessionStorage.removeItem('superAdminDeptContext');
+                  }
+                  navigate(dept.id === 'battalion' ? '/' : dept.route);
+                }}
                 className={`group relative p-8 rounded-3xl border-2 ${dept.borderColor} ${dept.hoverBorder} bg-slate-800/60 backdrop-blur-xl transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl text-right overflow-hidden`}
               >
                 {/* Glow effect on hover */}

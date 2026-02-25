@@ -1703,6 +1703,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          battalion_name: string | null
           created_at: string
           department: string | null
           full_name: string
@@ -1719,6 +1720,7 @@ export type Database = {
           user_type: string | null
         }
         Insert: {
+          battalion_name?: string | null
           created_at?: string
           department?: string | null
           full_name: string
@@ -1735,6 +1737,7 @@ export type Database = {
           user_type?: string | null
         }
         Update: {
+          battalion_name?: string | null
           created_at?: string
           department?: string | null
           full_name?: string
