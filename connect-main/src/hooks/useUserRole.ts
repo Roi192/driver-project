@@ -1,45 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
-
-export type AppRole = 'admin' | 'driver' | 'platoon_commander' | 'battalion_admin' | 'super_admin' | 'hagmar_admin' | 'ravshatz';
+import { useAuth, type AppRole } from './useAuth';
 
 export function useUserRole() {
-  const { user } = useAuth();
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRole = async () => {
-      if (!user) {
-        setRole(null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching role:', error);
-          setRole('driver'); // Default to driver
-        } else {
-          setRole((data?.role as AppRole) || 'driver');
-        }
-      } catch (err) {
-        console.error('Error:', err);
-        setRole('driver');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRole();
-  }, [user]);
+  const { role, loading } = useAuth();
 
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin' || role === 'super_admin';
@@ -47,7 +9,7 @@ export function useUserRole() {
   const isPlatoonCommander = role === 'platoon_commander';
   const isBattalionAdmin = role === 'battalion_admin';
   const isHagmarAdmin = role === 'hagmar_admin' || role === 'super_admin';
-  
+
   // Permission helpers
   const canDelete = role === 'admin' || role === 'super_admin';
   const canEdit = role === 'admin' || role === 'platoon_commander' || role === 'battalion_admin' || role === 'super_admin';
@@ -75,14 +37,14 @@ export function useUserRole() {
   const canAccessEquipmentTracking = role === 'admin' || role === 'super_admin' || role === 'battalion_admin';
 
   return {
-    role,
+    role: role as AppRole | null,
     isSuperAdmin,
     isAdmin,
     isDriver,
     isPlatoonCommander,
     isBattalionAdmin,
     isHagmarAdmin,
-    isLoading,
+    isLoading: loading,
     canDelete,
     canEdit,
     canEditDrillLocations,

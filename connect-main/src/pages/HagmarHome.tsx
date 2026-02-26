@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Building2, Shield, Users, AlertTriangle, UserCog, Target, Package, LayoutDashboard, Crosshair, Siren, Gamepad2, Award, FileCheck, Search, Building, FolderArchive } from "lucide-react";
+import { Building2, Shield, Users, AlertTriangle, UserCog, Target, Package, LayoutDashboard, Crosshair, Siren, Gamepad2, Award, FileCheck, Search, Building, FolderArchive, Map, Settings } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -64,6 +64,8 @@ const HagmarHome = () => {
   const quickActions = [
     ...(isHagmarAdmin || isSuperAdmin ? [{ icon: LayoutDashboard, label: "דשבורד מנהל", color: "from-gold to-gold-dark", route: "/hagmar/dashboard" }] : []),
     ...(isHagmarAdmin || isSuperAdmin ? [{ icon: UserCog, label: "ניהול משתמשים", color: "from-pink-500 to-pink-600", route: "/hagmar/users-management" }] : []),
+    { icon: Map, label: "מפה חטיבתית", color: "from-cyan-600 to-blue-700", route: "/hagmar/map" },
+    { icon: Building, label: "כרטיס יישוב", color: "from-slate-700 to-slate-900", route: "/hagmar/settlement-card" },
     { icon: Users, label: 'לוחמי הגמ"ר', color: "from-emerald-500 to-teal-500", route: "/hagmar/soldiers" },
     { icon: Shield, label: "מעקב אוחזי נשק", color: "from-amber-500 to-orange-500", route: "/hagmar/weapon-holders" },
     { icon: Target, label: "אירועי אימונים", color: "from-blue-500 to-indigo-500", route: "/hagmar/training-events" },
@@ -78,6 +80,8 @@ const HagmarHome = () => {
     { icon: Package, label: 'אמל"ח יישובים', color: "from-sky-500 to-blue-600", route: "/hagmar/amlach" },
     { icon: Building, label: "מרכיבי ביטחון", color: "from-slate-500 to-gray-600", route: "/hagmar/security-components" },
     { icon: FolderArchive, label: "תיקי הגנה", color: "from-indigo-500 to-indigo-600", route: "/hagmar/defense-files" },
+    ...(isHagmarAdmin || isSuperAdmin ? [{ icon: Settings, label: "משקלות כשירות", color: "from-gray-600 to-gray-700", route: "/hagmar/readiness-weights" }] : []),
+    ...(isHagmarAdmin || isSuperAdmin ? [{ icon: AlertTriangle, label: "דירוג איומים", color: "from-red-600 to-red-800", route: "/hagmar/threat-ratings" }] : []),
   ];
 
   return (

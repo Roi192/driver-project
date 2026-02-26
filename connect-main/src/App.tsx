@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { EmergencyModeProvider } from "@/hooks/useEmergencyMode";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -58,6 +59,10 @@ import HagmarAmlach from "./pages/HagmarAmlach";
 import HagmarSecurityComponents from "./pages/HagmarSecurityComponents";
 import HagmarDefenseFiles from "./pages/HagmarDefenseFiles";
 import HagmarWeaponAuthorizations from "./pages/HagmarWeaponAuthorizations";
+import HagmarSettlementCard from "./pages/HagmarSettlementCard";
+import HagmarMap from "./pages/HagmarMap";
+import ReadinessWeightsSettings from "./pages/ReadinessWeightsSettings";
+import HagmarThreatRatings from "./pages/HagmarThreatRatings";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import BattalionUsersManagement from "./pages/BattalionUsersManagement";
 import NotFound from "./pages/NotFound";
@@ -69,6 +74,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <EmergencyModeProvider>
         <Toaster />
         <Sonner />
         <InstallPrompt />
@@ -219,6 +225,38 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <HagmarWeaponAuthorizations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/settlement-card"
+              element={
+                <ProtectedRoute>
+                  <HagmarSettlementCard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/map"
+              element={
+                <ProtectedRoute>
+                  <HagmarMap />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/readiness-weights"
+              element={
+                <ProtectedRoute>
+                  <ReadinessWeightsSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/hagmar/threat-ratings"
+              element={
+                <ProtectedRoute>
+                  <HagmarThreatRatings />
                 </ProtectedRoute>
               }
             />
@@ -497,6 +535,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </EmergencyModeProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

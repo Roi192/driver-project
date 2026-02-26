@@ -67,6 +67,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const ROLE_PRIORITY: AppRole[] = [
+  'super_admin',
+  'admin',
+  'hagmar_admin',
+  'battalion_admin',
+  'platoon_commander',
+  'ravshatz',
+  'driver',
+];
+
+const getHighestPriorityRole = (roles: AppRole[]): AppRole | null => {
+  return ROLE_PRIORITY.find((candidate) => roles.includes(candidate)) ?? null;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -80,17 +94,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const fetchRoleAndType = async (userId: string) => {
       const [roleResult, typeResult] = await Promise.all([
-        supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+        supabase.from('user_roles').select('role').eq('user_id', userId),
         supabase.from('profiles').select('user_type').eq('user_id', userId).maybeSingle(),
       ]);
-      
+
       if (!mounted) return;
-      
-      if (!roleResult.error && roleResult.data) {
-        setRole(roleResult.data.role as AppRole);
+
+      if (roleResult.error) {
+        console.error('Failed to fetch user roles:', roleResult.error);
+        setRole(null);
+      } else {
+        const roles = (roleResult.data ?? []).map((row) => row.role as AppRole);
+        setRole(getHighestPriorityRole(roles));
       }
-      if (!typeResult.error && typeResult.data) {
-        setUserType(typeResult.data.user_type);
+
+      if (typeResult.error) {
+        console.error('Failed to fetch user type:', typeResult.error);
+        setUserType(null);
+      } else {
+        setUserType(typeResult.data?.user_type ?? null);
       }
     };
 
@@ -101,8 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fire-and-forget role fetch (don't await - keeps callback synchronous)
-          fetchRoleAndType(session.user.id);
+          if (event === 'SIGNED_IN') {
+            // On login, re-enter loading state until role is fetched
+            setLoading(true);
+            fetchRoleAndType(session.user.id).then(() => {
+              if (mounted) setLoading(false);
+            });
+          } else {
+            // For other events (TOKEN_REFRESHED etc), fire-and-forget
+            fetchRoleAndType(session.user.id);
+          }
         } else {
           setRole(null);
           setUserType(null);
@@ -130,30 +160,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
-
-  const fetchUserRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (!error && data) {
-      setRole(data.role as AppRole);
-    }
-  };
-
-  const fetchUserType = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('user_type')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (!error && data) {
-      setUserType(data.user_type);
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
