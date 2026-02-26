@@ -14,19 +14,26 @@ const Index = () => {
   const location = useLocation();
   const [departmentChecked, setDepartmentChecked] = useState(false);
   const [isHagmarUser, setIsHagmarUser] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   // Only redirect from "/" root path, not from "/planag"
   const isRootPath = location.pathname === '/';
 
   useEffect(() => {
     const checkDepartment = async () => {
+      // Wait for role to be resolved before checking redirects
       if (!user || !isRootPath) { setDepartmentChecked(true); return; }
       
+      // If role is still null (not yet fetched), wait for it
+      if (role === null) return;
+      
       if (isSuperAdmin) {
+        setIsRedirecting(true);
         navigate('/department-selector', { replace: true });
         return;
       }
       if (role === 'hagmar_admin' || role === 'ravshatz') {
+        setIsRedirecting(true);
         navigate('/hagmar', { replace: true });
         return;
       }
@@ -40,6 +47,7 @@ const Index = () => {
       
       if (data?.department === 'hagmar') {
         setIsHagmarUser(true);
+        setIsRedirecting(true);
         navigate('/hagmar', { replace: true });
         return;
       }
@@ -53,7 +61,7 @@ const Index = () => {
 
   const hasAdminAccess = isAdmin || isPlatoonCommander || isBattalionAdmin;
 
-  if (loading || !departmentChecked || (isRootPath && (isSuperAdmin || role === 'hagmar_admin' || role === 'ravshatz' || isHagmarUser))) {
+  if (loading || !departmentChecked || isRedirecting) {
     return (
       <AppLayout>
         <div className="min-h-screen flex items-center justify-center">
