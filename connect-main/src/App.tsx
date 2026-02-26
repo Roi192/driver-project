@@ -55,7 +55,7 @@ import HagmarSimulatorTraining from "./pages/HagmarSimulatorTraining";
 import HagmarProfessionalDev from "./pages/HagmarProfessionalDev";
 import HagmarSafetyInvestigations from "./pages/HagmarSafetyInvestigations";
 import HagmarAmlach from "./pages/HagmarAmlach";
-import HagmarSecurityComponents from "./pages/HagmarSecurityComponents";
+import HagmarSecurityComponents from "./pages/HagmarSecurityComponents.tsx";
 import HagmarDefenseFiles from "./pages/HagmarDefenseFiles";
 import HagmarWeaponAuthorizations from "./pages/HagmarWeaponAuthorizations";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
