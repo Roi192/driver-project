@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { deleteStorageFiles } from "@/lib/storage-cleanup";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
 import { ArrowRight, Flag, MapPin, Users, Calendar, Plus, Pencil, Trash2, Loader2, Play, FileText, Image, AlertTriangle, Clock } from "lucide-react";
@@ -10,8 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import { StorageImage } from "@/components/shared/StorageImage";
-import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.png";
-import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.png";
+import flagInvestigationThumbnail from "@/assets/flag-investigation-thumbnail.jpg";
+import monthlySummaryThumbnail from "@/assets/monthly-summary-thumbnail.jpg";
 import { REGIONS, OUTPOSTS } from "@/lib/constants";
 
 type View = "categories" | "items" | "itemDetail";
@@ -404,6 +405,9 @@ export default function SafetyEvents() {
   const handleDelete = async () => {
     if (!selectedItem) return;
     setIsSubmitting(true);
+
+    // Delete associated files from storage
+    await deleteStorageFiles([selectedItem.image_url, selectedItem.file_url], "content-images");
 
     const { error } = await supabase
       .from("safety_content")

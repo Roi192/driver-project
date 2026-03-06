@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { deleteStorageFiles } from '@/lib/storage-cleanup';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -174,6 +175,15 @@ export default function AdminDashboard() {
     if (!reportToDelete) return;
     setIsDeleting(true);
     
+    // Delete photos from storage
+    await deleteStorageFiles([
+      reportToDelete.photo_front,
+      reportToDelete.photo_left,
+      reportToDelete.photo_right,
+      reportToDelete.photo_back,
+      reportToDelete.photo_steering_wheel,
+    ], "shift-photos");
+
     const { error } = await supabase
       .from('shift_reports')
       .delete()

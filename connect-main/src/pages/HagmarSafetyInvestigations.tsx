@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { deleteStorageFiles } from "@/lib/storage-cleanup";
 import { supabase } from "@/integrations/supabase/client";
 import { useHagmarSettlement } from "@/hooks/useHagmarSettlement";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +82,11 @@ export default function HagmarSafetyInvestigations() {
 
   const deleteInv = async (id: string) => {
     if (!confirm("למחוק?")) return;
+    // Find the record to clean up storage files
+    const inv = investigations.find(i => i.id === id);
+    if (inv?.file_url) {
+      await deleteStorageFiles([inv.file_url], "content-images");
+    }
     await supabase.from("hagmar_safety_investigations").delete().eq("id", id);
     toast.success("נמחק");
     fetchData();

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { deleteStorageFiles } from "@/lib/storage-cleanup";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DeckCard } from "@/components/shared/DeckCard";
 import { OUTPOSTS, DRILLS } from "@/lib/constants";
@@ -195,6 +196,11 @@ export default function DrillLocations() {
     if (!selectedLocation) return;
     setIsSubmitting(true);
     
+    // Delete image from storage first
+    if (selectedLocation.image_url) {
+      await deleteStorageFiles([selectedLocation.image_url], "content-images");
+    }
+
     const { error } = await supabase
       .from("drill_locations")
       .delete()

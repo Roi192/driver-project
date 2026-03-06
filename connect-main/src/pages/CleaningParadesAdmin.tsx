@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { deleteStorageFiles } from "@/lib/storage-cleanup";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -325,6 +326,11 @@ export default function CleaningParadesAdmin() {
 
   const handleDeletePhoto = async (id: string) => {
     if (!confirm("האם למחוק את התמונה?")) return;
+    // Find the photo record to get the URL before deleting
+    const photo = referencePhotos.find(p => p.id === id);
+    if (photo?.image_url) {
+      await deleteStorageFiles([photo.image_url], "cleaning-examples");
+    }
     await supabase.from('cleaning_reference_photos').delete().eq('id', id);
     toast.success("התמונה נמחקה");
     fetchReferencePhotos();
