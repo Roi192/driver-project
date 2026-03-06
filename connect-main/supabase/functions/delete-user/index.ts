@@ -31,14 +31,15 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    // Check if caller is admin
-    const { data: roleData } = await supabaseUser
+    // Check if caller has an allowed role
+    const { data: roles } = await supabaseUser
       .from('user_roles')
       .select('role')
       .eq('user_id', callerUser.id)
-      .single()
 
-    if (!roleData || roleData.role !== 'admin') {
+    const allowedRoles = ['admin', 'super_admin', 'hagmar_admin']
+    const hasPermission = roles?.some(r => allowedRoles.includes(r.role))
+    if (!hasPermission) {
       throw new Error('Only admins can delete users')
     }
 
@@ -58,7 +59,11 @@ Deno.serve(async (req) => {
       throw new Error('Cannot delete your own account')
     }
 
-    // Delete the user from auth.users (this will cascade to profiles and user_roles due to ON DELETE CASCADE)
+    // Delete related records first to avoid FK constraint errors
+    await supabaseAdmin.from('user_roles').delete().eq('user_id', targetUserId)
+    await supabaseAdmin.from('profiles').delete().eq('user_id', targetUserId)
+
+    // Delete the user from auth.users
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(targetUserId)
 
     if (deleteError) {

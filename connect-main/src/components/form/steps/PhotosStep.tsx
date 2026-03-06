@@ -54,13 +54,15 @@ export function PhotosStep() {
       try {
         // Compress the image before storing
         const compressedDataUrl = await compressImage(file, 800, 0.6);
-        setValue(`photos.${photoId}`, compressedDataUrl);
+        const currentPhotos = watch("photos") || {};
+        setValue("photos", { ...currentPhotos, [photoId]: compressedDataUrl }, { shouldDirty: true, shouldTouch: true });
       } catch (error) {
         console.error('Error compressing image:', error);
         // Fallback to original if compression fails
         const reader = new FileReader();
         reader.onload = (e) => {
-          setValue(`photos.${photoId}`, e.target?.result as string);
+          const currentPhotos = watch("photos") || {};
+          setValue("photos", { ...currentPhotos, [photoId]: e.target?.result as string }, { shouldDirty: true, shouldTouch: true });
         };
         reader.readAsDataURL(file);
       }
@@ -68,7 +70,9 @@ export function PhotosStep() {
   };
 
   const removePhoto = (photoId: string) => {
-    setValue(`photos.${photoId}`, undefined);
+    const currentPhotos = { ...photos };
+    delete currentPhotos[photoId];
+    setValue("photos", currentPhotos, { shouldDirty: true, shouldTouch: true });
   };
 
   const completedPhotos = VEHICLE_PHOTOS.filter((p) => photos[p.id]).length;
