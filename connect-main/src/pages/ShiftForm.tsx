@@ -133,8 +133,69 @@ export default function ShiftForm() {
     return true;
   };
 
+  const validateAllSteps = () => {
+    const formData = methods.getValues();
+    
+    // Step 1: General Details
+    if (!formData.outpost || !formData.driverName || !formData.vehicleNumber || !formData.shiftType) {
+      toast({
+        title: "שגיאה",
+        description: "חסרים פרטים בסיסיים (מוצב, שם, רכב, סוג משמרת). יש למלא מחדש.",
+        variant: "destructive",
+      });
+      updateStep(1);
+      return false;
+    }
+    
+    // Step 2: Briefings
+    if (formData.emergencyProcedure === undefined || formData.commanderBriefing === undefined || formData.workCardFilled === undefined) {
+      toast({
+        title: "שגיאה",
+        description: "חסרים פרטי תדריכים. יש למלא מחדש.",
+        variant: "destructive",
+      });
+      updateStep(2);
+      return false;
+    }
+    
+    // Step 3: Equipment
+    if (!formData.combatEquipment?.length || !formData.preMovementChecks?.length || !formData.driverTools?.length) {
+      toast({
+        title: "שגיאה",
+        description: "חסרים פרטי ציוד. יש למלא מחדש.",
+        variant: "destructive",
+      });
+      updateStep(3);
+      return false;
+    }
+    
+    // Step 4: Drills
+    if (!formData.drillsCompleted?.length || !formData.safetyVulnerabilities || !formData.vardimProcedure || !formData.vardimPoints) {
+      toast({
+        title: "שגיאה",
+        description: "חסרים פרטי תרגולות. יש למלא מחדש.",
+        variant: "destructive",
+      });
+      updateStep(4);
+      return false;
+    }
+    
+    // Step 5: Photos
+    const photos = formData.photos as Record<string, string>;
+    if (!photos?.front || !photos?.left || !photos?.right || !photos?.back || !photos?.steering) {
+      toast({
+        title: "שגיאה",
+        description: "יש להעלות את כל התמונות הנדרשות",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleSubmit = async () => {
-    if (!validateCurrentStep()) return;
+    if (!validateAllSteps()) return;
     
     const formData = methods.getValues();
     const success = await submitReport(formData);
