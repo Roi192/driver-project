@@ -133,7 +133,9 @@ export async function uploadShiftPhoto(params: {
   file: File;
   photoId: string;
 }): Promise<string> {
+  console.log("[uploadShiftPhoto] Starting upload for photoId:", params.photoId);
   const authenticatedUserId = await getAuthenticatedUserId();
+  console.log("[uploadShiftPhoto] Authenticated userId:", authenticatedUserId);
   const optimizedFile = await maybeOptimizeImageForUpload(params.file);
   const uploadCandidates = optimizedFile === params.file ? [params.file] : [optimizedFile, params.file];
 

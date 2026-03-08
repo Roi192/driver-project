@@ -79,9 +79,16 @@ export function PhotosStep() {
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
-    if (!file) return;
+    console.log("[PhotosStep] handlePhotoCapture called", { photoId, hasFile: !!file, fileCount: event.currentTarget.files?.length });
+    if (!file) {
+      console.warn("[PhotosStep] No file selected for", photoId);
+      return;
+    }
+
+    console.log("[PhotosStep] File details:", { name: file.name, type: file.type, size: file.size });
 
     if (!user) {
+      console.error("[PhotosStep] No user found - auth required");
       toast({
         title: "נדרשת התחברות",
         description: "יש להתחבר מחדש כדי להעלות תמונות.",
@@ -115,10 +122,12 @@ export function PhotosStep() {
     setLocalPreview(photoId, file);
 
     try {
+      console.log("[PhotosStep] Starting upload for", photoId, "user:", user.id);
       const uploadedPath = await uploadShiftPhoto({
         file,
         photoId,
       });
+      console.log("[PhotosStep] Upload succeeded:", uploadedPath);
 
       const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
       const previousPhotoPath = currentPhotos[photoId];
