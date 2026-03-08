@@ -1,4 +1,4 @@
-import { type ChangeEvent } from "react";
+import { useRef, type ChangeEvent } from "react";
 import { Camera, Check, ImagePlus, Loader2, X } from "lucide-react";
 import { StorageImage } from "@/components/shared/StorageImage";
 import { cn } from "@/lib/utils";
@@ -27,11 +27,23 @@ export function PhotoCaptureCard({
   onRemove,
 }: PhotoCaptureCardProps) {
   const inputId = `shift-photo-${photoId}`;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenCamera = () => {
+    if (disabled || isProcessing) return;
+
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    input.value = "";
+    input.click();
+  };
 
   return (
     <div className="relative animate-fade-in" style={{ animationDelay: `${animationDelayMs}ms` }}>
-      <label
-        htmlFor={inputId}
+      <button
+        type="button"
+        onClick={handleOpenCamera}
         aria-label={label}
         aria-disabled={disabled || isProcessing}
         className={cn(
@@ -83,17 +95,15 @@ export function PhotoCaptureCard({
             מצלמה
           </div>
         )}
-      </label>
+      </button>
 
       <input
+        ref={fileInputRef}
         id={inputId}
         type="file"
         accept="image/*"
         capture="environment"
         disabled={disabled || isProcessing}
-        onClick={(event) => {
-          event.currentTarget.value = "";
-        }}
         onChange={onPhotoChange}
         className="sr-only"
       />

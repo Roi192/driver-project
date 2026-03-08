@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { StorageImage } from '@/components/shared/StorageImage';
 import { Truck, ArrowLeft, Calendar, MapPin, User, Camera, ChevronLeft, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -178,10 +179,12 @@ export function VehicleReportsCard({ reports }: VehicleReportsCardProps) {
                                 className="relative aspect-square rounded-xl overflow-hidden cursor-pointer hover:ring-2 ring-primary transition-all hover:scale-105"
                                 onClick={() => setSelectedPhoto(photo.url)}
                               >
-                                <img 
-                                  src={photo.url} 
+                                <StorageImage
+                                  src={photo.url}
+                                  bucket="shift-photos"
                                   alt={photo.label}
                                   className="w-full h-full object-cover"
+                                  showLoader={false}
                                 />
                                 <div className="absolute inset-x-0 bottom-0 bg-black/70 text-[10px] text-center py-1 text-white font-bold">
                                   {photo.label}
@@ -239,9 +242,10 @@ export function VehicleReportsCard({ reports }: VehicleReportsCardProps) {
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
         <DialogContent className="max-w-2xl p-2 rounded-3xl">
           {selectedPhoto && (
-            <img 
-              src={selectedPhoto} 
-              alt="תמונה מלאה" 
+            <StorageImage
+              src={selectedPhoto}
+              bucket="shift-photos"
+              alt="תמונה מלאה"
               className="w-full h-auto rounded-2xl"
             />
           )}

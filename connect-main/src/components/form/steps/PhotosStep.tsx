@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
@@ -10,6 +10,8 @@ import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
 type ShiftPhotos = Record<string, string | undefined>;
+
+type LocalPreviews = Record<string, string | undefined>;
 
 const ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
 
@@ -27,8 +29,53 @@ export function PhotosStep() {
   const { control, setValue, register, getValues } = useFormContext();
   const { user } = useAuth();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
+  const localPreviewsRef = useRef<LocalPreviews>({});
 
   const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
+
+  useEffect(() => {
+    localPreviewsRef.current = localPreviews;
+  }, [localPreviews]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(localPreviewsRef.current).forEach((previewUrl) => {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      });
+    };
+  }, []);
+
+  const setLocalPreview = (photoId: string, file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+
+    setLocalPreviews((prev) => {
+      const previousPreview = prev[photoId];
+      if (previousPreview) {
+        URL.revokeObjectURL(previousPreview);
+      }
+
+      return {
+        ...prev,
+        [photoId]: previewUrl,
+      };
+    });
+  };
+
+  const clearLocalPreview = (photoId: string) => {
+    setLocalPreviews((prev) => {
+      const previousPreview = prev[photoId];
+      if (previousPreview) {
+        URL.revokeObjectURL(previousPreview);
+      }
+
+      const next = { ...prev };
+      delete next[photoId];
+      return next;
+    });
+  };
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -65,6 +112,7 @@ export function PhotosStep() {
     }
 
     setProcessingPhoto(photoId);
+    setLocalPreview(photoId, file);
 
     try {
       const uploadedPath = await uploadShiftPhoto({
@@ -90,6 +138,7 @@ export function PhotosStep() {
       }
     } catch (error) {
       console.error("Error handling camera photo upload:", error);
+      clearLocalPreview(photoId);
       toast({
         title: "שגיאה בהעלאת התמונה",
         description: "לא הצלחנו להעלות את התמונה. נסה לצלם שוב.",
@@ -112,6 +161,8 @@ export function PhotosStep() {
       shouldTouch: true,
       shouldValidate: true,
     });
+
+    clearLocalPreview(photoId);
 
     if (removedPhotoPath) {
       void deleteShiftPhoto(removedPhotoPath).catch((error) => {
@@ -163,7 +214,7 @@ export function PhotosStep() {
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto = hasPhotoValue(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = photos[photo.id];
+          const previewSrc = localPreviews[photo.id] ?? photos[photo.id];
 
           return (
             <PhotoCaptureCard
