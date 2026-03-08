@@ -23,78 +23,87 @@ interface ShiftFormData {
   photos: Record<string, string | File>;
 }
 
+type RequiredPhotoKey = "front" | "left" | "right" | "back" | "steering";
+
+const REQUIRED_PHOTO_KEYS: RequiredPhotoKey[] = ["front", "left", "right", "back", "steering"];
+
+
+interface UploadedPhoto {
+  path: string;
+  signedUrl: string;
+}
+
+interface PhotoUpdatePayload {
+  photo_front: string | null;
+  photo_left: string | null;
+  photo_right: string | null;
+  photo_back: string | null;
+  photo_steering_wheel: string | null;
+  is_complete: boolean;
+}
+
 export function useShiftReport() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const resolvePhotoBlob = async (photoData: string | File): Promise<Blob | null> => {
-    try {
-      if (photoData instanceof Blob) {
-        return photoData;
-      }
-
-      if (typeof photoData === "string") {
-        const response = await fetch(photoData);
-        return await response.blob();
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Failed to resolve photo blob:", error);
-      return null;
+  const resolvePhotoBlob = async (photoData: string | File): Promise<Blob> => {
+    if (photoData instanceof Blob) {
+      return photoData;
     }
+
+    if (typeof photoData === "string") {
+      const response = await fetch(photoData);
+      if (!response.ok) {
+        throw new Error("Failed to read photo data");
+      }
+      return await response.blob();
+    }
+
+    throw new Error("Unsupported photo format");
   };
 
   const uploadPhoto = async (
     photoData: string | File,
-    photoType: string,
+    photoType: RequiredPhotoKey,
     reportId: string
-  ): Promise<string | null> => {
-    try {
-      const blob = await resolvePhotoBlob(photoData);
-      if (!blob) return null;
+  ): Promise<UploadedPhoto> => {
+    const blob = await resolvePhotoBlob(photoData);
 
-      const rawMimeExtension = blob.type?.split("/")?.[1]?.toLowerCase()?.split(";")?.[0];
-      const extension = rawMimeExtension === "jpeg" ? "jpg" : (rawMimeExtension || "jpg");
-      const contentType = blob.type || "image/jpeg";
-      const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.${extension}`;
+    const rawMimeExtension = blob.type?.split("/")?.[1]?.toLowerCase()?.split(";")?.[0];
+    const extension = rawMimeExtension === "jpeg" ? "jpg" : (rawMimeExtension || "jpg");
+    const contentType = blob.type || "image/jpeg";
+    const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.${extension}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("shift-photos")
-        .upload(fileName, blob, {
-          contentType,
-          upsert: true,
-        });
+    const { error: uploadError } = await supabase.storage
+      .from("shift-photos")
+      .upload(fileName, blob, {
+        contentType,
+        upsert: true,
+      });
 
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        return null;
-      }
-
-      // Create a signed URL valid for 7 days (604800 seconds) for private bucket access
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from("shift-photos")
-        .createSignedUrl(fileName, 60 * 60 * 24 * 7);
-
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        console.error("Signed URL error:", signedUrlError);
-        return null;
-      }
-
-      return signedUrlData.signedUrl;
-    } catch (error) {
-      console.error("Photo upload failed:", error);
-      return null;
+    if (uploadError) {
+      throw uploadError;
     }
+
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from("shift-photos")
+      .createSignedUrl(fileName, 60 * 60 * 24 * 7);
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      throw signedUrlError || new Error("Failed to create signed URL");
+    }
+
+    return {
+      path: fileName,
+      signedUrl: signedUrlData.signedUrl,
+    };
   };
 
   const mapShiftType = (shiftType: string): "morning" | "afternoon" | "evening" => {
-    // Current UI stores english enum values
     if (shiftType === "morning" || shiftType === "afternoon" || shiftType === "evening") {
       return shiftType;
     }
 
-    // Backwards compatibility (old UI stored hebrew labels)
     if (shiftType.includes("בוקר")) return "morning";
     if (shiftType.includes("צהריים")) return "afternoon";
     if (shiftType.includes("ערב")) return "evening";
@@ -114,8 +123,16 @@ export function useShiftReport() {
 
     setIsSubmitting(true);
 
+    let createdReportId: string | null = null;
+    const uploadedPaths: string[] = [];
+
     try {
-      // Create the report first to get the ID
+      for (const key of REQUIRED_PHOTO_KEYS) {
+        if (!formData.photos[key]) {
+          throw new Error(`Missing required photo: ${key}`);
+        }
+      }
+
       const reportDate = formData.dateTime.toISOString().split("T")[0];
       const reportTime = formData.dateTime.toTimeString().split(" ")[0];
 
@@ -155,29 +172,52 @@ export function useShiftReport() {
         throw insertError || new Error("Failed to create report");
       }
 
-      // Upload photos if any
-      const photoUrls: Record<string, string | null> = {};
-      const photoKeys = Object.keys(formData.photos);
+      createdReportId = report.id;
 
-      for (const key of photoKeys) {
-        const photoData = formData.photos[key];
-        if (photoData) {
-          const url = await uploadPhoto(photoData, key, report.id);
-          photoUrls[key] = url;
+      const uploadedEntries = await Promise.all(
+        REQUIRED_PHOTO_KEYS.map(async (key) => {
+          const uploadResult = await uploadPhoto(formData.photos[key], key, report.id);
+          uploadedPaths.push(uploadResult.path);
+          return [key, uploadResult.signedUrl] as const;
+        })
+      );
+
+      const photoUrls = Object.fromEntries(uploadedEntries) as Record<RequiredPhotoKey, string>;
+
+      const updatePayload: PhotoUpdatePayload = {
+        photo_front: null,
+        photo_left: null,
+        photo_right: null,
+        photo_back: null,
+        photo_steering_wheel: null,
+        is_complete: true,
+      };
+
+      for (const key of REQUIRED_PHOTO_KEYS) {
+        const photoUrl = photoUrls[key] || null;
+
+        switch (key) {
+          case "front":
+            updatePayload.photo_front = photoUrl;
+            break;
+          case "left":
+            updatePayload.photo_left = photoUrl;
+            break;
+          case "right":
+            updatePayload.photo_right = photoUrl;
+            break;
+          case "back":
+            updatePayload.photo_back = photoUrl;
+            break;
+          case "steering":
+            updatePayload.photo_steering_wheel = photoUrl;
+            break;
         }
       }
 
-      // Update report with photo URLs and mark as complete
       const { error: updateError } = await supabase
         .from("shift_reports")
-        .update({
-          photo_front: photoUrls.front || null,
-          photo_left: photoUrls.left || null,
-          photo_right: photoUrls.right || null,
-          photo_back: photoUrls.back || null,
-          photo_steering_wheel: photoUrls.steering || null,
-          is_complete: true,
-        })
+        .update(updatePayload)
         .eq("id", report.id);
 
       if (updateError) {
@@ -187,9 +227,28 @@ export function useShiftReport() {
       return true;
     } catch (error) {
       console.error("Submit error:", error);
+
+      if (uploadedPaths.length > 0) {
+        const { error: removeError } = await supabase.storage.from("shift-photos").remove(uploadedPaths);
+        if (removeError) {
+          console.error("Failed to cleanup uploaded photos:", removeError);
+        }
+      }
+
+      if (createdReportId) {
+        const { error: rollbackError } = await supabase
+          .from("shift_reports")
+          .delete()
+          .eq("id", createdReportId);
+
+        if (rollbackError) {
+          console.error("Failed to rollback partial report:", rollbackError);
+        }
+      }
+
       toast({
         title: "שגיאה בשליחת הדיווח",
-        description: "נסה שוב מאוחר יותר",
+        description: "שליחת התמונות נכשלה. נסה שוב.",
         variant: "destructive",
       });
       return false;

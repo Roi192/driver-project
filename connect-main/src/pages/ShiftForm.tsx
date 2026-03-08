@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Send, Check, Sparkles, FileText, Zap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useShiftReport } from "@/hooks/useShiftReport";
+import { VEHICLE_PHOTOS } from "@/lib/constants";
 
 const STEP_LABELS = ["פרטים", "תדריכים", "ציוד", "תרגולות", "תמונות"];
 
@@ -25,13 +26,19 @@ const steps = [
 
 export default function ShiftForm() {
   const [currentStep, setCurrentStep] = useState(() => {
-    const saved = sessionStorage.getItem('shiftFormStep');
-    return saved ? parseInt(saved, 10) : 1;
+    const saved = sessionStorage.getItem("shiftFormStep");
+    const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
+
+    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= steps.length) {
+      return parsed;
+    }
+
+    return 1;
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
   const { submitReport, isSubmitting } = useShiftReport();
-  
+
   const methods = useForm({
     defaultValues: {
       dateTime: new Date(),
@@ -59,12 +66,16 @@ export default function ShiftForm() {
   // Persist currentStep to sessionStorage so mobile camera doesn't lose progress
   const updateStep = (step: number) => {
     setCurrentStep(step);
-    sessionStorage.setItem('shiftFormStep', String(step));
+    sessionStorage.setItem("shiftFormStep", String(step));
   };
 
   const hasPhotoValue = (value: unknown) => {
     if (value instanceof File) return true;
     return typeof value === "string" && value.trim().length > 0;
+  };
+
+  const hasAllRequiredPhotos = (photos: Record<string, unknown> | undefined) => {
+    return VEHICLE_PHOTOS.every((photo) => hasPhotoValue(photos?.[photo.id]));
   };
 
   const goToNextStep = () => {
@@ -81,7 +92,7 @@ export default function ShiftForm() {
 
   const validateCurrentStep = () => {
     const formData = methods.getValues();
-    
+
     switch (currentStep) {
       case 1: // General Details
         if (!formData.outpost || !formData.driverName || !formData.vehicleNumber || !formData.shiftType) {
@@ -94,7 +105,11 @@ export default function ShiftForm() {
         }
         break;
       case 2: // Briefings
-        if (formData.emergencyProcedure === undefined || formData.commanderBriefing === undefined || formData.workCardFilled === undefined) {
+        if (
+          formData.emergencyProcedure === undefined ||
+          formData.commanderBriefing === undefined ||
+          formData.workCardFilled === undefined
+        ) {
           toast({
             title: "שגיאה",
             description: "יש לענות על כל השאלות בשלב זה",
@@ -114,7 +129,12 @@ export default function ShiftForm() {
         }
         break;
       case 4: // Drills
-        if (!formData.drillsCompleted?.length || !formData.safetyVulnerabilities || !formData.vardimProcedure || !formData.vardimPoints) {
+        if (
+          !formData.drillsCompleted?.length ||
+          !formData.safetyVulnerabilities ||
+          !formData.vardimProcedure ||
+          !formData.vardimPoints
+        ) {
           toast({
             title: "שגיאה",
             description: "יש למלא את כל השדות ולסמן לפחות תרגול אחד",
@@ -123,9 +143,9 @@ export default function ShiftForm() {
           return false;
         }
         break;
-      case 5: // Photos
-        const photos = formData.photos as Record<string, string | File | undefined>;
-        if (!hasPhotoValue(photos?.front) || !hasPhotoValue(photos?.left) || !hasPhotoValue(photos?.right) || !hasPhotoValue(photos?.back) || !hasPhotoValue(photos?.steering)) {
+      case 5: {
+        const photos = formData.photos as Record<string, unknown> | undefined;
+        if (!hasAllRequiredPhotos(photos)) {
           toast({
             title: "שגיאה",
             description: "יש להעלות את כל התמונות הנדרשות",
@@ -134,13 +154,17 @@ export default function ShiftForm() {
           return false;
         }
         break;
+      }
+      default:
+        break;
     }
+
     return true;
   };
 
   const validateAllSteps = () => {
     const formData = methods.getValues();
-    
+
     // Step 1: General Details
     if (!formData.outpost || !formData.driverName || !formData.vehicleNumber || !formData.shiftType) {
       toast({
@@ -151,9 +175,13 @@ export default function ShiftForm() {
       updateStep(1);
       return false;
     }
-    
+
     // Step 2: Briefings
-    if (formData.emergencyProcedure === undefined || formData.commanderBriefing === undefined || formData.workCardFilled === undefined) {
+    if (
+      formData.emergencyProcedure === undefined ||
+      formData.commanderBriefing === undefined ||
+      formData.workCardFilled === undefined
+    ) {
       toast({
         title: "שגיאה",
         description: "חסרים פרטי תדריכים. יש למלא מחדש.",
@@ -162,7 +190,7 @@ export default function ShiftForm() {
       updateStep(2);
       return false;
     }
-    
+
     // Step 3: Equipment
     if (!formData.combatEquipment?.length || !formData.preMovementChecks?.length || !formData.driverTools?.length) {
       toast({
@@ -173,7 +201,7 @@ export default function ShiftForm() {
       updateStep(3);
       return false;
     }
-    
+
     // Step 4: Drills
     if (!formData.drillsCompleted?.length || !formData.safetyVulnerabilities || !formData.vardimProcedure || !formData.vardimPoints) {
       toast({
@@ -184,10 +212,10 @@ export default function ShiftForm() {
       updateStep(4);
       return false;
     }
-    
+
     // Step 5: Photos
-    const photos = formData.photos as Record<string, string | File | undefined>;
-    if (!hasPhotoValue(photos?.front) || !hasPhotoValue(photos?.left) || !hasPhotoValue(photos?.right) || !hasPhotoValue(photos?.back) || !hasPhotoValue(photos?.steering)) {
+    const photos = formData.photos as Record<string, unknown> | undefined;
+    if (!hasAllRequiredPhotos(photos)) {
       toast({
         title: "שגיאה",
         description: "יש להעלות את כל התמונות הנדרשות",
@@ -195,19 +223,19 @@ export default function ShiftForm() {
       });
       return false;
     }
-    
+
     return true;
   };
 
   const handleSubmit = async () => {
     if (!validateAllSteps()) return;
-    
+
     const formData = methods.getValues();
     const success = await submitReport(formData);
-    
+
     if (success) {
       setIsSubmitted(true);
-      sessionStorage.removeItem('shiftFormStep');
+      sessionStorage.removeItem("shiftFormStep");
       toast({
         title: "הדיווח נשלח בהצלחה!",
         description: "הטופס שלך נשמר במערכת",
@@ -237,16 +265,16 @@ export default function ShiftForm() {
                 <Check className="w-12 h-12 text-white animate-bounce" />
               </div>
             </div>
-            
+
             <h2 className="text-3xl font-black mb-3 bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent">
               הדיווח נשלח בהצלחה!
             </h2>
             <p className="text-muted-foreground mb-6 text-lg">הטופס שלך נשמר במערכת</p>
-            
+
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0s" }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
               <span className="mr-2">מעביר לדף הבית</span>
             </div>
           </div>
@@ -265,7 +293,7 @@ export default function ShiftForm() {
             <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
             <div className="absolute top-10 left-1/4 w-32 h-32 bg-primary/10 rounded-full blur-3xl opacity-50" />
             <div className="absolute top-16 right-1/4 w-24 h-24 bg-accent/10 rounded-full blur-2xl opacity-50" />
-            
+
             <div className="relative flex items-center justify-center gap-4 mb-2 animate-slide-up">
               {/* Clean icon container */}
               <div className="relative">
@@ -275,9 +303,7 @@ export default function ShiftForm() {
                 </div>
               </div>
               <div className="text-center">
-                <h1 className="text-3xl font-black text-foreground">
-                  טופס לפני משמרת
-                </h1>
+                <h1 className="text-3xl font-black text-foreground">טופס לפני משמרת</h1>
                 <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5 mt-1">
                   <Sparkles className="w-3.5 h-3.5 text-accent" />
                   מלא את כל השדות בכל שלב
@@ -285,12 +311,8 @@ export default function ShiftForm() {
               </div>
             </div>
           </div>
-          
-          <FormProgress
-            currentStep={currentStep}
-            totalSteps={steps.length}
-            stepLabels={STEP_LABELS}
-          />
+
+          <FormProgress currentStep={currentStep} totalSteps={steps.length} stepLabels={STEP_LABELS} />
 
           <div className="px-4 pb-32 max-w-lg mx-auto animate-fade-in">
             <CurrentStepComponent />
@@ -300,7 +322,7 @@ export default function ShiftForm() {
           <div className="fixed bottom-0 right-0 left-0 bg-white/95 backdrop-blur-xl border-t border-border/30 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.08)]">
             {/* Subtle top line */}
             <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-            
+
             <div className="max-w-lg mx-auto flex gap-3">
               {currentStep > 1 && (
                 <Button

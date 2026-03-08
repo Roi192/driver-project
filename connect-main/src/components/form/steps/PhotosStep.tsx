@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
@@ -7,43 +7,81 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
-export function PhotosStep() {
-  const { control, setValue, register, trigger, getValues } = useFormContext();
-  const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
+type ShiftPhotoValue = string | File;
+type ShiftPhotos = Record<string, ShiftPhotoValue | undefined>;
 
-  const photos = (useWatch({ control, name: "photos" }) || {}) as Record<string, string | File>;
+interface FilePreviewMeta {
+  fingerprint: string;
+  url: string;
+}
+
+const buildFileFingerprint = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+
+const hasPhotoValue = (value: ShiftPhotoValue | undefined) =>
+  value instanceof File || (typeof value === "string" && value.trim().length > 0);
+
+export function PhotosStep() {
+  const { control, setValue, register, getValues } = useFormContext();
+  const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const filePreviewCacheRef = useRef<Record<string, FilePreviewMeta>>({});
+
+  const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
 
   useEffect(() => {
-    register("photos");
-  }, [register]);
+    const revokeUrl = (url: string | undefined) => {
+      if (url?.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    };
 
-  const photoPreviews = useMemo(() => {
-    const previews: Record<string, string> = {};
+    const nextPreviews: Record<string, string> = {};
+    const nextFileCache: Record<string, FilePreviewMeta> = {};
 
-    for (const photo of VEHICLE_PHOTOS) {
-      const value = photos[photo.id];
+    for (const { id } of VEHICLE_PHOTOS) {
+      const value = photos[id];
+      const cached = filePreviewCacheRef.current[id];
+
+      if (value instanceof File) {
+        const fingerprint = buildFileFingerprint(value);
+
+        if (cached && cached.fingerprint === fingerprint) {
+          nextPreviews[id] = cached.url;
+          nextFileCache[id] = cached;
+          continue;
+        }
+
+        revokeUrl(cached?.url);
+
+        const blobUrl = URL.createObjectURL(value);
+        nextPreviews[id] = blobUrl;
+        nextFileCache[id] = { fingerprint, url: blobUrl };
+        continue;
+      }
+
+      revokeUrl(cached?.url);
+
       if (typeof value === "string" && value.trim().length > 0) {
-        previews[photo.id] = value;
-      } else if (value instanceof File) {
-        previews[photo.id] = URL.createObjectURL(value);
+        nextPreviews[id] = value;
       }
     }
 
-    return previews;
+    filePreviewCacheRef.current = nextFileCache;
+    setPreviewUrls(nextPreviews);
   }, [photos]);
 
   useEffect(() => {
     return () => {
-      Object.values(photoPreviews).forEach((url) => {
+      Object.values(filePreviewCacheRef.current).forEach(({ url }) => {
         if (url.startsWith("blob:")) {
           URL.revokeObjectURL(url);
         }
       });
     };
-  }, [photoPreviews]);
+  }, []);
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.currentTarget.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -52,7 +90,7 @@ export function PhotosStep() {
         description: "יש לבחור תמונה מהמצלמה בלבד.",
         variant: "destructive",
       });
-      event.target.value = "";
+      event.currentTarget.value = "";
       return;
     }
 
@@ -62,23 +100,21 @@ export function PhotosStep() {
         description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
         variant: "destructive",
       });
-      event.target.value = "";
+      event.currentTarget.value = "";
       return;
     }
 
     setProcessingPhoto(photoId);
 
     try {
-      const currentPhotos = (getValues("photos") || {}) as Record<string, string | File>;
-      const nextPhotos = { ...currentPhotos, [photoId]: file };
+      const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
+      const nextPhotos: ShiftPhotos = { ...currentPhotos, [photoId]: file };
 
       setValue("photos", nextPhotos, {
         shouldDirty: true,
         shouldTouch: true,
         shouldValidate: true,
       });
-
-      await trigger("photos");
     } catch (error) {
       console.error("Error handling camera photo:", error);
       toast({
@@ -88,13 +124,13 @@ export function PhotosStep() {
       });
     } finally {
       setProcessingPhoto(null);
-      event.target.value = "";
+      event.currentTarget.value = "";
     }
   };
 
-  const removePhoto = async (photoId: string) => {
-    const currentPhotos = (getValues("photos") || {}) as Record<string, string | File>;
-    const nextPhotos = { ...currentPhotos };
+  const removePhoto = (photoId: string) => {
+    const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
+    const nextPhotos: ShiftPhotos = { ...currentPhotos };
     delete nextPhotos[photoId];
 
     setValue("photos", nextPhotos, {
@@ -102,11 +138,9 @@ export function PhotosStep() {
       shouldTouch: true,
       shouldValidate: true,
     });
-
-    await trigger("photos");
   };
 
-  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => Boolean(photos[photo.id])).length;
+  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => hasPhotoValue(photos[photo.id])).length;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
@@ -147,9 +181,9 @@ export function PhotosStep() {
 
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
-          const hasPhoto = Boolean(photos[photo.id]);
+          const hasPhoto = hasPhotoValue(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = photoPreviews[photo.id];
+          const previewSrc = previewUrls[photo.id];
 
           return (
             <PhotoCaptureCard
