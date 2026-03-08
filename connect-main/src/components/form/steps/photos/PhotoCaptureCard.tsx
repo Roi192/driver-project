@@ -1,6 +1,5 @@
-import { useRef, type ChangeEvent } from "react";
+import { type ChangeEvent } from "react";
 import { Camera, Check, ImagePlus, Loader2, X } from "lucide-react";
-import { StorageImage } from "@/components/shared/StorageImage";
 import { cn } from "@/lib/utils";
 
 interface PhotoCaptureCardProps {
@@ -27,25 +26,13 @@ export function PhotoCaptureCard({
   onRemove,
 }: PhotoCaptureCardProps) {
   const inputId = `shift-photo-${photoId}`;
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleOpenCamera = () => {
-    if (disabled || isProcessing) return;
-
-    const input = fileInputRef.current;
-    if (!input) return;
-
-    input.value = "";
-    input.click();
-  };
 
   return (
-    <div className="relative animate-fade-in" style={{ animationDelay: `${animationDelayMs}ms` }}>
-      <button
-        type="button"
-        onClick={handleOpenCamera}
-        aria-label={label}
-        aria-disabled={disabled || isProcessing}
+    <div
+      className="relative animate-fade-in"
+      style={{ animationDelay: `${animationDelayMs}ms` }}
+    >
+      <div
         className={cn(
           "relative block aspect-square w-full overflow-hidden rounded-2xl border-2 text-right transition-all duration-300",
           hasPhoto
@@ -57,22 +44,17 @@ export function PhotoCaptureCard({
         {isProcessing ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/50 p-4 text-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">מעלה תמונה...</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              מעלה תמונה...
+            </span>
           </div>
         ) : hasPhoto && previewSrc ? (
-          previewSrc.startsWith("blob:") ? (
-            <img src={previewSrc} alt={label} className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            <StorageImage
-              src={previewSrc}
-              bucket="shift-photos"
-              alt={label}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              showLoader={false}
-              fallback={<div className="h-full w-full bg-muted" />}
-            />
-          )
+          <img
+            src={previewSrc}
+            alt={label}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
@@ -95,18 +77,19 @@ export function PhotoCaptureCard({
             מצלמה
           </div>
         )}
-      </button>
 
-      <input
-        ref={fileInputRef}
-        id={inputId}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        disabled={disabled || isProcessing}
-        onChange={onPhotoChange}
-        className="sr-only"
-      />
+        {!disabled && !isProcessing && (
+          <input
+            id={inputId}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onPhotoChange}
+            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+            aria-label={label}
+          />
+        )}
+      </div>
 
       {hasPhoto && (
         <button
