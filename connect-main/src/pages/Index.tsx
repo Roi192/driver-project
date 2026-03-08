@@ -19,6 +19,12 @@ const Index = () => {
   // Only redirect from "/" root path, not from "/planag"
   const isRootPath = location.pathname === '/';
 
+  // Reset departmentChecked when user changes to prevent stale state
+  useEffect(() => {
+    setDepartmentChecked(false);
+    setIsRedirecting(false);
+  }, [user]);
+
   useEffect(() => {
     const checkDepartment = async () => {
       // Wait for role to be resolved before checking redirects
