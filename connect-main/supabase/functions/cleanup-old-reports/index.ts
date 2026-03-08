@@ -72,26 +72,42 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${oldReports?.length || 0} reports to delete`)
 
-    // Collect storage file paths from photo URLs
-    const photoPaths: string[] = []
+    // Collect storage file paths from photo values (supports raw paths + signed/public URLs)
+    const extractShiftPhotoPath = (value: string | null): string | null => {
+      if (!value) return null
+
+      if (!value.startsWith('http')) {
+        return value
+      }
+
+      const signedOrPublicMatch = value.match(/\/storage\/v1\/object\/(?:sign|public)\/shift-photos\/([^?]+)/)
+      if (signedOrPublicMatch) return signedOrPublicMatch[1]
+
+      const legacyMatch = value.match(/shift-photos\/([^?]+)/)
+      return legacyMatch ? legacyMatch[1] : null
+    }
+
+    const photoPaths = new Set<string>()
     oldReports?.forEach(report => {
       [report.photo_front, report.photo_left, report.photo_right, report.photo_back, report.photo_steering_wheel]
-        .forEach(photoUrl => {
-          if (photoUrl && photoUrl.includes('shift-photos')) {
-            const match = photoUrl.match(/shift-photos\/([^?]+)/)
-            if (match) photoPaths.push(match[1])
+        .forEach(photoValue => {
+          const normalizedPath = extractShiftPhotoPath(photoValue)
+          if (normalizedPath) {
+            photoPaths.add(normalizedPath)
           }
         })
     })
 
-    console.log(`Found ${photoPaths.length} photos to delete from storage`)
+    const photoPathsList = Array.from(photoPaths)
 
-    if (photoPaths.length > 0) {
+    console.log(`Found ${photoPathsList.length} photos to delete from storage`)
+
+    if (photoPathsList.length > 0) {
       const { error: storageError } = await supabase.storage
         .from('shift-photos')
-        .remove(photoPaths)
+        .remove(photoPathsList)
       if (storageError) console.error('Error deleting photos:', storageError)
-      else console.log(`Deleted ${photoPaths.length} photos`)
+      else console.log(`Deleted ${photoPathsList.length} photos`)
     }
 
     const { error: deleteError } = await supabase
@@ -104,9 +120,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Cleaned up ${oldReports?.length || 0} reports and ${photoPaths.length} photos`,
+        message: `Cleaned up ${oldReports?.length || 0} reports and ${photoPathsList.length} photos`,
         deletedReports: oldReports?.length || 0,
-        deletedPhotos: photoPaths.length
+        deletedPhotos: photoPathsList.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )

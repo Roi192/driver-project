@@ -1239,6 +1239,54 @@ export type Database = {
         }
         Relationships: []
       }
+      hagmar_readiness_weights: {
+        Row: {
+          components_weight: number
+          created_at: string
+          id: string
+          personnel_weight: number
+          priority_readiness_weight: number
+          priority_risk_weight: number
+          risk_incidents_weight: number
+          risk_infra_weight: number
+          risk_response_weight: number
+          risk_threat_weight: number
+          training_weight: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          components_weight?: number
+          created_at?: string
+          id?: string
+          personnel_weight?: number
+          priority_readiness_weight?: number
+          priority_risk_weight?: number
+          risk_incidents_weight?: number
+          risk_infra_weight?: number
+          risk_response_weight?: number
+          risk_threat_weight?: number
+          training_weight?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          components_weight?: number
+          created_at?: string
+          id?: string
+          personnel_weight?: number
+          priority_readiness_weight?: number
+          priority_risk_weight?: number
+          risk_incidents_weight?: number
+          risk_infra_weight?: number
+          risk_response_weight?: number
+          risk_threat_weight?: number
+          training_weight?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       hagmar_safety_investigations: {
         Row: {
           company: string | null
@@ -1467,6 +1515,48 @@ export type Database = {
         }
         Relationships: []
       }
+      hagmar_settlement_inspections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          findings: string | null
+          id: string
+          inspection_date: string
+          inspection_type: string
+          inspector_name: string | null
+          score: number | null
+          settlement: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          findings?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          score?: number | null
+          settlement: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          findings?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          score?: number | null
+          settlement?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hagmar_shooting_ranges: {
         Row: {
           company: string | null
@@ -1659,6 +1749,45 @@ export type Database = {
           uniform_size_top?: string | null
           updated_at?: string
           weapon_serial?: string | null
+        }
+        Relationships: []
+      }
+      hagmar_threat_ratings: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          regional_alert_level: number
+          road_proximity: number
+          settlement: string
+          topographic_vulnerability: number
+          updated_at: string
+          updated_by: string | null
+          village_proximity: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          regional_alert_level?: number
+          road_proximity?: number
+          settlement: string
+          topographic_vulnerability?: number
+          updated_at?: string
+          updated_by?: string | null
+          village_proximity?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          regional_alert_level?: number
+          road_proximity?: number
+          settlement?: string
+          topographic_vulnerability?: number
+          updated_at?: string
+          updated_by?: string | null
+          village_proximity?: number
         }
         Relationships: []
       }
@@ -2702,6 +2831,7 @@ export type Database = {
           user_id: string
           vardim_points: string | null
           vardim_procedure_explanation: string | null
+          vehicle_notes: string | null
           vehicle_number: string
           work_card_completed: boolean | null
         }
@@ -2737,6 +2867,7 @@ export type Database = {
           user_id: string
           vardim_points?: string | null
           vardim_procedure_explanation?: string | null
+          vehicle_notes?: string | null
           vehicle_number: string
           work_card_completed?: boolean | null
         }
@@ -2772,6 +2903,7 @@ export type Database = {
           user_id?: string
           vardim_points?: string | null
           vardim_procedure_explanation?: string | null
+          vehicle_notes?: string | null
           vehicle_number?: string
           work_card_completed?: boolean | null
         }

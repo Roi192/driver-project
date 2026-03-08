@@ -21,6 +21,7 @@ interface ShiftFormData {
   safetyVulnerabilities: string;
   vardimProcedure: string;
   vardimPoints: string;
+  vehicleNotes: string;
   photos: Record<string, string>;
 }
 
@@ -123,6 +124,7 @@ export function useShiftReport() {
         safety_vulnerabilities: formData.safetyVulnerabilities || null,
         vardim_procedure_explanation: formData.vardimProcedure || null,
         vardim_points: formData.vardimPoints || null,
+        vehicle_notes: formData.vehicleNotes || null,
         ...photoPayload,
       });
 

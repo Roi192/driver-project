@@ -1,78 +1,56 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
-import { supabase } from "@/integrations/supabase/client";
 
-type PhotosFormValue = Record<string, string>;
+type ShiftPhotos = Record<string, string | undefined>;
 
-async function uploadVehiclePhoto(file: File, photoId: string): Promise<string> {
-  const fileExt = file.name.split(".").pop() || "jpg";
-  const fileName = `${Date.now()}-${photoId}.${fileExt}`;
-  const filePath = `vehicle-photos/${fileName}`;
+const ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
 
-  const { error: uploadError } = await supabase.storage
-    .from("shift-photos")
-    .upload(filePath, file, {
-      upsert: true,
-    });
+const hasPhotoValue = (value: string | undefined) => typeof value === "string" && value.trim().length > 0;
 
-  if (uploadError) {
-    throw uploadError;
-  }
+const isAcceptedImageFile = (file: File) => {
+  const mimeType = file.type?.toLowerCase() ?? "";
+  if (mimeType.startsWith("image/")) return true;
 
-  const { data } = supabase.storage
-    .from("shift-photos")
-    .getPublicUrl(filePath);
-
-  if (!data?.publicUrl) {
-    throw new Error("לא התקבל URL לתמונה");
-  }
-
-  return data.publicUrl;
-}
+  const filename = file.name?.toLowerCase() ?? "";
+  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`));
+};
 
 export function PhotosStep() {
-  const { control, setValue, register, trigger, getValues } = useFormContext();
+  const { control, setValue, register, getValues } = useFormContext();
+  const { user } = useAuth();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
 
-  const photos = (useWatch({ control, name: "photos" }) || {}) as PhotosFormValue;
+  const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
 
-  useEffect(() => {
-    register("photos");
-  }, [register]);
-
-  const photoPreviews = useMemo(() => {
-    const previews: Record<string, string> = {};
-
-    for (const photo of VEHICLE_PHOTOS) {
-      const value = photos[photo.id];
-      if (typeof value === "string" && value.trim().length > 0) {
-        previews[photo.id] = value;
-      }
-    }
-
-    return previews;
-  }, [photos]);
-
-  const handlePhotoCapture = async (
-    photoId: string,
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+  const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!user) {
       toast({
-        title: "קובץ לא תקין",
-        description: "יש לבחור תמונה תקינה.",
+        title: "נדרשת התחברות",
+        description: "יש להתחבר מחדש כדי להעלות תמונות.",
         variant: "destructive",
       });
-      event.target.value = "";
+      event.currentTarget.value = "";
+      return;
+    }
+
+    if (!isAcceptedImageFile(file)) {
+      toast({
+        title: "קובץ לא תקין",
+        description: "אפשר להעלות רק תמונת מצלמה תקינה (JPG/PNG/WEBP/HEIC).",
+        variant: "destructive",
+      });
+      event.currentTarget.value = "";
       return;
     }
 
@@ -82,20 +60,22 @@ export function PhotosStep() {
         description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
         variant: "destructive",
       });
-      event.target.value = "";
+      event.currentTarget.value = "";
       return;
     }
 
     setProcessingPhoto(photoId);
 
     try {
-      const uploadedUrl = await uploadVehiclePhoto(file, photoId);
+      const uploadedPath = await uploadShiftPhoto({
+        file,
+        userId: user.id,
+        photoId,
+      });
 
-      const currentPhotos = (getValues("photos") || {}) as PhotosFormValue;
-      const nextPhotos: PhotosFormValue = {
-        ...currentPhotos,
-        [photoId]: uploadedUrl,
-      };
+      const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
+      const previousPhotoPath = currentPhotos[photoId];
+      const nextPhotos: ShiftPhotos = { ...currentPhotos, [photoId]: uploadedPath };
 
       setValue("photos", nextPhotos, {
         shouldDirty: true,
@@ -103,30 +83,28 @@ export function PhotosStep() {
         shouldValidate: true,
       });
 
-      await trigger("photos");
-
-      toast({
-        title: "התמונה הועלתה",
-        description: "התמונה נשמרה בהצלחה.",
-      });
+      if (previousPhotoPath && previousPhotoPath !== uploadedPath) {
+        void deleteShiftPhoto(previousPhotoPath).catch((error) => {
+          console.error("Failed to cleanup replaced photo:", error);
+        });
+      }
     } catch (error) {
-      console.error("Error uploading camera photo:", error);
-
+      console.error("Error handling camera photo upload:", error);
       toast({
         title: "שגיאה בהעלאת התמונה",
-        description: "לא הצלחנו להעלות את התמונה. נסה שוב.",
+        description: "לא הצלחנו להעלות את התמונה. נסה לצלם שוב.",
         variant: "destructive",
       });
     } finally {
       setProcessingPhoto(null);
-      event.target.value = "";
+      event.currentTarget.value = "";
     }
   };
 
-  const removePhoto = async (photoId: string) => {
-    const currentPhotos = (getValues("photos") || {}) as PhotosFormValue;
-    const nextPhotos: PhotosFormValue = { ...currentPhotos };
-
+  const removePhoto = (photoId: string) => {
+    const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
+    const removedPhotoPath = currentPhotos[photoId];
+    const nextPhotos: ShiftPhotos = { ...currentPhotos };
     delete nextPhotos[photoId];
 
     setValue("photos", nextPhotos, {
@@ -135,13 +113,14 @@ export function PhotosStep() {
       shouldValidate: true,
     });
 
-    await trigger("photos");
+    if (removedPhotoPath) {
+      void deleteShiftPhoto(removedPhotoPath).catch((error) => {
+        console.error("Failed to delete removed photo:", error);
+      });
+    }
   };
 
-  const completedPhotos = VEHICLE_PHOTOS.filter(
-    (photo) => Boolean(photos[photo.id])
-  ).length;
-
+  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => hasPhotoValue(photos[photo.id])).length;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
@@ -151,14 +130,8 @@ export function PhotosStep() {
           <Camera className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold text-primary">שלב 5 מתוך 5</span>
         </div>
-
-        <h2 className="mb-3 text-3xl font-black text-foreground">
-          תמונות הרכב
-        </h2>
-
-        <p className="text-muted-foreground">
-          צלם את הרכב מכל הזוויות הנדרשות
-        </p>
+        <h2 className="mb-3 text-3xl font-black text-foreground">תמונות הרכב</h2>
+        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות (מצלמה בלבד)</p>
 
         <div
           className={cn(
@@ -181,18 +154,16 @@ export function PhotosStep() {
         <div className="h-3 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
-            style={{
-              width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%`,
-            }}
+            style={{ width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%` }}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
-          const hasPhoto = Boolean(photos[photo.id]);
+          const hasPhoto = hasPhotoValue(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = photoPreviews[photo.id];
+          const previewSrc = photos[photo.id];
 
           return (
             <PhotoCaptureCard
@@ -216,18 +187,14 @@ export function PhotosStep() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
             <MessageSquare className="h-5 w-5 text-primary" />
           </div>
-
           <div>
             <h3 className="font-bold text-foreground">הערות או בעיות ברכב</h3>
-            <p className="text-sm text-muted-foreground">
-              אופציונלי - תאר בעיות שנמצאו
-            </p>
+            <p className="text-sm text-muted-foreground">אופציונלי - תאר בעיות שנמצאו</p>
           </div>
         </div>
-
         <Textarea
           {...register("vehicleNotes")}
-          placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת."
+          placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת..."
           className="min-h-[100px] resize-none rounded-xl border-border bg-muted/30"
         />
       </div>
