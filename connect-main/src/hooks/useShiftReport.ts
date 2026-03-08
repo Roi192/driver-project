@@ -20,60 +20,49 @@ interface ShiftFormData {
   safetyVulnerabilities: string;
   vardimProcedure: string;
   vardimPoints: string;
-  photos: Record<string, string>;
+  photos: Record<string, string | File>;
 }
 
 export function useShiftReport() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const compressImageBlob = async (
-    input: Blob,
-    options: { maxDimension: number; quality: number } = { maxDimension: 1600, quality: 0.75 }
-  ): Promise<Blob> => {
+  const resolvePhotoBlob = async (photoData: string | File): Promise<Blob | null> => {
     try {
-      const bitmap = await createImageBitmap(input);
-      const ratio = Math.min(1, options.maxDimension / Math.max(bitmap.width, bitmap.height));
-      const targetW = Math.max(1, Math.round(bitmap.width * ratio));
-      const targetH = Math.max(1, Math.round(bitmap.height * ratio));
+      if (photoData instanceof Blob) {
+        return photoData;
+      }
 
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
+      if (typeof photoData === "string") {
+        const response = await fetch(photoData);
+        return await response.blob();
+      }
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return input;
-
-      ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-      bitmap.close?.();
-
-      const output = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", options.quality)
-      );
-
-      return output ?? input;
-    } catch {
-      return input;
+      return null;
+    } catch (error) {
+      console.error("Failed to resolve photo blob:", error);
+      return null;
     }
   };
 
   const uploadPhoto = async (
-    base64Data: string,
+    photoData: string | File,
     photoType: string,
     reportId: string
   ): Promise<string | null> => {
     try {
-      // Convert base64 to blob, then compress for storage savings
-      const base64Response = await fetch(base64Data);
-      const originalBlob = await base64Response.blob();
-      const blob = await compressImageBlob(originalBlob);
+      const blob = await resolvePhotoBlob(photoData);
+      if (!blob) return null;
 
-      const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.jpg`;
+      const rawMimeExtension = blob.type?.split("/")?.[1]?.toLowerCase()?.split(";")?.[0];
+      const extension = rawMimeExtension === "jpeg" ? "jpg" : (rawMimeExtension || "jpg");
+      const contentType = blob.type || "image/jpeg";
+      const fileName = `${user?.id}/${reportId}/${photoType}_${Date.now()}.${extension}`;
 
       const { error: uploadError } = await supabase.storage
         .from("shift-photos")
         .upload(fileName, blob, {
-          contentType: "image/jpeg",
+          contentType,
           upsert: true,
         });
 
@@ -83,7 +72,6 @@ export function useShiftReport() {
       }
 
       // Create a signed URL valid for 7 days (604800 seconds) for private bucket access
-      // Shorter validity reduces risk if URL is shared/leaked
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("shift-photos")
         .createSignedUrl(fileName, 60 * 60 * 24 * 7);

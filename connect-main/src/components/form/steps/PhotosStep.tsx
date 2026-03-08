@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useFormContext } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare, Loader2 } from "lucide-react";
@@ -6,94 +6,49 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 
-const readBlobAsDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
-
-const canvasToCompressedDataUrl = async (canvas: HTMLCanvasElement, quality: number): Promise<string> => {
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-  if (!blob) throw new Error("Canvas toBlob returned null");
-  return readBlobAsDataUrl(blob);
-};
-
-// Robust image compression for mobile cameras with cross-browser fallbacks
-const compressImage = async (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
-  const drawToCanvas = (
-    width: number,
-    height: number,
-    draw: (ctx: CanvasRenderingContext2D, targetW: number, targetH: number) => void
-  ) => {
-    const ratio = Math.min(1, maxWidth / Math.max(width, height));
-    const targetW = Math.max(1, Math.round(width * ratio));
-    const targetH = Math.max(1, Math.round(height * ratio));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = targetW;
-    canvas.height = targetH;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Could not get canvas context");
-
-    draw(ctx, targetW, targetH);
-    return canvas;
-  };
-
-  try {
-    if (typeof createImageBitmap === "function") {
-      const bitmap = await createImageBitmap(file);
-      const canvas = drawToCanvas(bitmap.width, bitmap.height, (ctx, targetW, targetH) => {
-        ctx.drawImage(bitmap, 0, 0, targetW, targetH);
-      });
-      bitmap.close?.();
-      return await canvasToCompressedDataUrl(canvas, quality);
-    }
-  } catch (err) {
-    console.warn("createImageBitmap compression failed, trying img fallback:", err);
-  }
-
-  // iOS / older webview fallback
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Image decode failed"));
-      image.src = objectUrl;
-    });
-
-    const canvas = drawToCanvas(img.naturalWidth, img.naturalHeight, (ctx, targetW, targetH) => {
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-    });
-
-    return await canvasToCompressedDataUrl(canvas, quality);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
 export function PhotosStep() {
   const { setValue, watch, register } = useFormContext();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
   const photos = watch("photos") || {};
-  
+
+  const photoPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+
+    VEHICLE_PHOTOS.forEach((photo) => {
+      const value = photos[photo.id];
+      if (value instanceof File) {
+        previews[photo.id] = URL.createObjectURL(value);
+      } else if (typeof value === "string") {
+        previews[photo.id] = value;
+      }
+    });
+
+    return previews;
+  }, [photos]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(photoPreviews).forEach((url) => {
+        if (url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [photoPreviews]);
+
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setProcessingPhoto(photoId);
     try {
-      const compressedDataUrl = await compressImage(file, 800, 0.6);
       const currentPhotos = watch("photos") || {};
-      setValue("photos", { ...currentPhotos, [photoId]: compressedDataUrl }, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+      setValue("photos", { ...currentPhotos, [photoId]: file }, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
     } catch (error) {
       console.error("Error processing image:", error);
       toast({
         title: "שגיאה בהעלאת התמונה",
-        description: "לא הצלחנו לעבד את התמונה. נסה לצלם שוב.",
+        description: "לא הצלחנו לקלוט את התמונה. נסה לצלם שוב.",
         variant: "destructive",
       });
     } finally {
@@ -173,7 +128,7 @@ export function PhotosStep() {
                   </div>
                 ) : hasPhoto ? (
                   <img
-                    src={photos[photo.id]}
+                    src={photoPreviews[photo.id]}
                     alt={photo.label}
                     className="w-full h-full object-cover"
                   />
