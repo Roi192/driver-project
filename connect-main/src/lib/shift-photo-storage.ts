@@ -11,8 +11,6 @@ const resolveFileExtension = (file: File) => {
   const extension = fromMime || fromName || FALLBACK_EXTENSION;
 
   if (extension === "jpeg") return "jpg";
-  if (extension === "heic" || extension === "heif") return "jpg";
-
   return extension;
 };
 
@@ -67,13 +65,6 @@ export async function uploadShiftPhoto(params: {
 }): Promise<string> {
   const { file, photoId, userId } = params;
 
-  console.log("[uploadShiftPhoto] starting", {
-    photoId,
-    fileName: file?.name,
-    fileSize: file?.size,
-    fileType: file?.type,
-  });
-
   if (!file) {
     throw new Error("לא התקבל קובץ תמונה");
   }
@@ -102,11 +93,8 @@ export async function uploadShiftPhoto(params: {
     });
 
   if (error) {
-    console.error("[uploadShiftPhoto] upload error:", error);
     throw new Error(getUploadErrorMessage(error));
   }
-
-  console.log("[uploadShiftPhoto] upload success:", filePath);
 
   return filePath;
 }

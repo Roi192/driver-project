@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
@@ -7,23 +7,30 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
+import {
+  deleteShiftPhoto,
+  SHIFT_PHOTOS_BUCKET,
+  uploadShiftPhoto,
+} from "@/lib/shift-photo-storage";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
+import { supabase } from "@/integrations/supabase/client";
 
 type ShiftPhotos = Record<string, string | undefined>;
-
 type LocalPreviews = Record<string, string | undefined>;
 
 const ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
 
-const hasPhotoValue = (value: string | undefined) => typeof value === "string" && value.trim().length > 0;
+const hasPhotoValue = (value: string | undefined) =>
+  typeof value === "string" && value.trim().length > 0;
 
 const isAcceptedImageFile = (file: File) => {
   const mimeType = file.type?.toLowerCase() ?? "";
   if (mimeType.startsWith("image/")) return true;
 
   const filename = file.name?.toLowerCase() ?? "";
-  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`));
+  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) =>
+    filename.endsWith(`.${extension}`)
+  );
 };
 
 const isMobileDevice = () => {
@@ -31,15 +38,25 @@ const isMobileDevice = () => {
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
 };
 
+const getStoragePreviewUrl = (path: string) => {
+  const { data } = supabase.storage.from(SHIFT_PHOTOS_BUCKET).getPublicUrl(path);
+  return data?.publicUrl || path;
+};
+
 export function PhotosStep() {
   const { control, setValue, register, getValues } = useFormContext();
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
   const localPreviewsRef = useRef<LocalPreviews>({});
 
   const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
+
+  useEffect(() => {
+    register("photos");
+  }, [register]);
 
   useEffect(() => {
     localPreviewsRef.current = localPreviews;
@@ -84,9 +101,37 @@ export function PhotosStep() {
     });
   };
 
-  const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
+  const photoPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+
+    for (const photo of VEHICLE_PHOTOS) {
+      const localPreview = localPreviews[photo.id];
+      if (localPreview) {
+        previews[photo.id] = localPreview;
+        continue;
+      }
+
+      const storedPath = photos[photo.id];
+      if (hasPhotoValue(storedPath)) {
+        previews[photo.id] = getStoragePreviewUrl(storedPath!);
+      }
+    }
+
+    return previews;
+  }, [localPreviews, photos]);
+
+  const handlePhotoCapture = async (
+    photoId: string,
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.currentTarget.files?.[0];
-    console.log("[PhotosStep] handlePhotoCapture called", { photoId, hasFile: !!file, fileCount: event.currentTarget.files?.length });
+
+    console.log("[PhotosStep] handlePhotoCapture called", {
+      photoId,
+      hasFile: !!file,
+      fileCount: event.currentTarget.files?.length,
+    });
+
     if (!file) {
       console.warn("[PhotosStep] No file selected for", photoId);
       return;
@@ -102,7 +147,11 @@ export function PhotosStep() {
       return;
     }
 
-    console.log("[PhotosStep] File details:", { name: file.name, type: file.type, size: file.size });
+    console.log("[PhotosStep] File details:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
 
     if (!user) {
       console.error("[PhotosStep] No user found - auth required");
@@ -126,7 +175,7 @@ export function PhotosStep() {
       return;
     }
 
-    if (file.size === 0) {
+    if (file.size <= 0) {
       toast({
         title: "קובץ לא תקין",
         description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
@@ -141,16 +190,22 @@ export function PhotosStep() {
 
     try {
       console.log("[PhotosStep] Starting upload for", photoId, "user:", user.id);
+
       const uploadedPath = await uploadShiftPhoto({
         file,
         photoId,
         userId: user.id,
       });
+
       console.log("[PhotosStep] Upload succeeded:", uploadedPath);
 
       const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
       const previousPhotoPath = currentPhotos[photoId];
-      const nextPhotos: ShiftPhotos = { ...currentPhotos, [photoId]: uploadedPath };
+
+      const nextPhotos: ShiftPhotos = {
+        ...currentPhotos,
+        [photoId]: uploadedPath,
+      };
 
       setValue("photos", nextPhotos, {
         shouldDirty: true,
@@ -163,15 +218,23 @@ export function PhotosStep() {
           console.error("Failed to cleanup replaced photo:", error);
         });
       }
+
+      toast({
+        title: "התמונה הועלתה",
+        description: "התמונה נשמרה בהצלחה.",
+      });
     } catch (error) {
       console.error("Error handling camera photo upload:", error);
-      clearLocalPreview(photoId);
       const errorDetail = error instanceof Error ? error.message : String(error);
+
       toast({
         title: "שגיאה בהעלאת התמונה",
         description: `פרטי שגיאה: ${errorDetail}`,
         variant: "destructive",
       });
+
+      // בכוונה לא מוחקים preview מקומי,
+      // כדי שהמשתמש יראה שהתמונה נקלטה ויוכל לנסות שוב.
     } finally {
       setProcessingPhoto(null);
       event.currentTarget.value = "";
@@ -182,6 +245,7 @@ export function PhotosStep() {
     const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
     const removedPhotoPath = currentPhotos[photoId];
     const nextPhotos: ShiftPhotos = { ...currentPhotos };
+
     delete nextPhotos[photoId];
 
     setValue("photos", nextPhotos, {
@@ -199,7 +263,10 @@ export function PhotosStep() {
     }
   };
 
-  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => hasPhotoValue(photos[photo.id])).length;
+  const completedPhotos = VEHICLE_PHOTOS.filter((photo) =>
+    hasPhotoValue(photos[photo.id]) || Boolean(localPreviews[photo.id])
+  ).length;
+
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
@@ -209,8 +276,10 @@ export function PhotosStep() {
           <Camera className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold text-primary">שלב 5 מתוך 5</span>
         </div>
+
         <h2 className="mb-3 text-3xl font-black text-foreground">תמונות הרכב</h2>
-        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות (מצלמה בלבד)</p>
+
+        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות</p>
 
         <div
           className={cn(
@@ -233,16 +302,19 @@ export function PhotosStep() {
         <div className="h-3 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
-            style={{ width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%` }}
+            style={{
+              width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%`,
+            }}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
-          const hasPhoto = hasPhotoValue(photos[photo.id]);
+          const hasPhoto =
+            hasPhotoValue(photos[photo.id]) || Boolean(localPreviews[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = localPreviews[photo.id] ?? photos[photo.id];
+          const previewSrc = photoPreviews[photo.id];
 
           return (
             <PhotoCaptureCard
@@ -266,14 +338,18 @@ export function PhotosStep() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
             <MessageSquare className="h-5 w-5 text-primary" />
           </div>
+
           <div>
             <h3 className="font-bold text-foreground">הערות או בעיות ברכב</h3>
-            <p className="text-sm text-muted-foreground">אופציונלי - תאר בעיות שנמצאו</p>
+            <p className="text-sm text-muted-foreground">
+              אופציונלי - תאר בעיות שנמצאו
+            </p>
           </div>
         </div>
+
         <Textarea
           {...register("vehicleNotes")}
-          placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת..."
+          placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת."
           className="min-h-[100px] resize-none rounded-xl border-border bg-muted/30"
         />
       </div>
