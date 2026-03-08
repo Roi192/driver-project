@@ -79,11 +79,11 @@ export const DRILLS = [
 ] as const;
 
 export const VEHICLE_PHOTOS = [
-  { id: "front", label: "תמונת חזית הרכב" },
-  { id: "left", label: "תמונת צד שמאל הרכב" },
-  { id: "right", label: "תמונת צד ימין הרכב" },
+  { id: "front", label: "תמונת חזית של הרכב" },
+  { id: "left", label: "תמונת צד שמאל של הרכב" },
+  { id: "right", label: "תמונת צד ימין של הרכב" },
   { id: "back", label: "תמונה אחורית של הרכב" },
-  { id: "steering", label: "תמונה של ההגה של הרכב" },
+  { id: "steering", label: "תמונה של הגה הרכב" },
 ] as const;
 
 export const MONTHS_HEB = [

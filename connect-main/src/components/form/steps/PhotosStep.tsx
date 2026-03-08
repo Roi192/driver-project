@@ -1,47 +1,60 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
-import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare, Loader2 } from "lucide-react";
+import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
 export function PhotosStep() {
-  const { control, setValue, register, trigger } = useFormContext();
+  const { control, setValue, register, trigger, getValues } = useFormContext();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const photos = useWatch({ control, name: "photos" }) || {};
+  const photos = (useWatch({ control, name: "photos" }) || {}) as Record<string, string | File>;
 
   useEffect(() => {
     register("photos");
   }, [register]);
 
-  // Only revoke blob URLs on component unmount
+  const photoPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+
+    for (const photo of VEHICLE_PHOTOS) {
+      const value = photos[photo.id];
+      if (typeof value === "string" && value.trim().length > 0) {
+        previews[photo.id] = value;
+      } else if (value instanceof File) {
+        previews[photo.id] = URL.createObjectURL(value);
+      }
+    }
+
+    return previews;
+  }, [photos]);
+
   useEffect(() => {
     return () => {
-      Object.values(previewUrls).forEach((url) => {
+      Object.values(photoPreviews).forEach((url) => {
         if (url.startsWith("blob:")) {
           URL.revokeObjectURL(url);
         }
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const openCamera = (photoId: string) => {
-    const input = fileInputRefs.current[photoId];
-    if (!input) return;
-
-    // Reset before opening to ensure onChange fires even if camera returns same filename
-    input.value = "";
-    input.click();
-  };
+  }, [photoPreviews]);
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "קובץ לא תקין",
+        description: "יש לבחור תמונה מהמצלמה בלבד.",
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
 
     if (file.size === 0) {
       toast({
@@ -49,31 +62,23 @@ export function PhotosStep() {
         description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
         variant: "destructive",
       });
+      event.target.value = "";
       return;
     }
 
     setProcessingPhoto(photoId);
 
     try {
-      const nextPhotos = { ...photos, [photoId]: file };
+      const currentPhotos = (getValues("photos") || {}) as Record<string, string | File>;
+      const nextPhotos = { ...currentPhotos, [photoId]: file };
+
       setValue("photos", nextPhotos, {
         shouldDirty: true,
         shouldTouch: true,
         shouldValidate: true,
       });
+
       await trigger("photos");
-
-      setPreviewUrls((prev) => {
-        const prevUrl = prev[photoId];
-        if (prevUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(prevUrl);
-        }
-
-        return {
-          ...prev,
-          [photoId]: URL.createObjectURL(file),
-        };
-      });
     } catch (error) {
       console.error("Error handling camera photo:", error);
       toast({
@@ -88,34 +93,20 @@ export function PhotosStep() {
   };
 
   const removePhoto = async (photoId: string) => {
-    setPreviewUrls((prev) => {
-      const next = { ...prev };
-      const previewToRevoke = next[photoId];
-      if (previewToRevoke?.startsWith("blob:")) {
-        URL.revokeObjectURL(previewToRevoke);
-      }
-      delete next[photoId];
-      return next;
-    });
+    const currentPhotos = (getValues("photos") || {}) as Record<string, string | File>;
+    const nextPhotos = { ...currentPhotos };
+    delete nextPhotos[photoId];
 
-    const currentPhotos = { ...photos };
-    delete currentPhotos[photoId];
-
-    setValue("photos", currentPhotos, {
+    setValue("photos", nextPhotos, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
+
     await trigger("photos");
   };
 
-  const getPreviewSrc = (photoId: string): string | undefined => {
-    const value = photos[photoId];
-    if (typeof value === "string") return value;
-    return previewUrls[photoId];
-  };
-
-  const completedPhotos = VEHICLE_PHOTOS.filter((p) => Boolean(photos[p.id])).length;
+  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => Boolean(photos[photo.id])).length;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
@@ -126,7 +117,7 @@ export function PhotosStep() {
           <span className="text-sm font-bold text-primary">שלב 5 מתוך 5</span>
         </div>
         <h2 className="mb-3 text-3xl font-black text-foreground">תמונות הרכב</h2>
-        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות</p>
+        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות (מצלמה בלבד)</p>
 
         <div
           className={cn(
@@ -148,12 +139,7 @@ export function PhotosStep() {
       <div className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="h-3 overflow-hidden rounded-full bg-muted">
           <div
-            className={cn(
-              "h-full transition-all duration-500",
-              allPhotosCompleted
-                ? "bg-gradient-to-r from-primary to-accent"
-                : "bg-gradient-to-r from-primary to-accent"
-            )}
+            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
             style={{ width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%` }}
           />
         </div>
@@ -163,71 +149,21 @@ export function PhotosStep() {
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto = Boolean(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = getPreviewSrc(photo.id);
+          const previewSrc = photoPreviews[photo.id];
 
           return (
-            <div
+            <PhotoCaptureCard
               key={photo.id}
-              className="relative animate-fade-in"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <button
-                type="button"
-                onClick={() => openCamera(photo.id)}
-                disabled={isProcessing}
-                className={cn(
-                  "block aspect-square w-full overflow-hidden rounded-2xl border-2 transition-all duration-300",
-                  hasPhoto
-                    ? "border-primary shadow-lg"
-                    : "border-dashed border-border bg-card hover:border-primary/40 hover:bg-primary/5",
-                  isProcessing && "cursor-wait"
-                )}
-              >
-                {isProcessing ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/50 p-4 text-center">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <span className="text-sm font-medium text-muted-foreground">מעבד תמונה...</span>
-                  </div>
-                ) : hasPhoto && previewSrc ? (
-                  <img src={previewSrc} alt={photo.label} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
-                      <ImagePlus className="h-7 w-7 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{photo.label}</span>
-                  </div>
-                )}
-              </button>
-
-              <input
-                ref={(el) => {
-                  fileInputRefs.current[photo.id] = el;
-                }}
-                type="file"
-                accept="image/*,image/heic,image/heif"
-                capture="environment"
-                disabled={isProcessing}
-                onChange={(e) => handlePhotoCapture(photo.id, e)}
-                className="hidden"
-              />
-
-              {hasPhoto && (
-                <button
-                  type="button"
-                  onClick={() => removePhoto(photo.id)}
-                  className="absolute -left-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-
-              {hasPhoto && (
-                <div className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-scale-in">
-                  <Check className="h-5 w-5" />
-                </div>
-              )}
-            </div>
+              photoId={photo.id}
+              label={photo.label}
+              hasPhoto={hasPhoto}
+              isProcessing={isProcessing}
+              previewSrc={previewSrc}
+              disabled={Boolean(processingPhoto) && !isProcessing}
+              animationDelayMs={index * 80}
+              onPhotoChange={(event) => handlePhotoCapture(photo.id, event)}
+              onRemove={() => removePhoto(photo.id)}
+            />
           );
         })}
       </div>

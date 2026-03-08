@@ -62,6 +62,11 @@ export default function ShiftForm() {
     sessionStorage.setItem('shiftFormStep', String(step));
   };
 
+  const hasPhotoValue = (value: unknown) => {
+    if (value instanceof File) return true;
+    return typeof value === "string" && value.trim().length > 0;
+  };
+
   const goToNextStep = () => {
     if (currentStep < steps.length) {
       updateStep(currentStep + 1);
@@ -119,8 +124,8 @@ export default function ShiftForm() {
         }
         break;
       case 5: // Photos
-        const photos = formData.photos as Record<string, string>;
-        if (!photos?.front || !photos?.left || !photos?.right || !photos?.back || !photos?.steering) {
+        const photos = formData.photos as Record<string, string | File | undefined>;
+        if (!hasPhotoValue(photos?.front) || !hasPhotoValue(photos?.left) || !hasPhotoValue(photos?.right) || !hasPhotoValue(photos?.back) || !hasPhotoValue(photos?.steering)) {
           toast({
             title: "שגיאה",
             description: "יש להעלות את כל התמונות הנדרשות",
@@ -181,8 +186,8 @@ export default function ShiftForm() {
     }
     
     // Step 5: Photos
-    const photos = formData.photos as Record<string, string>;
-    if (!photos?.front || !photos?.left || !photos?.right || !photos?.back || !photos?.steering) {
+    const photos = formData.photos as Record<string, string | File | undefined>;
+    if (!hasPhotoValue(photos?.front) || !hasPhotoValue(photos?.left) || !hasPhotoValue(photos?.right) || !hasPhotoValue(photos?.back) || !hasPhotoValue(photos?.steering)) {
       toast({
         title: "שגיאה",
         description: "יש להעלות את כל התמונות הנדרשות",
