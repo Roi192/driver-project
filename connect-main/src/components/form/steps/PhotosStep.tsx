@@ -23,7 +23,12 @@ const isAcceptedImageFile = (file: File) => {
   if (mimeType.startsWith("image/")) return true;
 
   const filename = file.name?.toLowerCase() ?? "";
-  return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`));
+  if (ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`))) {
+    return true;
+  }
+
+  // Some mobile WebViews return camera files without mime/extension
+  return mimeType.length === 0 && !filename.includes(".") && file.size > 0;
 };
 
 
@@ -86,11 +91,24 @@ export function PhotosStep() {
     });
   };
 
-  const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    console.log("[PhotosStep] handlePhotoCapture called", { photoId, hasFile: !!file, fileCount: event.currentTarget.files?.length });
+const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    let file = input.files?.[0];
+
+    // Mobile camera capture can populate files a tick later in some browsers
     if (!file) {
-      console.warn("[PhotosStep] No file selected for", photoId);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      file = input.files?.[0];
+    }
+
+    console.log("[PhotosStep] handlePhotoCapture called", { photoId, hasFile: !!file, fileCount: input.files?.length });
+    if (!file) {
+      toast({
+        title: "לא זוהתה תמונה",
+        description: "לא התקבלה תמונה מהמצלמה. נסה לצלם שוב.",
+        variant: "destructive",
+      });
+      input.value = "";
       return;
     }
 

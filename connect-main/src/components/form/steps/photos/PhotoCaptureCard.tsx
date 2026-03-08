@@ -89,9 +89,6 @@ export function PhotoCaptureCard({
           accept="image/*,.heic,.heif"
           capture="environment"
           disabled={disabled || isProcessing}
-          onClick={(event) => {
-            event.currentTarget.value = "";
-          }}
           onChange={onPhotoChange}
           className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
           aria-label={`צלם ${label}`}
