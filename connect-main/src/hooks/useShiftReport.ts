@@ -89,6 +89,13 @@ export function useShiftReport() {
     setIsSubmitting(true);
 
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const authenticatedUserId = authData.user?.id;
+
+      if (authError || !authenticatedUserId) {
+        throw new Error("AUTH_REQUIRED: Missing authenticated session");
+      }
+
       for (const key of REQUIRED_PHOTO_KEYS) {
         if (!formData.photos[key] || formData.photos[key].trim().length === 0) {
           throw new Error(`Missing required photo: ${key}`);
@@ -100,7 +107,7 @@ export function useShiftReport() {
       const photoPayload = buildPhotoPayload(formData.photos);
 
       const { error: insertError } = await supabase.from("shift_reports").insert({
-        user_id: user.id,
+        user_id: authenticatedUserId,
         report_date: reportDate,
         report_time: reportTime,
         outpost: formData.outpost,
