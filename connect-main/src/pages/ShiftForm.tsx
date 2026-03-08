@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Send, Check, Sparkles, FileText, Zap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useShiftReport } from "@/hooks/useShiftReport";
+import { useAuth } from "@/hooks/useAuth";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 
 const STEP_LABELS = ["פרטים", "תדריכים", "ציוד", "תרגולות", "תמונות"];
@@ -24,49 +25,85 @@ const steps = [
   PhotosStep,
 ];
 
+const SHIFT_FORM_STEP_STORAGE_KEY = "shiftFormStep";
+
+const createDefaultShiftFormValues = () => ({
+  dateTime: new Date(),
+  outpost: "",
+  driverName: "",
+  vehicleNumber: "",
+  shiftType: "",
+  emergencyProcedure: undefined,
+  commanderBriefing: undefined,
+  workCardFilled: undefined,
+  combatEquipment: [],
+  preMovementChecks: [],
+  driverTools: [],
+  drillsCompleted: [],
+  safetyVulnerabilities: "",
+  vardimProcedure: "",
+  vardimPoints: "",
+  photos: {},
+  vehicleNotes: "",
+});
+
+const parseStoredStep = (value: string | null): number => {
+  const parsed = value ? Number.parseInt(value, 10) : Number.NaN;
+
+  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= steps.length) {
+    return parsed;
+  }
+
+  return 1;
+};
+
 export default function ShiftForm() {
-  const [currentStep, setCurrentStep] = useState(() => {
-    const saved = sessionStorage.getItem("shiftFormStep");
-    const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
-
-    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= steps.length) {
-      return parsed;
-    }
-
-    return 1;
-  });
+  const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
   const { submitReport, isSubmitting } = useShiftReport();
 
   const methods = useForm({
-    defaultValues: {
-      dateTime: new Date(),
-      outpost: "",
-      driverName: "",
-      vehicleNumber: "",
-      shiftType: "",
-      emergencyProcedure: undefined,
-      commanderBriefing: undefined,
-      workCardFilled: undefined,
-      combatEquipment: [],
-      preMovementChecks: [],
-      driverTools: [],
-      drillsCompleted: [],
-      safetyVulnerabilities: "",
-      vardimProcedure: "",
-      vardimPoints: "",
-      photos: {},
-      vehicleNotes: "",
-    },
+    defaultValues: createDefaultShiftFormValues(),
   });
+  const { reset } = methods;
+  const stepStorageKey = user?.id ? `${SHIFT_FORM_STEP_STORAGE_KEY}:${user.id}` : null;
+  const previousUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    sessionStorage.removeItem(SHIFT_FORM_STEP_STORAGE_KEY);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      previousUserIdRef.current = null;
+      setCurrentStep(1);
+      return;
+    }
+
+    if (previousUserIdRef.current && previousUserIdRef.current !== user.id) {
+      reset(createDefaultShiftFormValues());
+      setIsSubmitted(false);
+    }
+
+    previousUserIdRef.current = user.id;
+
+    if (!stepStorageKey) {
+      setCurrentStep(1);
+      return;
+    }
+
+    setCurrentStep(parseStoredStep(sessionStorage.getItem(stepStorageKey)));
+  }, [reset, stepStorageKey, user?.id]);
 
   const CurrentStepComponent = steps[currentStep - 1];
 
-  // Persist currentStep to sessionStorage so mobile camera doesn't lose progress
   const updateStep = (step: number) => {
     setCurrentStep(step);
-    sessionStorage.setItem("shiftFormStep", String(step));
+    if (stepStorageKey) {
+      sessionStorage.setItem(stepStorageKey, String(step));
+    }
   };
 
   const hasPhotoValue = (value: unknown) => {
@@ -235,7 +272,9 @@ export default function ShiftForm() {
 
     if (success) {
       setIsSubmitted(true);
-      sessionStorage.removeItem("shiftFormStep");
+      if (stepStorageKey) {
+        sessionStorage.removeItem(stepStorageKey);
+      }
       toast({
         title: "הדיווח נשלח בהצלחה!",
         description: "הטופס שלך נשמר במערכת",
