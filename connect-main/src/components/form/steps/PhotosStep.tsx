@@ -38,20 +38,18 @@ const isMobileDevice = () => {
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
 };
 
-const getStoragePreviewUrl = async (path: string) => {
-  // אם הבאקט public
+const getStoragePreviewUrl = (path: string) => {
   const { data } = supabase.storage.from(SHIFT_PHOTOS_BUCKET).getPublicUrl(path);
   return data?.publicUrl || path;
 };
 
 export function PhotosStep() {
-  const { control, setValue, register, getValues } = useFormContext();
+  const { control, setValue, register } = useFormContext();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
-  const [remotePreviews, setRemotePreviews] = useState<Record<string, string>>({});
   const localPreviewsRef = useRef<LocalPreviews>({});
 
   const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
@@ -72,31 +70,12 @@ export function PhotosStep() {
     };
   }, []);
 
-  useEffect(() => {
-    const loadRemotePreviews = async () => {
-      const next: Record<string, string> = {};
-
-      for (const photo of VEHICLE_PHOTOS) {
-        const path = photos?.[photo.id];
-        if (hasPhotoValue(path)) {
-          next[photo.id] = await getStoragePreviewUrl(path!);
-        }
-      }
-
-      setRemotePreviews(next);
-    };
-
-    void loadRemotePreviews();
-  }, [photos]);
-
   const setLocalPreview = (photoId: string, file: File) => {
     const previewUrl = URL.createObjectURL(file);
 
     setLocalPreviews((prev) => {
       const previousPreview = prev[photoId];
-      if (previousPreview) {
-        URL.revokeObjectURL(previousPreview);
-      }
+      if (previousPreview) URL.revokeObjectURL(previousPreview);
 
       return {
         ...prev,
@@ -108,9 +87,7 @@ export function PhotosStep() {
   const clearLocalPreview = (photoId: string) => {
     setLocalPreviews((prev) => {
       const previousPreview = prev[photoId];
-      if (previousPreview) {
-        URL.revokeObjectURL(previousPreview);
-      }
+      if (previousPreview) URL.revokeObjectURL(previousPreview);
 
       const next = { ...prev };
       delete next[photoId];
@@ -118,12 +95,30 @@ export function PhotosStep() {
     });
   };
 
+  const photoPreviews = useMemo(() => {
+    const previews: Record<string, string> = {};
+
+    for (const photo of VEHICLE_PHOTOS) {
+      const localPreview = localPreviews[photo.id];
+      if (localPreview) {
+        previews[photo.id] = localPreview;
+        continue;
+      }
+
+      const storedPath = photos[photo.id];
+      if (hasPhotoValue(storedPath)) {
+        previews[photo.id] = getStoragePreviewUrl(storedPath!);
+      }
+    }
+
+    return previews;
+  }, [localPreviews, photos]);
+
   const handlePhotoCapture = async (
     photoId: string,
     event: ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.currentTarget.files?.[0];
-
     if (!file) return;
 
     if (!isMobileDevice()) {
@@ -177,19 +172,11 @@ export function PhotosStep() {
         userId: user.id,
       });
 
-      // שומרים ישירות לשדה הספציפי
       setValue(`photos.${photoId}`, uploadedPath, {
         shouldDirty: true,
         shouldTouch: true,
         shouldValidate: true,
       });
-
-      const previewUrl = await getStoragePreviewUrl(uploadedPath);
-
-      setRemotePreviews((prev) => ({
-        ...prev,
-        [photoId]: previewUrl,
-      }));
 
       toast({
         title: "התמונה הועלתה",
@@ -211,8 +198,7 @@ export function PhotosStep() {
   };
 
   const removePhoto = (photoId: string) => {
-    const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
-    const removedPhotoPath = currentPhotos[photoId];
+    const removedPhotoPath = photos[photoId];
 
     setValue(`photos.${photoId}`, undefined, {
       shouldDirty: true,
@@ -222,12 +208,6 @@ export function PhotosStep() {
 
     clearLocalPreview(photoId);
 
-    setRemotePreviews((prev) => {
-      const next = { ...prev };
-      delete next[photoId];
-      return next;
-    });
-
     if (removedPhotoPath) {
       void deleteShiftPhoto(removedPhotoPath).catch((error) => {
         console.error("Failed to delete removed photo:", error);
@@ -236,7 +216,7 @@ export function PhotosStep() {
   };
 
   const completedPhotos = VEHICLE_PHOTOS.filter((photo) => {
-    const hasStored = hasPhotoValue(photos?.[photo.id]);
+    const hasStored = hasPhotoValue(photos[photo.id]);
     const hasLocal = Boolean(localPreviews[photo.id]);
     return hasStored || hasLocal;
   }).length;
@@ -285,10 +265,10 @@ export function PhotosStep() {
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto =
-            hasPhotoValue(photos?.[photo.id]) || Boolean(localPreviews[photo.id]);
+            hasPhotoValue(photos[photo.id]) || Boolean(localPreviews[photo.id]);
 
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = localPreviews[photo.id] || remotePreviews[photo.id];
+          const previewSrc = photoPreviews[photo.id];
 
           return (
             <PhotoCaptureCard
