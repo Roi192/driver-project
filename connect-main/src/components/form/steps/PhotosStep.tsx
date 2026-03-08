@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
@@ -23,14 +23,13 @@ const isAcceptedImageFile = (file: File) => {
   if (mimeType.startsWith("image/")) return true;
 
   const filename = file.name?.toLowerCase() ?? "";
-  if (ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`))) {
+  if (ACCEPTED_IMAGE_EXTENSIONS.some((ext) => filename.endsWith(`.${ext}`))) {
     return true;
   }
 
   // Some mobile WebViews return camera files without mime/extension
   return mimeType.length === 0 && !filename.includes(".") && file.size > 0;
 };
-
 
 export function PhotosStep() {
   const { control, setValue, register, getValues } = useFormContext();
@@ -91,28 +90,13 @@ export function PhotosStep() {
     });
   };
 
-const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.currentTarget;
-    let file = input.files?.[0];
-
-    // Mobile camera capture can populate files a tick later in some browsers
-    if (!file) {
-      await new Promise((resolve) => setTimeout(resolve, 120));
-      file = input.files?.[0];
-    }
-
-    console.log("[PhotosStep] handlePhotoCapture called", { photoId, hasFile: !!file, fileCount: input.files?.length });
-    if (!file) {
-      toast({
-        title: "לא זוהתה תמונה",
-        description: "לא התקבלה תמונה מהמצלמה. נסה לצלם שוב.",
-        variant: "destructive",
-      });
-      input.value = "";
-      return;
-    }
-
-    console.log("[PhotosStep] File details:", { name: file.name, type: file.type, size: file.size });
+  const handleFileSelected = async (photoId: string, file: File) => {
+    console.log("[PhotosStep] handleFileSelected called", {
+      photoId,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
 
     if (!user) {
       console.error("[PhotosStep] No user found - auth required");
@@ -121,7 +105,6 @@ const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputE
         description: "יש להתחבר מחדש כדי להעלות תמונות.",
         variant: "destructive",
       });
-      event.currentTarget.value = "";
       navigate("/auth", { replace: true });
       return;
     }
@@ -132,7 +115,6 @@ const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputE
         description: "אפשר להעלות רק תמונת מצלמה תקינה (JPG/PNG/WEBP/HEIC).",
         variant: "destructive",
       });
-      event.currentTarget.value = "";
       return;
     }
 
@@ -142,7 +124,6 @@ const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputE
         description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
         variant: "destructive",
       });
-      event.currentTarget.value = "";
       return;
     }
 
@@ -188,7 +169,6 @@ const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputE
       });
     } finally {
       setProcessingPhoto(null);
-      event.currentTarget.value = "";
     }
   };
 
@@ -267,7 +247,7 @@ const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputE
               previewSrc={previewSrc}
               disabled={Boolean(processingPhoto) && !isProcessing}
               animationDelayMs={index * 80}
-              onPhotoChange={(event) => handlePhotoCapture(photo.id, event)}
+              onFileSelected={(file) => handleFileSelected(photo.id, file)}
               onRemove={() => removePhoto(photo.id)}
             />
           );
