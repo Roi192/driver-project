@@ -1,88 +1,38 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
-type ShiftPhotoValue = string | File;
-type ShiftPhotos = Record<string, ShiftPhotoValue | undefined>;
+type ShiftPhotos = Record<string, string | undefined>;
 
-interface FilePreviewMeta {
-  fingerprint: string;
-  url: string;
-}
-
-const buildFileFingerprint = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
-
-const hasPhotoValue = (value: ShiftPhotoValue | undefined) =>
-  value instanceof File || (typeof value === "string" && value.trim().length > 0);
+const hasPhotoValue = (value: string | undefined) => typeof value === "string" && value.trim().length > 0;
 
 export function PhotosStep() {
   const { control, setValue, register, getValues } = useFormContext();
+  const { user } = useAuth();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
-  const filePreviewCacheRef = useRef<Record<string, FilePreviewMeta>>({});
 
   const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
-
-  useEffect(() => {
-    const revokeUrl = (url: string | undefined) => {
-      if (url?.startsWith("blob:")) {
-        URL.revokeObjectURL(url);
-      }
-    };
-
-    const nextPreviews: Record<string, string> = {};
-    const nextFileCache: Record<string, FilePreviewMeta> = {};
-
-    for (const { id } of VEHICLE_PHOTOS) {
-      const value = photos[id];
-      const cached = filePreviewCacheRef.current[id];
-
-      if (value instanceof File) {
-        const fingerprint = buildFileFingerprint(value);
-
-        if (cached && cached.fingerprint === fingerprint) {
-          nextPreviews[id] = cached.url;
-          nextFileCache[id] = cached;
-          continue;
-        }
-
-        revokeUrl(cached?.url);
-
-        const blobUrl = URL.createObjectURL(value);
-        nextPreviews[id] = blobUrl;
-        nextFileCache[id] = { fingerprint, url: blobUrl };
-        continue;
-      }
-
-      revokeUrl(cached?.url);
-
-      if (typeof value === "string" && value.trim().length > 0) {
-        nextPreviews[id] = value;
-      }
-    }
-
-    filePreviewCacheRef.current = nextFileCache;
-    setPreviewUrls(nextPreviews);
-  }, [photos]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(filePreviewCacheRef.current).forEach(({ url }) => {
-        if (url.startsWith("blob:")) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, []);
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
+
+    if (!user) {
+      toast({
+        title: "נדרשת התחברות",
+        description: "יש להתחבר מחדש כדי להעלות תמונות.",
+        variant: "destructive",
+      });
+      event.currentTarget.value = "";
+      return;
+    }
 
     if (!file.type.startsWith("image/")) {
       toast({
@@ -107,19 +57,32 @@ export function PhotosStep() {
     setProcessingPhoto(photoId);
 
     try {
+      const uploadedPath = await uploadShiftPhoto({
+        file,
+        userId: user.id,
+        photoId,
+      });
+
       const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
-      const nextPhotos: ShiftPhotos = { ...currentPhotos, [photoId]: file };
+      const previousPhotoPath = currentPhotos[photoId];
+      const nextPhotos: ShiftPhotos = { ...currentPhotos, [photoId]: uploadedPath };
 
       setValue("photos", nextPhotos, {
         shouldDirty: true,
         shouldTouch: true,
         shouldValidate: true,
       });
+
+      if (previousPhotoPath && previousPhotoPath !== uploadedPath) {
+        void deleteShiftPhoto(previousPhotoPath).catch((error) => {
+          console.error("Failed to cleanup replaced photo:", error);
+        });
+      }
     } catch (error) {
-      console.error("Error handling camera photo:", error);
+      console.error("Error handling camera photo upload:", error);
       toast({
         title: "שגיאה בהעלאת התמונה",
-        description: "לא הצלחנו לקלוט את התמונה. נסה לצלם שוב.",
+        description: "לא הצלחנו להעלות את התמונה. נסה לצלם שוב.",
         variant: "destructive",
       });
     } finally {
@@ -130,6 +93,7 @@ export function PhotosStep() {
 
   const removePhoto = (photoId: string) => {
     const currentPhotos = (getValues("photos") || {}) as ShiftPhotos;
+    const removedPhotoPath = currentPhotos[photoId];
     const nextPhotos: ShiftPhotos = { ...currentPhotos };
     delete nextPhotos[photoId];
 
@@ -138,6 +102,12 @@ export function PhotosStep() {
       shouldTouch: true,
       shouldValidate: true,
     });
+
+    if (removedPhotoPath) {
+      void deleteShiftPhoto(removedPhotoPath).catch((error) => {
+        console.error("Failed to delete removed photo:", error);
+      });
+    }
   };
 
   const completedPhotos = VEHICLE_PHOTOS.filter((photo) => hasPhotoValue(photos[photo.id])).length;
@@ -183,7 +153,7 @@ export function PhotosStep() {
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto = hasPhotoValue(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
-          const previewSrc = previewUrls[photo.id];
+          const previewSrc = photos[photo.id];
 
           return (
             <PhotoCaptureCard

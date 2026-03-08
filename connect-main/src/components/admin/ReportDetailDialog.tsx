@@ -17,6 +17,7 @@ import {
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 import { COMBAT_EQUIPMENT, PRE_MOVEMENT_CHECKS, DRIVER_TOOLS } from "@/lib/constants";
+import { StorageImage } from "@/components/shared/StorageImage";
 
 interface ShiftReport {
   id: string;
@@ -301,10 +302,12 @@ export function ReportDetailDialog({ report, open, onOpenChange }: ReportDetailD
                 {photos.map((photo, index) => (
                   <div key={index} className="space-y-2">
                     <p className="text-xs text-slate-500 font-medium">{photo.label}</p>
-                    <img 
-                      src={photo.url} 
+                    <StorageImage
+                      src={photo.url}
+                      bucket="shift-photos"
                       alt={photo.label}
                       className="w-full h-32 object-cover rounded-xl border border-slate-200"
+                      showLoader={false}
                     />
                   </div>
                 ))}
