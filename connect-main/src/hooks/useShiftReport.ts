@@ -76,6 +76,29 @@ export function useShiftReport() {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const resolveAuthenticatedUserId = async (): Promise<string> => {
+    if (user?.id) {
+      return user.id;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.user?.id) {
+      return sessionData.session.user.id;
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (!authError && authData.user?.id) {
+      return authData.user.id;
+    }
+
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshData.session?.user?.id) {
+      return refreshData.session.user.id;
+    }
+
+    throw new Error("AUTH_REQUIRED: Missing authenticated session");
+  };
+
   const submitReport = async (formData: ShiftFormData): Promise<boolean> => {
     if (!user) {
       toast({
@@ -89,12 +112,7 @@ export function useShiftReport() {
     setIsSubmitting(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      const authenticatedUserId = authData.user?.id;
-
-      if (authError || !authenticatedUserId) {
-        throw new Error("AUTH_REQUIRED: Missing authenticated session");
-      }
+      const authenticatedUserId = await resolveAuthenticatedUserId();
 
       for (const key of REQUIRED_PHOTO_KEYS) {
         if (!formData.photos[key] || formData.photos[key].trim().length === 0) {

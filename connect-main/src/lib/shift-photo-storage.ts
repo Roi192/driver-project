@@ -119,22 +119,36 @@ export const normalizeShiftPhotoPath = (value: string | null | undefined): strin
   return extractFilePath(value, SHIFT_PHOTOS_BUCKET) ?? value;
 };
 
-const getAuthenticatedUserId = async (): Promise<string> => {
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error || !data.user?.id) {
-    throw new Error("AUTH_REQUIRED: Missing authenticated session");
+const getAuthenticatedUserId = async (fallbackUserId?: string): Promise<string> => {
+  if (typeof fallbackUserId === "string" && fallbackUserId.trim().length > 0) {
+    return fallbackUserId.trim();
   }
 
-  return data.user.id;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (sessionData.session?.user?.id) {
+    return sessionData.session.user.id;
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (!userError && userData.user?.id) {
+    return userData.user.id;
+  }
+
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+  if (!refreshError && refreshData.session?.user?.id) {
+    return refreshData.session.user.id;
+  }
+
+  throw new Error("AUTH_REQUIRED: Missing authenticated session");
 };
 
 export async function uploadShiftPhoto(params: {
   file: File;
   photoId: string;
+  userId?: string;
 }): Promise<string> {
   console.log("[uploadShiftPhoto] Starting upload for photoId:", params.photoId);
-  const authenticatedUserId = await getAuthenticatedUserId();
+  const authenticatedUserId = await getAuthenticatedUserId(params.userId);
   console.log("[uploadShiftPhoto] Authenticated userId:", authenticatedUserId);
   const optimizedFile = await maybeOptimizeImageForUpload(params.file);
   const uploadCandidates = optimizedFile === params.file ? [params.file] : [optimizedFile, params.file];

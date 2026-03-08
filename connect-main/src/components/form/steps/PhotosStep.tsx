@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,9 +26,15 @@ const isAcceptedImageFile = (file: File) => {
   return ACCEPTED_IMAGE_EXTENSIONS.some((extension) => filename.endsWith(`.${extension}`));
 };
 
+const isMobileDevice = () => {
+  if (typeof navigator === "undefined") return true;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+};
+
 export function PhotosStep() {
   const { control, setValue, register, getValues } = useFormContext();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
   const localPreviewsRef = useRef<LocalPreviews>({});
@@ -85,16 +92,27 @@ export function PhotosStep() {
       return;
     }
 
+    if (!isMobileDevice()) {
+      toast({
+        title: "צילום זמין רק מהנייד",
+        description: "שלב התמונות תומך בצילום חי מהטלפון בלבד.",
+        variant: "destructive",
+      });
+      event.currentTarget.value = "";
+      return;
+    }
+
     console.log("[PhotosStep] File details:", { name: file.name, type: file.type, size: file.size });
 
     if (!user) {
       console.error("[PhotosStep] No user found - auth required");
       toast({
-        title: "נדרשת התחברות",
+        title: "פג תוקף ההתחברות",
         description: "יש להתחבר מחדש כדי להעלות תמונות.",
         variant: "destructive",
       });
       event.currentTarget.value = "";
+      navigate("/auth", { replace: true });
       return;
     }
 
@@ -126,6 +144,7 @@ export function PhotosStep() {
       const uploadedPath = await uploadShiftPhoto({
         file,
         photoId,
+        userId: user.id,
       });
       console.log("[PhotosStep] Upload succeeded:", uploadedPath);
 
