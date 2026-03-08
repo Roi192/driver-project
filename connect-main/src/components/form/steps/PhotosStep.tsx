@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { useFormContext } from "react-hook-form";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,97 +7,151 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 
 export function PhotosStep() {
-  const { setValue, watch, register } = useFormContext();
+  const { control, setValue, register, trigger } = useFormContext();
   const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
-  const photos = watch("photos") || {};
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const photoPreviews = useMemo(() => {
-    const previews: Record<string, string> = {};
+  const photos = useWatch({ control, name: "photos" }) || {};
 
-    VEHICLE_PHOTOS.forEach((photo) => {
-      const value = photos[photo.id];
-      if (value instanceof File) {
-        previews[photo.id] = URL.createObjectURL(value);
-      } else if (typeof value === "string") {
-        previews[photo.id] = value;
-      }
-    });
-
-    return previews;
-  }, [photos]);
+  useEffect(() => {
+    register("photos");
+  }, [register]);
 
   useEffect(() => {
     return () => {
-      Object.values(photoPreviews).forEach((url) => {
+      Object.values(previewUrls).forEach((url) => {
         if (url.startsWith("blob:")) {
           URL.revokeObjectURL(url);
         }
       });
     };
-  }, [photoPreviews]);
+  }, [previewUrls]);
+
+  const openCamera = (photoId: string) => {
+    const input = fileInputRefs.current[photoId];
+    if (!input) return;
+
+    // Reset before opening to ensure onChange fires even if camera returns same filename
+    input.value = "";
+    input.click();
+  };
 
   const handlePhotoCapture = async (photoId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (file.size === 0) {
+      toast({
+        title: "קובץ לא תקין",
+        description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setProcessingPhoto(photoId);
+
     try {
-      const currentPhotos = watch("photos") || {};
-      setValue("photos", { ...currentPhotos, [photoId]: file }, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+      const nextPhotos = { ...photos, [photoId]: file };
+      setValue("photos", nextPhotos, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+      await trigger("photos");
+
+      setPreviewUrls((prev) => {
+        const prevUrl = prev[photoId];
+        if (prevUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(prevUrl);
+        }
+
+        return {
+          ...prev,
+          [photoId]: URL.createObjectURL(file),
+        };
+      });
     } catch (error) {
-      console.error("Error processing image:", error);
+      console.error("Error handling camera photo:", error);
       toast({
         title: "שגיאה בהעלאת התמונה",
         description: "לא הצלחנו לקלוט את התמונה. נסה לצלם שוב.",
         variant: "destructive",
       });
     } finally {
-      event.target.value = "";
       setProcessingPhoto(null);
+      event.target.value = "";
     }
   };
 
-  const removePhoto = (photoId: string) => {
+  const removePhoto = async (photoId: string) => {
+    setPreviewUrls((prev) => {
+      const next = { ...prev };
+      const previewToRevoke = next[photoId];
+      if (previewToRevoke?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewToRevoke);
+      }
+      delete next[photoId];
+      return next;
+    });
+
     const currentPhotos = { ...photos };
     delete currentPhotos[photoId];
-    setValue("photos", currentPhotos, { shouldDirty: true, shouldTouch: true });
+
+    setValue("photos", currentPhotos, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+    await trigger("photos");
   };
 
-  const completedPhotos = VEHICLE_PHOTOS.filter((p) => photos[p.id]).length;
+  const getPreviewSrc = (photoId: string): string | undefined => {
+    const value = photos[photoId];
+    if (typeof value === "string") return value;
+    return previewUrls[photoId];
+  };
+
+  const completedPhotos = VEHICLE_PHOTOS.filter((p) => Boolean(photos[p.id])).length;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-4">
-          <Camera className="w-4 h-4 text-primary" />
+      <div className="mb-8 text-center">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2">
+          <Camera className="h-4 w-4 text-primary" />
           <span className="text-sm font-bold text-primary">שלב 5 מתוך 5</span>
         </div>
-        <h2 className="text-3xl font-black mb-3 text-slate-800">תמונות הרכב</h2>
-        <p className="text-slate-500">צלם את הרכב מכל הזוויות הנדרשות</p>
-        
-        {/* Progress indicator */}
-        <div className={`mt-5 inline-flex items-center gap-3 px-5 py-2.5 rounded-full border ${
-          allPhotosCompleted 
-            ? "bg-green-50 border-green-200 text-green-600" 
-            : "bg-primary/5 border-primary/20 text-primary"
-        }`}>
-          {allPhotosCompleted && <Sparkles className="w-4 h-4" />}
-          <span className="font-bold">{completedPhotos} / {VEHICLE_PHOTOS.length}</span>
-          <span className="text-slate-500">תמונות הועלו</span>
-          {allPhotosCompleted && <Check className="w-4 h-4" />}
+        <h2 className="mb-3 text-3xl font-black text-foreground">תמונות הרכב</h2>
+        <p className="text-muted-foreground">צלם את הרכב מכל הזוויות הנדרשות</p>
+
+        <div
+          className={cn(
+            "mt-5 inline-flex items-center gap-3 rounded-full border px-5 py-2.5",
+            allPhotosCompleted
+              ? "border-primary/20 bg-primary/10 text-primary"
+              : "border-primary/20 bg-primary/5 text-primary"
+          )}
+        >
+          {allPhotosCompleted && <Sparkles className="h-4 w-4" />}
+          <span className="font-bold">
+            {completedPhotos} / {VEHICLE_PHOTOS.length}
+          </span>
+          <span className="text-muted-foreground">תמונות הועלו</span>
+          {allPhotosCompleted && <Check className="h-4 w-4" />}
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mb-6">
-        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-          <div 
-            className={`h-full transition-all duration-500 ${
-              allPhotosCompleted 
-                ? "bg-gradient-to-r from-green-500 to-primary" 
+      <div className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="h-3 overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full transition-all duration-500",
+              allPhotosCompleted
+                ? "bg-gradient-to-r from-primary to-accent"
                 : "bg-gradient-to-r from-primary to-accent"
-            }`}
+            )}
             style={{ width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%` }}
           />
         </div>
@@ -105,65 +159,70 @@ export function PhotosStep() {
 
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
-          const hasPhoto = photos[photo.id];
+          const hasPhoto = Boolean(photos[photo.id]);
           const isProcessing = processingPhoto === photo.id;
+          const previewSrc = getPreviewSrc(photo.id);
+
           return (
-            <div 
-              key={photo.id} 
+            <div
+              key={photo.id}
               className="relative animate-fade-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <label
+              <button
+                type="button"
+                onClick={() => openCamera(photo.id)}
+                disabled={isProcessing}
                 className={cn(
-                  "block aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 border-2",
-                  hasPhoto 
-                    ? "border-green-400 shadow-lg" 
-                    : "bg-white border-dashed border-slate-300 hover:border-primary/30 hover:bg-primary/5"
+                  "block aspect-square w-full overflow-hidden rounded-2xl border-2 transition-all duration-300",
+                  hasPhoto
+                    ? "border-primary shadow-lg"
+                    : "border-dashed border-border bg-card hover:border-primary/40 hover:bg-primary/5",
+                  isProcessing && "cursor-wait"
                 )}
               >
                 {isProcessing ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center gap-3 bg-muted/50">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/50 p-4 text-center">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     <span className="text-sm font-medium text-muted-foreground">מעבד תמונה...</span>
                   </div>
-                ) : hasPhoto ? (
-                  <img
-                    src={photoPreviews[photo.id]}
-                    alt={photo.label}
-                    className="w-full h-full object-cover"
-                  />
+                ) : hasPhoto && previewSrc ? (
+                  <img src={previewSrc} alt={photo.label} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center gap-3">
-                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                      <ImagePlus className="w-7 h-7 text-primary" />
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+                      <ImagePlus className="h-7 w-7 text-primary" />
                     </div>
-                    <span className="text-sm font-medium text-slate-600">{photo.label}</span>
+                    <span className="text-sm font-medium text-foreground">{photo.label}</span>
                   </div>
                 )}
-                
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp,image/*"
-                  capture="environment"
-                  disabled={isProcessing}
-                  onChange={(e) => handlePhotoCapture(photo.id, e)}
-                  className="hidden"
-                />
-              </label>
+              </button>
+
+              <input
+                ref={(el) => {
+                  fileInputRefs.current[photo.id] = el;
+                }}
+                type="file"
+                accept="image/*,image/heic,image/heif"
+                capture="environment"
+                disabled={isProcessing}
+                onChange={(e) => handlePhotoCapture(photo.id, e)}
+                className="hidden"
+              />
 
               {hasPhoto && (
                 <button
                   type="button"
                   onClick={() => removePhoto(photo.id)}
-                  className="absolute -top-2 -left-2 w-9 h-9 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
+                  className="absolute -left-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-5 w-5" />
                 </button>
               )}
 
               {hasPhoto && (
-                <div className="absolute -top-2 -right-2 w-9 h-9 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg animate-scale-in">
-                  <Check className="w-5 h-5" />
+                <div className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-scale-in">
+                  <Check className="h-5 w-5" />
                 </div>
               )}
             </div>
@@ -171,21 +230,20 @@ export function PhotosStep() {
         })}
       </div>
 
-      {/* Vehicle Notes Section */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mt-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500/15 to-orange-500/5 flex items-center justify-center border border-orange-200">
-            <MessageSquare className="w-5 h-5 text-orange-600" />
+      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+            <MessageSquare className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800">הערות או בעיות ברכב</h3>
-            <p className="text-sm text-slate-500">אופציונלי - תאר בעיות שנמצאו</p>
+            <h3 className="font-bold text-foreground">הערות או בעיות ברכב</h3>
+            <p className="text-sm text-muted-foreground">אופציונלי - תאר בעיות שנמצאו</p>
           </div>
         </div>
         <Textarea
           {...register("vehicleNotes")}
           placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת..."
-          className="min-h-[100px] bg-slate-50 border-slate-200 resize-none rounded-xl text-slate-800 placeholder:text-slate-400"
+          className="min-h-[100px] resize-none rounded-xl border-border bg-muted/30"
         />
       </div>
     </div>
