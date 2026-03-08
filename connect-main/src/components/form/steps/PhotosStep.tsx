@@ -18,6 +18,7 @@ export function PhotosStep() {
     register("photos");
   }, [register]);
 
+  // Only revoke blob URLs on component unmount
   useEffect(() => {
     return () => {
       Object.values(previewUrls).forEach((url) => {
@@ -26,7 +27,8 @@ export function PhotosStep() {
         }
       });
     };
-  }, [previewUrls]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openCamera = (photoId: string) => {
     const input = fileInputRefs.current[photoId];
