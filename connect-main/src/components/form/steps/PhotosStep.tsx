@@ -139,9 +139,10 @@ export function PhotosStep() {
     } catch (error) {
       console.error("Error handling camera photo upload:", error);
       clearLocalPreview(photoId);
+      const errorDetail = error instanceof Error ? error.message : String(error);
       toast({
         title: "שגיאה בהעלאת התמונה",
-        description: "לא הצלחנו להעלות את התמונה. נסה לצלם שוב.",
+        description: `פרטי שגיאה: ${errorDetail}`,
         variant: "destructive",
       });
     } finally {
