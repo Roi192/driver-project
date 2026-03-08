@@ -40,7 +40,7 @@ const isMobileDevice = () => {
 
 const getStoragePreviewUrl = (path: string) => {
   const { data } = supabase.storage.from(SHIFT_PHOTOS_BUCKET).getPublicUrl(path);
-  return data?.publicUrl || path;
+  return data?.publicUrl || "";
 };
 
 export function PhotosStep() {
@@ -52,7 +52,11 @@ export function PhotosStep() {
   const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
   const localPreviewsRef = useRef<LocalPreviews>({});
 
-  const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
+  const photos = useWatch({
+    control,
+    name: "photos",
+    defaultValue: {},
+  }) as ShiftPhotos;
 
   useEffect(() => {
     register("photos");
@@ -65,7 +69,9 @@ export function PhotosStep() {
   useEffect(() => {
     return () => {
       Object.values(localPreviewsRef.current).forEach((previewUrl) => {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        if (previewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(previewUrl);
+        }
       });
     };
   }, []);
@@ -75,7 +81,9 @@ export function PhotosStep() {
 
     setLocalPreviews((prev) => {
       const previousPreview = prev[photoId];
-      if (previousPreview) URL.revokeObjectURL(previousPreview);
+      if (previousPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(previousPreview);
+      }
 
       return {
         ...prev,
@@ -87,7 +95,9 @@ export function PhotosStep() {
   const clearLocalPreview = (photoId: string) => {
     setLocalPreviews((prev) => {
       const previousPreview = prev[photoId];
-      if (previousPreview) URL.revokeObjectURL(previousPreview);
+      if (previousPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(previousPreview);
+      }
 
       const next = { ...prev };
       delete next[photoId];
@@ -105,9 +115,12 @@ export function PhotosStep() {
         continue;
       }
 
-      const storedPath = photos[photo.id];
+      const storedPath = photos?.[photo.id];
       if (hasPhotoValue(storedPath)) {
-        previews[photo.id] = getStoragePreviewUrl(storedPath!);
+        const publicUrl = getStoragePreviewUrl(storedPath!);
+        if (publicUrl) {
+          previews[photo.id] = publicUrl;
+        }
       }
     }
 
@@ -163,6 +176,8 @@ export function PhotosStep() {
     }
 
     setProcessingPhoto(photoId);
+
+    // מציגים מיד preview מקומי
     setLocalPreview(photoId, file);
 
     try {
@@ -191,6 +206,8 @@ export function PhotosStep() {
         description: `פרטי שגיאה: ${errorDetail}`,
         variant: "destructive",
       });
+
+      // בכוונה לא מוחקים preview
     } finally {
       setProcessingPhoto(null);
       event.currentTarget.value = "";
@@ -198,7 +215,7 @@ export function PhotosStep() {
   };
 
   const removePhoto = (photoId: string) => {
-    const removedPhotoPath = photos[photoId];
+    const removedPhotoPath = photos?.[photoId];
 
     setValue(`photos.${photoId}`, undefined, {
       shouldDirty: true,
@@ -216,7 +233,7 @@ export function PhotosStep() {
   };
 
   const completedPhotos = VEHICLE_PHOTOS.filter((photo) => {
-    const hasStored = hasPhotoValue(photos[photo.id]);
+    const hasStored = hasPhotoValue(photos?.[photo.id]);
     const hasLocal = Boolean(localPreviews[photo.id]);
     return hasStored || hasLocal;
   }).length;
@@ -265,7 +282,7 @@ export function PhotosStep() {
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto =
-            hasPhotoValue(photos[photo.id]) || Boolean(localPreviews[photo.id]);
+            hasPhotoValue(photos?.[photo.id]) || Boolean(localPreviews[photo.id]);
 
           const isProcessing = processingPhoto === photo.id;
           const previewSrc = photoPreviews[photo.id];
