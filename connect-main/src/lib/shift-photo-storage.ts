@@ -119,11 +119,21 @@ export const normalizeShiftPhotoPath = (value: string | null | undefined): strin
   return extractFilePath(value, SHIFT_PHOTOS_BUCKET) ?? value;
 };
 
+const getAuthenticatedUserId = async (): Promise<string> => {
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user?.id) {
+    throw new Error("AUTH_REQUIRED: Missing authenticated session");
+  }
+
+  return data.user.id;
+};
+
 export async function uploadShiftPhoto(params: {
   file: File;
-  userId: string;
   photoId: string;
 }): Promise<string> {
+  const authenticatedUserId = await getAuthenticatedUserId();
   const optimizedFile = await maybeOptimizeImageForUpload(params.file);
   const uploadCandidates = optimizedFile === params.file ? [params.file] : [optimizedFile, params.file];
 
@@ -133,7 +143,7 @@ export async function uploadShiftPhoto(params: {
     const extension = resolveFileExtension(candidateFile);
 
     for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES; attempt += 1) {
-      const filePath = `${params.userId}/drafts/${params.photoId}_${Date.now()}.${extension}`;
+      const filePath = `${authenticatedUserId}/drafts/${params.photoId}_${Date.now()}.${extension}`;
 
       try {
         const { error } = await withTimeout(
