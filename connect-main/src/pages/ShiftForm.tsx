@@ -42,7 +42,6 @@ const createDefaultShiftFormValues = () => ({
   drillsCompleted: [],
   safetyVulnerabilities: "",
   vardimProcedure: "",
-  vardimPoints: "",
   photos: {},
   vehicleNotes: "",
 });
@@ -107,7 +106,6 @@ export default function ShiftForm() {
   };
 
   const hasPhotoValue = (value: unknown) => {
-    if (value instanceof File) return true;
     return typeof value === "string" && value.trim().length > 0;
   };
 
@@ -169,8 +167,7 @@ export default function ShiftForm() {
         if (
           !formData.drillsCompleted?.length ||
           !formData.safetyVulnerabilities ||
-          !formData.vardimProcedure ||
-          !formData.vardimPoints
+          !formData.vardimProcedure
         ) {
           toast({
             title: "שגיאה",
@@ -240,7 +237,7 @@ export default function ShiftForm() {
     }
 
     // Step 4: Drills
-    if (!formData.drillsCompleted?.length || !formData.safetyVulnerabilities || !formData.vardimProcedure || !formData.vardimPoints) {
+    if (!formData.drillsCompleted?.length || !formData.safetyVulnerabilities || !formData.vardimProcedure) {
       toast({
         title: "שגיאה",
         description: "חסרים פרטי תרגולות. יש למלא מחדש.",

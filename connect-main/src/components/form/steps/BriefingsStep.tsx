@@ -59,7 +59,7 @@ export function BriefingsStep() {
   const briefings = [
     {
       icon: AlertCircle,
-      label: "השתתפות בנוהל קרה",
+      label: "השתתפות בנוהל קרב",
       name: "emergencyProcedure",
       accentColor: "warning",
     },

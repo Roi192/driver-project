@@ -52,7 +52,7 @@ export const COMBAT_EQUIPMENT = [
 ] as const;
 
 export const PRE_MOVEMENT_CHECKS = [
-  "בדיקת שמן",
+  "בדיקת שמן מנוע",
   "בדיקת נוזל קירור",
   "בדיקת נוזל בלמים",
   "בדיקת מים לוישרים",

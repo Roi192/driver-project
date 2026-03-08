@@ -1,197 +1,50 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
 import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
-type ShiftPhotos = Record<string, string | undefined>;
-
-type LocalPreviews = Record<string, string | undefined>;
-
-const ACCEPTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
-
-const hasPhotoValue = (value: unknown) => typeof value === "string" && value.trim().length > 0;
-
-const isAcceptedImageFile = (file: File) => {
-  const mimeType = file.type?.toLowerCase() ?? "";
-  if (mimeType.startsWith("image/")) return true;
-
-  const filename = file.name?.toLowerCase() ?? "";
-  if (ACCEPTED_IMAGE_EXTENSIONS.some((ext) => filename.endsWith(`.${ext}`))) {
-    return true;
-  }
-
-  // Some mobile WebViews return camera files without mime/extension
-  return mimeType.length === 0 && !filename.includes(".") && file.size > 0;
-};
+const PHOTO_FIELD_NAMES = VEHICLE_PHOTOS.map((photo) => `photos.${photo.id}`);
 
 export function PhotosStep() {
-  const { control, setValue, register, getValues } = useFormContext();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
-  const [localPreviews, setLocalPreviews] = useState<LocalPreviews>({});
-  const localPreviewsRef = useRef<LocalPreviews>({});
+  const { control, setValue, register } = useFormContext();
 
-  const photos = (useWatch({ control, name: "photos" }) || {}) as ShiftPhotos;
+  const watchedPhotoValues = useWatch({
+    control,
+    name: PHOTO_FIELD_NAMES,
+  }) as Array<string | undefined>;
 
   useEffect(() => {
-    VEHICLE_PHOTOS.forEach((photo) => {
-      register(`photos.${photo.id}` as const);
+    PHOTO_FIELD_NAMES.forEach((fieldName) => {
+      register(fieldName);
     });
   }, [register]);
 
-  useEffect(() => {
-    localPreviewsRef.current = localPreviews;
-  }, [localPreviews]);
-
-  useEffect(() => {
-    return () => {
-      Object.values(localPreviewsRef.current).forEach((previewUrl) => {
-        if (previewUrl) {
-          URL.revokeObjectURL(previewUrl);
-        }
-      });
-    };
-  }, []);
-
-  const setLocalPreview = (photoId: string, file: File) => {
-    const previewUrl = URL.createObjectURL(file);
-
-    setLocalPreviews((prev) => {
-      const previousPreview = prev[photoId];
-      if (previousPreview) {
-        URL.revokeObjectURL(previousPreview);
-      }
-
-      return {
-        ...prev,
-        [photoId]: previewUrl,
-      };
-    });
-  };
-
-  const clearLocalPreview = (photoId: string) => {
-    setLocalPreviews((prev) => {
-      const previousPreview = prev[photoId];
-      if (previousPreview) {
-        URL.revokeObjectURL(previousPreview);
-      }
-
-      const next = { ...prev };
-      delete next[photoId];
-      return next;
-    });
-  };
-
-  const handleFileSelected = async (photoId: string, file: File) => {
-    console.log("[PhotosStep] handleFileSelected called", {
-      photoId,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-    });
-
-    if (!user) {
-      console.error("[PhotosStep] No user found - auth required");
-      toast({
-        title: "פג תוקף ההתחברות",
-        description: "יש להתחבר מחדש כדי להעלות תמונות.",
-        variant: "destructive",
-      });
-      navigate("/auth", { replace: true });
-      return;
-    }
-
-    if (!isAcceptedImageFile(file)) {
-      toast({
-        title: "קובץ לא תקין",
-        description: "אפשר להעלות רק תמונת מצלמה תקינה (JPG/PNG/WEBP/HEIC).",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size === 0) {
-      toast({
-        title: "קובץ לא תקין",
-        description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProcessingPhoto(photoId);
-    setLocalPreview(photoId, file);
-
-    try {
-      console.log("[PhotosStep] Starting upload for", photoId, "user:", user.id);
-      const uploadedPath = await uploadShiftPhoto({
-        file,
-        photoId,
-        userId: user.id,
-      });
-      console.log("[PhotosStep] Upload succeeded:", uploadedPath);
-
-      const fieldPath = `photos.${photoId}` as const;
-      const previousPhotoPath = getValues(fieldPath) as string | undefined;
-
-      setValue(fieldPath, uploadedPath, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-
-      console.log("[PhotosStep] Stored form value", {
-        photoId,
-        value: getValues(fieldPath),
-      });
-
-      if (previousPhotoPath && previousPhotoPath !== uploadedPath) {
-        void deleteShiftPhoto(previousPhotoPath).catch((error) => {
-          console.error("Failed to cleanup replaced photo:", error);
-        });
-      }
-    } catch (error) {
-      console.error("Error handling camera photo upload:", error);
-      clearLocalPreview(photoId);
-      const errorDetail = error instanceof Error ? error.message : String(error);
-      toast({
-        title: "שגיאה בהעלאת התמונה",
-        description: `פרטי שגיאה: ${errorDetail}`,
-        variant: "destructive",
-      });
-    } finally {
-      setProcessingPhoto(null);
-    }
-  };
-
-  const removePhoto = (photoId: string) => {
-    const fieldPath = `photos.${photoId}` as const;
-    const removedPhotoPath = getValues(fieldPath) as string | undefined;
-
-    setValue(fieldPath, undefined, {
+  const handlePhotoUploaded = (photoId: string, storagePath: string) => {
+    setValue(`photos.${photoId}`, storagePath, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
-
-    clearLocalPreview(photoId);
-
-    if (removedPhotoPath) {
-      void deleteShiftPhoto(removedPhotoPath).catch((error) => {
-        console.error("Failed to delete removed photo:", error);
-      });
-    }
   };
 
-  const completedPhotos = VEHICLE_PHOTOS.filter((photo) => hasPhotoValue(photos?.[photo.id])).length;
+  const handlePhotoRemoved = (photoId: string) => {
+    setValue(`photos.${photoId}`, undefined, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  };
+
+  const getStoredPath = (index: number) => {
+    const value = watchedPhotoValues?.[index];
+    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  };
+
+  const completedPhotos =
+    watchedPhotoValues?.filter((value) => typeof value === "string" && value.trim().length > 0).length ?? 0;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
@@ -231,27 +84,18 @@ export function PhotosStep() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {VEHICLE_PHOTOS.map((photo, index) => {
-          const storedPhotoPath = photos?.[photo.id];
-          const hasPhoto = hasPhotoValue(storedPhotoPath) || Boolean(localPreviews[photo.id]);
-          const isProcessing = processingPhoto === photo.id;
-          const previewSrc = localPreviews[photo.id] ?? storedPhotoPath;
-
-          return (
-            <PhotoCaptureCard
-              key={photo.id}
-              photoId={photo.id}
-              label={photo.label}
-              hasPhoto={hasPhoto}
-              isProcessing={isProcessing}
-              previewSrc={previewSrc}
-              disabled={Boolean(processingPhoto) && !isProcessing}
-              animationDelayMs={index * 80}
-              onFileSelected={(file) => handleFileSelected(photo.id, file)}
-              onRemove={() => removePhoto(photo.id)}
-            />
-          );
-        })}
+        {VEHICLE_PHOTOS.map((photo, index) => (
+          <PhotoCaptureCard
+            key={photo.id}
+            photoId={photo.id}
+            label={photo.label}
+            storedPath={getStoredPath(index)}
+            disabled={false}
+            animationDelayMs={index * 80}
+            onUploaded={handlePhotoUploaded}
+            onRemoved={handlePhotoRemoved}
+          />
+        ))}
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">

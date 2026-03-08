@@ -102,13 +102,13 @@ export function DrillsStep() {
             <AlertTriangle className="w-6 h-6 text-orange-600" />
           </div>
           <div>
-            <h3 className="font-bold text-lg text-slate-800">נקודות תורפה בטיחותיות</h3>
-            <p className="text-xs text-slate-500">ציין 2 נקודות תורפה בגזרתך</p>
+            <h3 className="font-bold text-lg text-slate-800">נקודות תורפה בטיחותיות בגזרה</h3>
+            <p className="text-xs text-slate-500">פנייה חדה, ציר מסוכן, צומת מסוכן וכו׳</p>
           </div>
         </div>
         <Textarea
           {...register("safetyVulnerabilities")}
-          placeholder="תאר את נקודות התורפה הבטיחותיות בגזרה שלך..."
+          placeholder="לדוגמה: פנייה או עיקול חד בכביש X, ציר מסוכן ליד צומת Y, צומת מסוכן..."
           className="min-h-[120px] bg-slate-50 border-slate-200 resize-none focus:border-orange-400 focus:ring-orange-200 transition-all duration-300 rounded-xl text-slate-800 placeholder:text-slate-400"
         />
       </div>
@@ -120,32 +120,14 @@ export function DrillsStep() {
             <MapPin className="w-6 h-6 text-accent" />
           </div>
           <div>
-            <h3 className="font-bold text-lg text-slate-800">נוהל ורדים</h3>
-            <p className="text-xs text-slate-500">מהו נוהל ורדים?</p>
+            <h3 className="font-bold text-lg text-slate-800">מהו נוהל ורדים?</h3>
+            <p className="text-xs text-slate-500">תאר את נוהל ורדים</p>
           </div>
         </div>
         <Textarea
           {...register("vardimProcedure")}
-          placeholder="תאר את נוהל ורדים בהרחבה..."
+          placeholder="תאר את נוהל ורדים..."
           className="min-h-[120px] bg-slate-50 border-slate-200 resize-none focus:border-accent/50 focus:ring-accent/20 transition-all duration-300 rounded-xl text-slate-800 placeholder:text-slate-400"
-        />
-      </div>
-
-      {/* Vardim Points */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center border border-slate-200">
-            <MapPin className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-bold text-lg text-slate-800">נקודות ורדים</h3>
-            <p className="text-xs text-slate-500">ציין 2 נקודות ורדים בגזרתך</p>
-          </div>
-        </div>
-        <Textarea
-          {...register("vardimPoints")}
-          placeholder="פרט את נקודות הורדים בגזרה שלך..."
-          className="min-h-[120px] bg-slate-50 border-slate-200 resize-none focus:border-primary/50 focus:ring-primary/20 transition-all duration-300 rounded-xl text-slate-800 placeholder:text-slate-400"
         />
       </div>
     </div>

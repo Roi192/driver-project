@@ -20,23 +20,13 @@ interface ShiftFormData {
   drillsCompleted: string[];
   safetyVulnerabilities: string;
   vardimProcedure: string;
-  vardimPoints: string;
+  photos: Record<string, string | undefined>;
   vehicleNotes: string;
-  photos: Record<string, string>;
 }
 
 type RequiredPhotoKey = "front" | "left" | "right" | "back" | "steering";
 
 const REQUIRED_PHOTO_KEYS: RequiredPhotoKey[] = ["front", "left", "right", "back", "steering"];
-
-interface PhotoUpdatePayload {
-  photo_front: string;
-  photo_left: string;
-  photo_right: string;
-  photo_back: string;
-  photo_steering_wheel: string;
-  is_complete: boolean;
-}
 
 const toStoredPhotoPath = (value: string | undefined, key: RequiredPhotoKey): string => {
   if (!value || value.trim().length === 0) {
@@ -62,15 +52,6 @@ const mapShiftType = (shiftType: string): "morning" | "afternoon" | "evening" =>
 
   return "evening";
 };
-
-const buildPhotoPayload = (photos: Record<string, string>): PhotoUpdatePayload => ({
-  photo_front: toStoredPhotoPath(photos.front, "front"),
-  photo_left: toStoredPhotoPath(photos.left, "left"),
-  photo_right: toStoredPhotoPath(photos.right, "right"),
-  photo_back: toStoredPhotoPath(photos.back, "back"),
-  photo_steering_wheel: toStoredPhotoPath(photos.steering, "steering"),
-  is_complete: true,
-});
 
 export function useShiftReport() {
   const { user } = useAuth();
@@ -114,15 +95,22 @@ export function useShiftReport() {
     try {
       const authenticatedUserId = await resolveAuthenticatedUserId();
 
+      // Validate all photos are already uploaded (string paths)
       for (const key of REQUIRED_PHOTO_KEYS) {
-        if (!formData.photos[key] || formData.photos[key].trim().length === 0) {
+        const photoValue = formData.photos[key];
+        if (!photoValue || photoValue.trim().length === 0) {
           throw new Error(`Missing required photo: ${key}`);
         }
       }
 
       const reportDate = formData.dateTime.toISOString().split("T")[0];
       const reportTime = formData.dateTime.toTimeString().split(" ")[0];
-      const photoPayload = buildPhotoPayload(formData.photos);
+
+      const photoFront = toStoredPhotoPath(formData.photos.front, "front");
+      const photoLeft = toStoredPhotoPath(formData.photos.left, "left");
+      const photoRight = toStoredPhotoPath(formData.photos.right, "right");
+      const photoBack = toStoredPhotoPath(formData.photos.back, "back");
+      const photoSteering = toStoredPhotoPath(formData.photos.steering, "steering");
 
       const { error: insertError } = await supabase.from("shift_reports").insert({
         user_id: authenticatedUserId,
@@ -148,9 +136,13 @@ export function useShiftReport() {
         fire_drill_completed: formData.drillsCompleted.includes(DRILLS[2]),
         safety_vulnerabilities: formData.safetyVulnerabilities || null,
         vardim_procedure_explanation: formData.vardimProcedure || null,
-        vardim_points: formData.vardimPoints || null,
         vehicle_notes: formData.vehicleNotes || null,
-        ...photoPayload,
+        photo_front: photoFront,
+        photo_left: photoLeft,
+        photo_right: photoRight,
+        photo_back: photoBack,
+        photo_steering_wheel: photoSteering,
+        is_complete: true,
       });
 
       if (insertError) {
@@ -163,7 +155,7 @@ export function useShiftReport() {
 
       toast({
         title: "שגיאה בשליחת הדיווח",
-        description: "שליחת התמונות נכשלה. נסה שוב.",
+        description: "שליחת הדיווח נכשלה. נסה שוב.",
         variant: "destructive",
       });
       return false;
