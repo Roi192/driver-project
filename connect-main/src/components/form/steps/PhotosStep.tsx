@@ -1,71 +1,77 @@
+import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
-import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare } from "lucide-react";
+import { Camera, Check, X, ImagePlus, Sparkles, MessageSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 
-// Image compression utility
-const compressImage = (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        // Calculate new dimensions
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-        
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // Convert to compressed JPEG
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
+// Robust image compression using createImageBitmap (avoids data URL stack overflow on large mobile photos)
+const compressImage = async (file: File, maxWidth = 800, quality = 0.6): Promise<string> => {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const ratio = Math.min(1, maxWidth / Math.max(bitmap.width, bitmap.height));
+    const targetW = Math.max(1, Math.round(bitmap.width * ratio));
+    const targetH = Math.max(1, Math.round(bitmap.height * ratio));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get canvas context");
+
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+    bitmap.close?.();
+
+    // Use toBlob + chunked ArrayBuffer→base64 to avoid stack overflow on large images
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality)
+    );
+
+    if (!blob) throw new Error("Canvas toBlob returned null");
+
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const CHUNK_SIZE = 8192;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length));
+      for (let j = 0; j < chunk.length; j++) {
+        binary += String.fromCharCode(chunk[j]);
+      }
+    }
+
+    return `data:image/jpeg;base64,${btoa(binary)}`;
+  } catch (err) {
+    console.error("Image compression failed, using fallback:", err);
+    // Fallback: read as data URL directly (may be large but at least works)
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = () => reject(new Error("FileReader failed"));
+      reader.readAsDataURL(file);
+    });
+  }
 };
 
 export function PhotosStep() {
   const { setValue, watch, register } = useFormContext();
+  const [processingPhoto, setProcessingPhoto] = useState<string | null>(null);
   const photos = watch("photos") || {};
   
   const handlePhotoCapture = async (photoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      try {
-        // Compress the image before storing
-        const compressedDataUrl = await compressImage(file, 800, 0.6);
-        const currentPhotos = watch("photos") || {};
-        setValue("photos", { ...currentPhotos, [photoId]: compressedDataUrl }, { shouldDirty: true, shouldTouch: true });
-      } catch (error) {
-        console.error('Error compressing image:', error);
-        // Fallback to original if compression fails
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const currentPhotos = watch("photos") || {};
-          setValue("photos", { ...currentPhotos, [photoId]: e.target?.result as string }, { shouldDirty: true, shouldTouch: true });
-        };
-        reader.readAsDataURL(file);
-      }
+    if (!file) return;
+    
+    setProcessingPhoto(photoId);
+    try {
+      const compressedDataUrl = await compressImage(file, 800, 0.6);
+      const currentPhotos = watch("photos") || {};
+      setValue("photos", { ...currentPhotos, [photoId]: compressedDataUrl }, { shouldDirty: true, shouldTouch: true });
+    } catch (error) {
+      console.error('Error processing image:', error);
+    } finally {
+      setProcessingPhoto(null);
     }
   };
 
@@ -118,7 +124,7 @@ export function PhotosStep() {
       <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => {
           const hasPhoto = photos[photo.id];
-          
+          const isProcessing = processingPhoto === photo.id;
           return (
             <div 
               key={photo.id} 
@@ -133,7 +139,12 @@ export function PhotosStep() {
                     : "bg-white border-dashed border-slate-300 hover:border-primary/30 hover:bg-primary/5"
                 )}
               >
-                {hasPhoto ? (
+                {isProcessing ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center gap-3 bg-muted/50">
+                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                    <span className="text-sm font-medium text-muted-foreground">מעבד תמונה...</span>
+                  </div>
+                ) : hasPhoto ? (
                   <img
                     src={photos[photo.id]}
                     alt={photo.label}
