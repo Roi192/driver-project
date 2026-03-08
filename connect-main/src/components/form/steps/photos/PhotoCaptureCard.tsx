@@ -1,5 +1,6 @@
 import { type ChangeEvent } from "react";
 import { Camera, Check, ImagePlus, Loader2, X } from "lucide-react";
+import { StorageImage } from "@/components/shared/StorageImage";
 import { cn } from "@/lib/utils";
 
 interface PhotoCaptureCardProps {
@@ -28,11 +29,10 @@ export function PhotoCaptureCard({
   const inputId = `shift-photo-${photoId}`;
 
   return (
-    <div
-      className="relative animate-fade-in"
-      style={{ animationDelay: `${animationDelayMs}ms` }}
-    >
+    <div className="relative animate-fade-in" style={{ animationDelay: `${animationDelayMs}ms` }}>
       <div
+        aria-label={label}
+        aria-disabled={disabled || isProcessing}
         className={cn(
           "relative block aspect-square w-full overflow-hidden rounded-2xl border-2 text-right transition-all duration-300",
           hasPhoto
@@ -44,17 +44,22 @@ export function PhotoCaptureCard({
         {isProcessing ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/50 p-4 text-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">
-              מעלה תמונה...
-            </span>
+            <span className="text-sm font-medium text-muted-foreground">מעלה תמונה...</span>
           </div>
         ) : hasPhoto && previewSrc ? (
-          <img
-            src={previewSrc}
-            alt={label}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          previewSrc.startsWith("blob:") ? (
+            <img src={previewSrc} alt={label} className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <StorageImage
+              src={previewSrc}
+              bucket="shift-photos"
+              alt={label}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              showLoader={false}
+              fallback={<div className="h-full w-full bg-muted" />}
+            />
+          )
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
@@ -78,17 +83,19 @@ export function PhotoCaptureCard({
           </div>
         )}
 
-        {!disabled && !isProcessing && (
-          <input
-            id={inputId}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={onPhotoChange}
-            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-            aria-label={label}
-          />
-        )}
+        <input
+          id={inputId}
+          type="file"
+          accept="image/*,.heic,.heif"
+          capture="environment"
+          disabled={disabled || isProcessing}
+          onClick={(event) => {
+            event.currentTarget.value = "";
+          }}
+          onChange={onPhotoChange}
+          className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
+          aria-label={`צלם ${label}`}
+        />
       </div>
 
       {hasPhoto && (
@@ -99,7 +106,7 @@ export function PhotoCaptureCard({
             event.stopPropagation();
             onRemove();
           }}
-          className="absolute -left-2 -top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
+          className="absolute -left-2 -top-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
           aria-label={`הסר ${label}`}
         >
           <X className="h-5 w-5" />
@@ -107,7 +114,7 @@ export function PhotoCaptureCard({
       )}
 
       {hasPhoto && (
-        <div className="absolute -right-2 -top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-scale-in">
+        <div className="absolute -right-2 -top-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-scale-in">
           <Check className="h-5 w-5" />
         </div>
       )}
