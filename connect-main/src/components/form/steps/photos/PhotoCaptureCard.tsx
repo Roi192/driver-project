@@ -283,14 +283,30 @@ export function PhotoCaptureCard({
   }, [disabled, processSelectedFileFromInput, resetInput, uploading]);
 
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    awaitingCaptureRef.current = false;
-    await processSelectedFile(event.currentTarget.files?.[0] ?? null);
-  };
+  const file = event.currentTarget.files?.[0];
 
-  const handleInput = async (event: React.FormEvent<HTMLInputElement>) => {
-    awaitingCaptureRef.current = false;
-    await processSelectedFile(event.currentTarget.files?.[0] ?? null);
-  };
+  setDebugText(
+    file
+      ? `CHANGE OK | name=${file.name} | type=${file.type} | size=${file.size}`
+      : "CHANGE FIRED BUT NO FILE"
+  );
+
+  awaitingCaptureRef.current = false;
+  await processSelectedFile(file ?? null);
+};
+
+ const handleInput = async (event: React.FormEvent<HTMLInputElement>) => {
+  const file = event.currentTarget.files?.[0];
+
+  setDebugText(
+    file
+      ? `INPUT OK | name=${file.name} | type=${file.type} | size=${file.size}`
+      : "INPUT FIRED BUT NO FILE"
+  );
+
+  awaitingCaptureRef.current = false;
+  await processSelectedFile(file ?? null);
+};
 
   const handleRetry = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
