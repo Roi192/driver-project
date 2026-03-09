@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { useFormContext } from "react-hook-form";
 import { Camera, Check, MessageSquare, Sparkles } from "lucide-react";
 
 import { Textarea } from "@/components/ui/textarea";
@@ -11,18 +11,19 @@ import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 const PHOTO_FIELD_NAMES = VEHICLE_PHOTOS.map((photo) => `photos.${photo.id}`);
 
 export function PhotosStep() {
-  const { control, setValue, register } = useFormContext();
-
-  const watchedPhotoValues = useWatch({
-    control,
-    name: PHOTO_FIELD_NAMES,
-  }) as Array<string | undefined>;
+  const { register, setValue, getValues } = useFormContext();
+  const [, forceRender] = useState(0);
 
   useEffect(() => {
     PHOTO_FIELD_NAMES.forEach((fieldName) => {
-      register(fieldName);
+      register(fieldName, { required: false });
     });
   }, [register]);
+
+  const getStoredPath = (photoId: string) => {
+    const value = getValues(`photos.${photoId}`);
+    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  };
 
   const handlePhotoUploaded = (photoId: string, storagePath: string) => {
     setValue(`photos.${photoId}`, storagePath, {
@@ -30,6 +31,15 @@ export function PhotosStep() {
       shouldTouch: true,
       shouldValidate: true,
     });
+
+    setTimeout(() => {
+      setValue(`photos.${photoId}`, storagePath, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+      forceRender((prev) => prev + 1);
+    }, 50);
   };
 
   const handlePhotoRemoved = (photoId: string) => {
@@ -38,17 +48,18 @@ export function PhotosStep() {
       shouldTouch: true,
       shouldValidate: true,
     });
+
+    setTimeout(() => {
+      forceRender((prev) => prev + 1);
+    }, 50);
   };
 
-  const getStoredPath = (index: number) => {
-    const value = watchedPhotoValues?.[index];
-    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
-  };
-
-  const completedPhotos =
-    watchedPhotoValues?.filter(
-      (value) => typeof value === "string" && value.trim().length > 0
-    ).length ?? 0;
+  const completedPhotos = useMemo(() => {
+    return VEHICLE_PHOTOS.filter((photo) => {
+      const value = getValues(`photos.${photo.id}`);
+      return typeof value === "string" && value.trim().length > 0;
+    }).length;
+  }, [getValues]);
 
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
@@ -63,7 +74,7 @@ export function PhotosStep() {
         <h2 className="mb-3 text-3xl font-bold tracking-tight">תמונות הרכב</h2>
 
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
-          צלם את כל תמונות הרכב מהמצלמה. רק תמונות שהועלו בהצלחה לשרת ייחשבו כהשלמה
+          צלם את כל תמונות הרכב מהמצלמה. רק תמונות שהועלו בהצלחה ייחשבו כהשלמה
           של השלב.
         </p>
       </div>
@@ -100,10 +111,10 @@ export function PhotosStep() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         {VEHICLE_PHOTOS.map((photo, index) => (
           <PhotoCaptureCard
-            key={photo.id}
+            key={`${photo.id}-${getStoredPath(photo.id) ?? "empty"}`}
             photoId={photo.id}
             label={photo.label}
-            storedPath={getStoredPath(index)}
+            storedPath={getStoredPath(photo.id)}
             animationDelayMs={index * 60}
             onUploaded={handlePhotoUploaded}
             onRemoved={handlePhotoRemoved}

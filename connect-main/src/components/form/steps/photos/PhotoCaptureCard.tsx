@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Camera, Check, ImagePlus, Loader2, RefreshCcw, X } from "lucide-react";
 
 import { StorageImage } from "@/components/shared/StorageImage";
@@ -27,20 +27,11 @@ export function PhotoCaptureCard({
 }: PhotoCaptureCardProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const processingRef = useRef(false);
-  const awaitingCaptureRef = useRef(false);
 
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (localPreview && localPreview.startsWith("blob:")) {
-        URL.revokeObjectURL(localPreview);
-      }
-    };
-  }, [localPreview]);
 
   const hasLocalPreview = Boolean(localPreview);
   const hasStoredPhoto = Boolean(storedPath);
@@ -53,12 +44,6 @@ export function PhotoCaptureCard({
   const resetInput = useCallback(() => {
     if (inputRef.current) {
       inputRef.current.value = "";
-    }
-  }, []);
-
-  const revokeOldPreviewIfNeeded = useCallback((value: string | null) => {
-    if (value && value.startsWith("blob:")) {
-      URL.revokeObjectURL(value);
     }
   }, []);
 
@@ -75,51 +60,30 @@ export function PhotoCaptureCard({
         }
       };
 
-      reader.onerror = () => {
-        reject(new Error("PREVIEW_READ_FAILED"));
-      };
-
+      reader.onerror = () => reject(new Error("PREVIEW_READ_FAILED"));
       reader.readAsDataURL(file);
     });
   }, []);
 
-  const applyLocalPreview = useCallback(
-    async (file: File) => {
-      try {
-        const nextPreview = await createPreviewFromFile(file);
-        setLocalPreview((previous) => {
-          revokeOldPreviewIfNeeded(previous);
-          return nextPreview;
-        });
-      } catch (error) {
-        console.error("[PhotoCapture] preview creation failed", photoId, error);
-      }
-    },
-    [createPreviewFromFile, photoId, revokeOldPreviewIfNeeded]
-  );
+  const validateSelectedFile = useCallback((file: File | null | undefined) => {
+    if (!file) {
+      return { ok: false, message: "לא נבחרה תמונה." };
+    }
 
-  const validateSelectedFile = useCallback(
-    (file: File | null | undefined) => {
-      if (!file) {
-        return { ok: false, message: "לא נבחרה תמונה." };
-      }
+    const isImage =
+      file.type?.startsWith("image/") ||
+      /\.(heic|heif|jpg|jpeg|png|webp|bmp|gif)$/i.test(file.name || "");
 
-      const isImage =
-        file.type?.startsWith("image/") ||
-        /\.(heic|heif|jpg|jpeg|png|webp|bmp|gif)$/i.test(file.name || "");
+    if (!isImage) {
+      return { ok: false, message: "הקובץ שנבחר אינו תמונה תקינה." };
+    }
 
-      if (!isImage) {
-        return { ok: false, message: "הקובץ שנבחר אינו תמונה תקינה." };
-      }
+    if (file.size === 0) {
+      return { ok: false, message: "התמונה שצולמה ריקה. נסה לצלם שוב." };
+    }
 
-      if (file.size === 0) {
-        return { ok: false, message: "התמונה שצולמה ריקה. נסה לצלם שוב." };
-      }
-
-      return { ok: true as const };
-    },
-    []
-  );
+    return { ok: true as const };
+  }, []);
 
   const uploadFile = useCallback(
     async (file: File) => {
@@ -127,25 +91,13 @@ export function PhotoCaptureCard({
       setUploadError(null);
 
       try {
-        console.log("[PhotoCapture] before upload", {
-          photoId,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          hasStoredPath: !!storedPath,
-        });
-
         const previousStoredPath = storedPath;
         const path = await uploadShiftPhoto({ file, photoId });
-
-        console.log("[PhotoCapture] upload success", { photoId, path });
 
         onUploaded(photoId, path);
 
         if (previousStoredPath && previousStoredPath !== path) {
-          await deleteShiftPhoto(previousStoredPath).catch((error) => {
-            console.warn("[PhotoCapture] failed deleting previous photo", error);
-          });
+          await deleteShiftPhoto(previousStoredPath).catch(() => {});
         }
 
         toast({
@@ -155,11 +107,6 @@ export function PhotoCaptureCard({
       } catch (error) {
         const message = error instanceof Error ? error.message : "אירעה שגיאה";
         setUploadError(message);
-
-        console.error("[PhotoCapture] upload failed", {
-          photoId,
-          message,
-        });
 
         toast({
           title: "❌ העלאת התמונה נכשלה",
@@ -176,9 +123,7 @@ export function PhotoCaptureCard({
 
   const processSelectedFile = useCallback(
     async (file: File | null | undefined) => {
-      if (processingRef.current || uploading) {
-        return;
-      }
+      if (processingRef.current || uploading) return;
 
       const validation = validateSelectedFile(file);
       if (!validation.ok) {
@@ -192,126 +137,36 @@ export function PhotoCaptureCard({
       }
 
       processingRef.current = true;
-      awaitingCaptureRef.current = false;
 
       try {
         setSelectedFile(file);
         setUploadError(null);
 
-        console.log("[PhotoCapture] file selected", {
-          photoId,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        });
+        const preview = await createPreviewFromFile(file);
+        setLocalPreview(preview);
 
-        await applyLocalPreview(file);
         await uploadFile(file);
       } finally {
         processingRef.current = false;
       }
     },
-    [applyLocalPreview, photoId, resetInput, uploadFile, uploading, validateSelectedFile]
+    [createPreviewFromFile, resetInput, uploadFile, uploading, validateSelectedFile]
   );
-
-  const processSelectedFileFromInput = useCallback(async (): Promise<boolean> => {
-    const selected = inputRef.current?.files?.[0];
-    if (!selected) {
-      return false;
-    }
-
-    await processSelectedFile(selected);
-    return true;
-  }, [processSelectedFile]);
-
-  useEffect(() => {
-    const handleResume = () => {
-      if (!awaitingCaptureRef.current) return;
-
-      window.setTimeout(() => {
-        void processSelectedFileFromInput().then((processed) => {
-          if (processed || document.visibilityState === "visible") {
-            awaitingCaptureRef.current = false;
-          }
-        });
-      }, 180);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        handleResume();
-      }
-    };
-
-    window.addEventListener("focus", handleResume);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", handleResume);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [processSelectedFileFromInput]);
 
   const openFilePicker = useCallback(() => {
     if (disabled || uploading) return;
-
-    const input = inputRef.current;
-    if (!input) return;
-
     resetInput();
-    awaitingCaptureRef.current = true;
-
-    try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-      } else {
-        input.click();
-      }
-    } catch {
-      input.click();
-    }
-
-    window.setTimeout(() => {
-      if (!awaitingCaptureRef.current) return;
-
-      void processSelectedFileFromInput().then((processed) => {
-        if (!processed) {
-          awaitingCaptureRef.current = false;
-        }
-      });
-    }, 1400);
-  }, [disabled, processSelectedFileFromInput, resetInput, uploading]);
+    inputRef.current?.click();
+  }, [disabled, resetInput, uploading]);
 
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.currentTarget.files?.[0];
-
-  setDebugText(
-    file
-      ? `CHANGE OK | name=${file.name} | type=${file.type} | size=${file.size}`
-      : "CHANGE FIRED BUT NO FILE"
-  );
-
-  awaitingCaptureRef.current = false;
-  await processSelectedFile(file ?? null);
-};
-
- const handleInput = async (event: React.FormEvent<HTMLInputElement>) => {
-  const file = event.currentTarget.files?.[0];
-
-  setDebugText(
-    file
-      ? `INPUT OK | name=${file.name} | type=${file.type} | size=${file.size}`
-      : "INPUT FIRED BUT NO FILE"
-  );
-
-  awaitingCaptureRef.current = false;
-  await processSelectedFile(file ?? null);
-};
+    const file = event.currentTarget.files?.[0] ?? null;
+    await processSelectedFile(file);
+  };
 
   const handleRetry = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-
     if (uploading || !selectedFile) return;
     await uploadFile(selectedFile);
   };
@@ -322,19 +177,12 @@ export function PhotoCaptureCard({
 
     try {
       if (storedPath) {
-        await deleteShiftPhoto(storedPath).catch((error) => {
-          console.warn("[PhotoCapture] failed deleting stored photo", error);
-        });
+        await deleteShiftPhoto(storedPath).catch(() => {});
       }
     } finally {
       setSelectedFile(null);
       setUploadError(null);
-
-      setLocalPreview((previous) => {
-        revokeOldPreviewIfNeeded(previous);
-        return null;
-      });
-
+      setLocalPreview(null);
       onRemoved(photoId);
       resetInput();
     }
@@ -354,7 +202,6 @@ export function PhotoCaptureCard({
         capture="environment"
         className="sr-only"
         onChange={handleChange}
-        onInput={handleInput}
         disabled={isDisabled}
       />
 
@@ -362,9 +209,7 @@ export function PhotoCaptureCard({
         role="button"
         tabIndex={isDisabled ? -1 : 0}
         onClick={() => {
-          if (!isDisabled) {
-            openFilePicker();
-          }
+          if (!isDisabled) openFilePicker();
         }}
         onKeyDown={(event) => {
           if (isDisabled) return;
@@ -409,9 +254,7 @@ export function PhotoCaptureCard({
             </div>
             <div className="space-y-1">
               <div className="text-sm font-semibold">{label}</div>
-              <div className="text-xs text-muted-foreground">
-                צילום מהמצלמה בלבד
-              </div>
+              <div className="text-xs text-muted-foreground">צילום מהמצלמה בלבד</div>
             </div>
           </div>
         )}
@@ -443,17 +286,9 @@ export function PhotoCaptureCard({
           </div>
         )}
 
-        {!hasPhoto && !uploading && (
-          <div className="absolute right-3 top-3 rounded-full bg-background/80 p-2 shadow-sm">
-            <ImagePlus className="h-4 w-4 text-primary" />
-          </div>
-        )}
-
         {uploadError && !uploading && (
           <div className="absolute inset-x-2 top-2 rounded-xl border border-destructive/30 bg-background/95 p-2 text-right shadow-lg">
-            <div className="text-xs font-semibold text-destructive">
-              העלאת התמונה נכשלה
-            </div>
+            <div className="text-xs font-semibold text-destructive">העלאת התמונה נכשלה</div>
             <div className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
               {uploadError}
             </div>
