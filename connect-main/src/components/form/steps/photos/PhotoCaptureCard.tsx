@@ -1,5 +1,19 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Camera, Check, ImagePlus, Loader2, RefreshCcw, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import {
+  Camera as CameraIcon,
+  Check,
+  ImagePlus,
+  Loader2,
+  RefreshCcw,
+  X,
+} from "lucide-react";
+import {
+  Camera,
+  CameraDirection,
+  CameraResultType,
+  CameraSource,
+  type Photo,
+} from "@capacitor/camera";
 
 import { StorageImage } from "@/components/shared/StorageImage";
 import { toast } from "@/hooks/use-toast";
@@ -25,9 +39,6 @@ export function PhotoCaptureCard({
   onUploaded,
   onRemoved,
 }: PhotoCaptureCardProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const processingRef = useRef(false);
-
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -40,30 +51,6 @@ export function PhotoCaptureCard({
   const previewSrc = useMemo(() => {
     return localPreview ?? storedPath ?? undefined;
   }, [localPreview, storedPath]);
-
-  const resetInput = useCallback(() => {
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-  }, []);
-
-  const createPreviewFromFile = useCallback(async (file: File) => {
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result === "string" && result.length > 0) {
-          resolve(result);
-        } else {
-          reject(new Error("PREVIEW_EMPTY"));
-        }
-      };
-
-      reader.onerror = () => reject(new Error("PREVIEW_READ_FAILED"));
-      reader.readAsDataURL(file);
-    });
-  }, []);
 
   const validateSelectedFile = useCallback((file: File | null | undefined) => {
     if (!file) {
@@ -83,6 +70,23 @@ export function PhotoCaptureCard({
     }
 
     return { ok: true as const };
+  }, []);
+
+  const photoToFile = useCallback(async (photo: Photo, fallbackName: string) => {
+    if (!photo.webPath) {
+      throw new Error("לא התקבל webPath מהמצלמה");
+    }
+
+    const response = await fetch(photo.webPath);
+    const blob = await response.blob();
+
+    const ext = photo.format || "jpeg";
+    const fileName = `${fallbackName}.${ext === "jpeg" ? "jpg" : ext}`;
+
+    return new File([blob], fileName, {
+      type: blob.type || `image/${ext}`,
+      lastModified: Date.now(),
+    });
   }, []);
 
   const uploadFile = useCallback(
@@ -115,58 +119,59 @@ export function PhotoCaptureCard({
         });
       } finally {
         setUploading(false);
-        resetInput();
       }
     },
-    [label, onUploaded, photoId, resetInput, storedPath]
+    [label, onUploaded, photoId, storedPath]
   );
 
-  const processSelectedFile = useCallback(
-    async (file: File | null | undefined) => {
-      if (processingRef.current || uploading) return;
-
-      const validation = validateSelectedFile(file);
-      if (!validation.ok) {
-        toast({
-          title: "קובץ לא תקין",
-          description: validation.message,
-          variant: "destructive",
-        });
-        resetInput();
-        return;
-      }
-
-      processingRef.current = true;
-
-      try {
-        setSelectedFile(file);
-        setUploadError(null);
-
-        const preview = await createPreviewFromFile(file);
-        setLocalPreview(preview);
-
-        await uploadFile(file);
-      } finally {
-        processingRef.current = false;
-      }
-    },
-    [createPreviewFromFile, resetInput, uploadFile, uploading, validateSelectedFile]
-  );
-
-  const openFilePicker = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
     if (disabled || uploading) return;
-    resetInput();
-    inputRef.current?.click();
-  }, [disabled, resetInput, uploading]);
 
-  const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0] ?? null;
-    await processSelectedFile(file);
-  };
+    try {
+      setUploadError(null);
+
+      const image = await Camera.getPhoto({
+        quality: 85,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera,
+        direction: CameraDirection.Rear,
+        correctOrientation: true,
+        saveToGallery: false,
+      });
+
+      if (!image.webPath) {
+        throw new Error("לא התקבלה תמונה מהמצלמה");
+      }
+
+      setLocalPreview(image.webPath);
+
+      const file = await photoToFile(image, `${photoId}-${Date.now()}`);
+      const validation = validateSelectedFile(file);
+
+      if (!validation.ok) {
+        throw new Error(validation.message);
+      }
+
+      setSelectedFile(file);
+      await uploadFile(file);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "שגיאה בצילום מהמצלמה";
+
+      setUploadError(message);
+
+      toast({
+        title: "❌ צילום או העלאה נכשלו",
+        description: `${label} - ${message}`,
+        variant: "destructive",
+      });
+    }
+  }, [disabled, label, photoId, photoToFile, uploadFile, uploading, validateSelectedFile]);
 
   const handleRetry = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+
     if (uploading || !selectedFile) return;
     await uploadFile(selectedFile);
   };
@@ -184,7 +189,6 @@ export function PhotoCaptureCard({
       setUploadError(null);
       setLocalPreview(null);
       onRemoved(photoId);
-      resetInput();
     }
   };
 
@@ -195,27 +199,19 @@ export function PhotoCaptureCard({
       className="animate-fade-in"
       style={{ animationDelay: `${animationDelayMs}ms` }}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="sr-only"
-        onChange={handleChange}
-        disabled={isDisabled}
-      />
-
       <div
         role="button"
         tabIndex={isDisabled ? -1 : 0}
         onClick={() => {
-          if (!isDisabled) openFilePicker();
+          if (!isDisabled) {
+            void capturePhoto();
+          }
         }}
         onKeyDown={(event) => {
           if (isDisabled) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            openFilePicker();
+            void capturePhoto();
           }
         }}
         className={cn(
@@ -233,7 +229,10 @@ export function PhotoCaptureCard({
             <div className="text-xs text-muted-foreground">{label}</div>
           </div>
         ) : hasPhoto && previewSrc ? (
-          previewSrc.startsWith("data:") || previewSrc.startsWith("blob:") ? (
+          previewSrc.startsWith("http") ||
+          previewSrc.startsWith("data:") ||
+          previewSrc.startsWith("blob:") ||
+          previewSrc.startsWith("capacitor:") ? (
             <img
               src={previewSrc}
               alt={label}
@@ -250,11 +249,13 @@ export function PhotoCaptureCard({
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
             <div className="rounded-full bg-primary/10 p-3">
-              <Camera className="h-7 w-7 text-primary" />
+              <CameraIcon className="h-7 w-7 text-primary" />
             </div>
             <div className="space-y-1">
               <div className="text-sm font-semibold">{label}</div>
-              <div className="text-xs text-muted-foreground">צילום מהמצלמה בלבד</div>
+              <div className="text-xs text-muted-foreground">
+                צילום מהמצלמה בלבד
+              </div>
             </div>
           </div>
         )}
@@ -288,7 +289,9 @@ export function PhotoCaptureCard({
 
         {uploadError && !uploading && (
           <div className="absolute inset-x-2 top-2 rounded-xl border border-destructive/30 bg-background/95 p-2 text-right shadow-lg">
-            <div className="text-xs font-semibold text-destructive">העלאת התמונה נכשלה</div>
+            <div className="text-xs font-semibold text-destructive">
+              העלאת התמונה נכשלה
+            </div>
             <div className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
               {uploadError}
             </div>
@@ -337,7 +340,7 @@ export function PhotoCaptureCard({
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              openFilePicker();
+              void capturePhoto();
             }}
             className="text-xs font-medium text-primary hover:underline"
           >
