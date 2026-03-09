@@ -205,19 +205,20 @@ export function PhotoCaptureCard({
   const openWebFilePicker = useCallback(() => {
     if (disabled || uploading) return;
     const input = inputRef.current;
-    if (!input) return;
+    if (!input) {
+      console.warn("[PhotoCapture] no input ref for", photoId);
+      return;
+    }
 
     resetInput();
     awaitingCaptureRef.current = true;
 
+    console.log("[PhotoCapture] opening file picker for", photoId);
+
     try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-      } else {
-        input.click();
-      }
-    } catch {
       input.click();
+    } catch (e) {
+      console.error("[PhotoCapture] click failed", photoId, e);
     }
 
     window.setTimeout(() => {
@@ -226,7 +227,7 @@ export function PhotoCaptureCard({
         if (!processed) awaitingCaptureRef.current = false;
       });
     }, 1400);
-  }, [disabled, processSelectedFileFromInput, resetInput, uploading]);
+  }, [disabled, processSelectedFileFromInput, resetInput, uploading, photoId]);
 
   const handleCardClick = useCallback(() => {
     if (disabled || uploading) return;
@@ -339,7 +340,6 @@ export function PhotoCaptureCard({
           ref={inputRef}
           type="file"
           accept="image/*,.heic,.heif"
-          capture="environment"
           disabled={isDisabled}
           onInput={handleInput}
           onChange={handleChange}
