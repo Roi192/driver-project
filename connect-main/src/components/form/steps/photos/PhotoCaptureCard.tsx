@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Check, ImagePlus, Loader2, X } from "lucide-react";
 import { StorageImage } from "@/components/shared/StorageImage";
 import { cn } from "@/lib/utils";
@@ -25,20 +25,14 @@ export function PhotoCaptureCard({
   onRemoved,
 }: PhotoCaptureCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+  const awaitingCaptureRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const inputId = `shift-photo-${photoId}`;
-
-  useEffect(() => {
-    if (storedPath && localPreview) {
-      URL.revokeObjectURL(localPreview);
-      setLocalPreview(null);
-    }
-  }, [storedPath, localPreview]);
 
   useEffect(() => {
     return () => {
-      if (localPreview) {
+      if (localPreview && localPreview.startsWith("blob:")) {
         URL.revokeObjectURL(localPreview);
       }
     };
@@ -47,68 +41,204 @@ export function PhotoCaptureCard({
   const hasPhoto = Boolean(storedPath) || Boolean(localPreview);
   const previewSrc = localPreview ?? storedPath ?? undefined;
 
-  const openCamera = () => {
-    if (disabled || uploading) return;
-    if (!inputRef.current) return;
-    inputRef.current.value = "";
-    inputRef.current.click();
-  };
+  const resetInput = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }, []);
 
-  const handleChange = async () => {
-    const file = inputRef.current?.files?.[0];
-    if (!file) return;
+  const processSelectedFile = useCallback(
+    async (file: File | null | undefined) => {
+      if (processingRef.current || uploading) {
+        return;
+      }
 
-    if (file.size === 0) {
-      toast({
-        title: "קובץ לא תקין",
-        description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
-        variant: "destructive",
+      if (!file) {
+        return;
+      }
+
+      processingRef.current = true;
+
+      console.log("[PhotoCapture] file selected", {
+        photoId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
       });
-      return;
-    }
 
-    if (localPreview) {
-      URL.revokeObjectURL(localPreview);
-      setLocalPreview(null);
-    }
+      // Broad image detection including HEIC/HEIF
+      const isImage =
+        file.type?.startsWith("image/") ||
+        /\.(heic|heif|jpg|jpeg|png|webp|bmp|gif)$/i.test(file.name || "");
 
-    const blobUrl = URL.createObjectURL(file);
-    setLocalPreview(blobUrl);
-    setUploading(true);
+      if (!isImage) {
+        toast({
+          title: "קובץ לא תקין",
+          description: "הקובץ שנבחר אינו תמונה תקינה.",
+          variant: "destructive",
+        });
+        resetInput();
+        processingRef.current = false;
+        return;
+      }
+
+      if (file.size === 0) {
+        toast({
+          title: "קובץ לא תקין",
+          description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
+          variant: "destructive",
+        });
+        resetInput();
+        processingRef.current = false;
+        return;
+      }
+
+      // Revoke old blob preview if exists
+      if (localPreview && localPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreview);
+      }
+
+      // Use FileReader for preview (more stable on Android/Galaxy than createObjectURL)
+      try {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          console.log("[PhotoCapture] FileReader preview ready for", photoId);
+          setLocalPreview(dataUrl);
+        };
+        reader.onerror = () => {
+          console.error("[PhotoCapture] FileReader preview failed for", photoId);
+          // Still allow upload even if preview fails
+          setLocalPreview(null);
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        console.error("[PhotoCapture] FileReader exception for", photoId);
+        setLocalPreview(null);
+      }
+
+      // Immediately start upload - don't wait for preview
+      setUploading(true);
+
+      try {
+        const previousStoredPath = storedPath;
+        const path = await uploadShiftPhoto({ file, photoId });
+
+        console.log("[PhotoCapture] upload success", photoId, path);
+        onUploaded(photoId, path);
+
+        if (previousStoredPath && previousStoredPath !== path) {
+          await deleteShiftPhoto(previousStoredPath).catch(() => {});
+        }
+
+        toast({
+          title: "✅ התמונה הועלתה בהצלחה",
+          description: label,
+        });
+      } catch (error) {
+        setLocalPreview(null);
+
+        const message = error instanceof Error ? error.message : "אירעה שגיאה";
+        console.error("[PhotoCapture] upload failed", photoId, message);
+        toast({
+          title: "❌ העלאת התמונה נכשלה",
+          description: `${label} - ${message}`,
+          variant: "destructive",
+        });
+      } finally {
+        setUploading(false);
+        resetInput();
+        processingRef.current = false;
+      }
+    },
+    [label, localPreview, onUploaded, photoId, resetInput, storedPath, uploading]
+  );
+
+  const processSelectedFileFromInput = useCallback(async (): Promise<boolean> => {
+    const selectedFile = inputRef.current?.files?.[0];
+    if (!selectedFile) return false;
+
+    awaitingCaptureRef.current = false;
+    await processSelectedFile(selectedFile);
+    return true;
+  }, [processSelectedFile]);
+
+  useEffect(() => {
+    const handleVisible = () => {
+      if (!awaitingCaptureRef.current) return;
+
+      window.setTimeout(() => {
+        void processSelectedFileFromInput().then((processed) => {
+          if (processed || document.visibilityState === "visible") {
+            awaitingCaptureRef.current = false;
+          }
+        });
+      }, 120);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        handleVisible();
+      }
+    };
+
+    window.addEventListener("focus", handleVisible);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleVisible);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [processSelectedFileFromInput]);
+
+  const openFilePicker = useCallback(() => {
+    if (disabled || uploading) return;
+
+    const input = inputRef.current;
+    if (!input) return;
+
+    resetInput();
+    awaitingCaptureRef.current = true;
 
     try {
-      if (storedPath) {
-        await deleteShiftPhoto(storedPath).catch(() => {});
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
       }
-
-      const path = await uploadShiftPhoto({ file, photoId });
-      onUploaded(photoId, path);
-
-      toast({
-        title: "✅ התמונה הועלתה בהצלחה",
-        description: label,
-      });
-    } catch (error) {
-      URL.revokeObjectURL(blobUrl);
-      setLocalPreview((currentPreview) => (currentPreview === blobUrl ? null : currentPreview));
-
-      const message = error instanceof Error ? error.message : "אירעה שגיאה";
-      toast({
-        title: "❌ העלאת התמונה נכשלה",
-        description: `${label} - ${message}`,
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
+    } catch {
+      input.click();
     }
+
+    window.setTimeout(() => {
+      if (!awaitingCaptureRef.current) return;
+
+      void processSelectedFileFromInput().then((processed) => {
+        if (!processed) {
+          awaitingCaptureRef.current = false;
+        }
+      });
+    }, 1400);
+  }, [disabled, processSelectedFileFromInput, resetInput, uploading]);
+
+  const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    awaitingCaptureRef.current = false;
+    await processSelectedFile(event.currentTarget.files?.[0] ?? inputRef.current?.files?.[0]);
   };
 
-  const handleRemove = async () => {
+  const handleInput = async (event: React.FormEvent<HTMLInputElement>) => {
+    awaitingCaptureRef.current = false;
+    await processSelectedFile(event.currentTarget.files?.[0] ?? inputRef.current?.files?.[0]);
+  };
+
+  const handleRemove = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (localPreview) {
-      URL.revokeObjectURL(localPreview);
+      if (localPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreview);
+      }
       setLocalPreview(null);
     }
     if (storedPath) {
@@ -117,19 +247,33 @@ export function PhotoCaptureCard({
     onRemoved(photoId);
   };
 
+  const isDisabled = disabled || uploading;
+
   return (
     <div className="relative animate-fade-in" style={{ animationDelay: `${animationDelayMs}ms` }}>
-      <button
-        type="button"
-        onClick={openCamera}
+      {/* Camera trigger card */}
+      <div
+        role="button"
+        tabIndex={isDisabled ? -1 : 0}
         aria-label={label}
-        disabled={disabled || uploading}
+        onClick={() => {
+          if (!isDisabled) {
+            openFilePicker();
+          }
+        }}
+        onKeyDown={(event) => {
+          if (isDisabled) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openFilePicker();
+          }
+        }}
         className={cn(
-          "relative block aspect-square w-full overflow-hidden rounded-2xl border-2 text-right transition-all duration-300",
+          "relative block aspect-square w-full overflow-hidden rounded-2xl border-2 text-right transition-all duration-300 cursor-pointer",
           hasPhoto
             ? "border-primary shadow-lg"
             : "border-dashed border-border bg-card hover:border-primary/40 hover:bg-primary/5",
-          (disabled || uploading) && "cursor-not-allowed opacity-90"
+          isDisabled && "cursor-not-allowed opacity-90"
         )}
       >
         {uploading ? (
@@ -138,7 +282,7 @@ export function PhotoCaptureCard({
             <span className="text-sm font-medium text-muted-foreground">מעלה תמונה...</span>
           </div>
         ) : hasPhoto && previewSrc ? (
-          previewSrc.startsWith("blob:") ? (
+          previewSrc.startsWith("blob:") || previewSrc.startsWith("data:") ? (
             <img src={previewSrc} alt={label} className="h-full w-full object-cover" loading="lazy" />
           ) : (
             <StorageImage
@@ -173,28 +317,24 @@ export function PhotoCaptureCard({
             מצלמה
           </div>
         )}
-      </button>
+      </div>
 
       <input
         ref={inputRef}
-        id={inputId}
         type="file"
         accept="image/*,.heic,.heif"
         capture="environment"
-        disabled={disabled || uploading}
+        disabled={isDisabled}
+        onInput={handleInput}
         onChange={handleChange}
-        className="sr-only"
+        className="hidden"
         aria-label={`צלם ${label}`}
       />
 
       {hasPhoto && !uploading && (
         <button
           type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            handleRemove();
-          }}
+          onClick={handleRemove}
           className="absolute -left-2 -top-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
           aria-label={`הסר ${label}`}
         >

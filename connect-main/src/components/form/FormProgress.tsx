@@ -9,74 +9,57 @@ interface FormProgressProps {
 
 export function FormProgress({ currentStep, totalSteps, stepLabels }: FormProgressProps) {
   return (
-    <div className="mx-4 mt-4 mb-6 sticky top-20 z-30">
-      <div className="relative p-5 rounded-2xl bg-card/90 backdrop-blur-xl border border-primary/20 shadow-luxury overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />
-        
-        {/* Progress bar background */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-secondary/30">
-          <div 
-            className="h-full bg-gradient-to-r from-primary via-primary to-accent transition-all duration-500 ease-out"
-            style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
-          />
-        </div>
-        
-        <div className="relative flex items-center justify-between max-w-md mx-auto">
-          {Array.from({ length: totalSteps }, (_, i) => {
-            const step = i + 1;
-            const isCompleted = step < currentStep;
-            const isActive = step === currentStep;
-            
-            return (
-              <div key={i} className="flex items-center">
-                <div className="flex flex-col items-center">
-                  {/* Step indicator */}
-                  <div className="relative">
-                    {/* Glow for active step */}
-                    {isActive && (
-                      <div className="absolute inset-0 bg-primary rounded-xl blur-lg opacity-50 animate-pulse" />
-                    )}
-                    
+    <div className="sticky top-20 z-30 mx-4 mb-6 mt-4">
+      <div className="rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur">
+        <div className="overflow-x-auto pb-1">
+          <div className="mx-auto flex min-w-[540px] items-center justify-between gap-2">
+            {Array.from({ length: totalSteps }, (_, i) => {
+              const step = i + 1;
+              const isCompleted = step < currentStep;
+              const isActive = step === currentStep;
+
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="flex min-w-[88px] flex-col items-center">
                     <div
                       className={cn(
-                        "relative w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black transition-all duration-500 border-2",
-                        isCompleted && "bg-gradient-to-br from-green-500 to-green-600 text-white border-green-400 shadow-lg",
-                        isActive && "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-primary/50 shadow-emblem scale-110",
-                        !isCompleted && !isActive && "bg-secondary/50 text-muted-foreground border-border/30"
+                        "flex h-9 w-9 items-center justify-center rounded-xl border text-xs font-black transition-all duration-300",
+                        isCompleted && "border-primary bg-primary text-primary-foreground",
+                        isActive && "border-primary bg-primary/10 text-primary",
+                        !isCompleted && !isActive && "border-border bg-muted text-muted-foreground"
                       )}
                     >
-                      {isCompleted ? (
-                        <Check className="w-5 h-5" />
-                      ) : isActive ? (
-                        <Sparkles className="w-5 h-5" />
-                      ) : (
-                        step
-                      )}
+                      {isCompleted ? <Check className="h-4 w-4" /> : isActive ? <Sparkles className="h-4 w-4" /> : step}
                     </div>
+                    <span
+                      className={cn(
+                        "mt-1 text-center text-[11px] font-bold",
+                        isActive ? "text-primary" : isCompleted ? "text-primary" : "text-muted-foreground"
+                      )}
+                    >
+                      {stepLabels[i]}
+                    </span>
                   </div>
-                  
-                  {/* Step label */}
-                  <span className={cn(
-                    "text-xs mt-2 text-center max-w-[50px] font-bold transition-colors duration-300",
-                    isActive ? "text-primary" : isCompleted ? "text-green-500" : "text-muted-foreground"
-                  )}>
-                    {stepLabels[i]}
-                  </span>
+
+                  {i < totalSteps - 1 && (
+                    <div
+                      className={cn(
+                        "h-1 w-5 rounded-full transition-all duration-300",
+                        step < currentStep ? "bg-primary" : "bg-muted"
+                      )}
+                    />
+                  )}
                 </div>
-                
-                {/* Connector line */}
-                {i < totalSteps - 1 && (
-                  <div className={cn(
-                    "w-8 h-1 mx-1 rounded-full transition-all duration-500",
-                    step < currentStep 
-                      ? "bg-gradient-to-r from-green-500 to-green-400" 
-                      : "bg-secondary/30"
-                  )} />
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+          />
         </div>
       </div>
     </div>
