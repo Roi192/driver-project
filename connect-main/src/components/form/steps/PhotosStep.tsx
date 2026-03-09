@@ -1,138 +1,131 @@
-import { useEffect, useMemo, useState } from "react";
-import { useFormContext } from "react-hook-form";
-import { Camera, Check, MessageSquare, Sparkles } from "lucide-react";
-
-import { Textarea } from "@/components/ui/textarea";
+import { useEffect } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 import { VEHICLE_PHOTOS } from "@/lib/constants";
+import { Camera, Check, Sparkles, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
-
+import { Textarea } from "@/components/ui/textarea";
 import { PhotoCaptureCard } from "./photos/PhotoCaptureCard";
 
-const PHOTO_FIELD_NAMES = VEHICLE_PHOTOS.map((photo) => `photos.${photo.id}`);
+const PHOTO_FIELD_NAMES = VEHICLE_PHOTOS.map((p) => `photos.${p.id}` as const);
+
+type PhotosMap = Record<string, string | undefined>;
 
 export function PhotosStep() {
-  const { register, setValue, getValues } = useFormContext();
-  const [, forceRender] = useState(0);
+  const methods = useFormContext();
+  const { setValue, register } = methods;
 
+  // Register each photo field once on mount
   useEffect(() => {
     PHOTO_FIELD_NAMES.forEach((fieldName) => {
-      register(fieldName, { required: false });
+      register(fieldName);
     });
   }, [register]);
 
-  const getStoredPath = (photoId: string) => {
-    const value = getValues(`photos.${photoId}`);
-    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
-  };
+  // Watch whole photos object for robust nested updates across mobile browsers
+  const watchedPhotos = useWatch({ name: "photos" }) as PhotosMap | undefined;
+
+  const photoValues: PhotosMap = {};
+  VEHICLE_PHOTOS.forEach((photo) => {
+    const value = watchedPhotos?.[photo.id];
+    photoValues[photo.id] = typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  });
 
   const handlePhotoUploaded = (photoId: string, storagePath: string) => {
-    setValue(`photos.${photoId}`, storagePath, {
+    const currentPhotos = (methods.getValues("photos") ?? {}) as PhotosMap;
+    const nextPhotos: PhotosMap = {
+      ...currentPhotos,
+      [photoId]: storagePath,
+    };
+
+    setValue("photos", nextPhotos, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
-
-    setTimeout(() => {
-      setValue(`photos.${photoId}`, storagePath, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
-      });
-      forceRender((prev) => prev + 1);
-    }, 50);
   };
 
   const handlePhotoRemoved = (photoId: string) => {
-    setValue(`photos.${photoId}`, undefined, {
+    const currentPhotos = (methods.getValues("photos") ?? {}) as PhotosMap;
+    const nextPhotos: PhotosMap = {
+      ...currentPhotos,
+      [photoId]: "",
+    };
+
+    setValue("photos", nextPhotos, {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
     });
-
-    setTimeout(() => {
-      forceRender((prev) => prev + 1);
-    }, 50);
   };
 
-  const completedPhotos = useMemo(() => {
-    return VEHICLE_PHOTOS.filter((photo) => {
-      const value = getValues(`photos.${photo.id}`);
-      return typeof value === "string" && value.trim().length > 0;
-    }).length;
-  }, [getValues]);
-
+  const completedPhotos = VEHICLE_PHOTOS.filter((p) => Boolean(photoValues[p.id])).length;
   const allPhotosCompleted = completedPhotos === VEHICLE_PHOTOS.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="mb-8 text-center">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">שלב 5 מתוך 5</span>
+          <Camera className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold text-primary">שלב 5 מתוך 5</span>
         </div>
+        <h2 className="mb-3 text-3xl font-black text-foreground">תמונות הרכב</h2>
+        <p className="text-muted-foreground">צלם את כל תמונות הרכב מהמצלמה</p>
 
-        <h2 className="mb-3 text-3xl font-bold tracking-tight">תמונות הרכב</h2>
-
-        <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
-          צלם את כל תמונות הרכב מהמצלמה. רק תמונות שהועלו בהצלחה ייחשבו כהשלמה
-          של השלב.
-        </p>
-      </div>
-
-      <div
-        className={cn(
-          "rounded-2xl border px-4 py-3 shadow-sm",
-          allPhotosCompleted
-            ? "border-emerald-500/30 bg-emerald-500/5"
-            : "border-border bg-card"
-        )}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {allPhotosCompleted ? (
-              <Check className="h-5 w-5 text-emerald-600" />
-            ) : (
-              <Camera className="h-5 w-5 text-primary" />
-            )}
-
-            <span className="text-sm font-medium">
-              {completedPhotos} / {VEHICLE_PHOTOS.length} תמונות הועלו
-            </span>
-          </div>
-
-          {allPhotosCompleted && (
-            <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white">
-              הושלם
-            </span>
+        <div
+          className={cn(
+            "mt-5 inline-flex items-center gap-3 rounded-full border px-5 py-2.5",
+            allPhotosCompleted
+              ? "border-primary/20 bg-primary/10 text-primary"
+              : "border-primary/20 bg-primary/5 text-primary"
           )}
+        >
+          {allPhotosCompleted && <Sparkles className="h-4 w-4" />}
+          <span className="font-bold">
+            {completedPhotos} / {VEHICLE_PHOTOS.length}
+          </span>
+          <span className="text-muted-foreground">תמונות הועלו</span>
+          {allPhotosCompleted && <Check className="h-4 w-4" />}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+      <div className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="h-3 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+            style={{ width: `${(completedPhotos / VEHICLE_PHOTOS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         {VEHICLE_PHOTOS.map((photo, index) => (
           <PhotoCaptureCard
-            key={`${photo.id}-${getStoredPath(photo.id) ?? "empty"}`}
+            key={photo.id}
             photoId={photo.id}
             label={photo.label}
-            storedPath={getStoredPath(photo.id)}
-            animationDelayMs={index * 60}
+            storedPath={photoValues[photo.id]}
+            disabled={false}
+            animationDelayMs={index * 80}
             onUploaded={handlePhotoUploaded}
             onRemoved={handlePhotoRemoved}
           />
         ))}
       </div>
 
-      <div className="rounded-2xl border bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-primary" />
-          <h3 className="text-base font-semibold">הערות או בעיות ברכב</h3>
+      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+            <MessageSquare className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800">הערות או בעיות ברכב</h3>
+            <p className="text-sm text-slate-500">אופציונלי - תאר בעיות שנמצאו</p>
+          </div>
         </div>
-
         <Textarea
-          dir="rtl"
-          placeholder="אופציונלי - תאר בעיות שנמצאו"
-          className="min-h-[110px]"
           {...register("vehicleNotes")}
+          placeholder="לדוגמה: שריטה בדלת ימנית, נורת אזהרה דולקת..."
+          className="min-h-[100px] resize-none rounded-xl border-border bg-white text-slate-800 placeholder:text-slate-400"
         />
       </div>
     </div>
