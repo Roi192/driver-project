@@ -1,24 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
-import {
-  Camera as CameraIcon,
-  Check,
-  ImagePlus,
-  Loader2,
-  RefreshCcw,
-  X,
-} from "lucide-react";
-import {
-  Camera,
-  CameraDirection,
-  CameraResultType,
-  CameraSource,
-  type Photo,
-} from "@capacitor/camera";
-
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Check, ImagePlus, Loader2, X } from "lucide-react";
 import { StorageImage } from "@/components/shared/StorageImage";
-import { toast } from "@/hooks/use-toast";
-import { deleteShiftPhoto, uploadShiftPhoto } from "@/lib/shift-photo-storage";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { uploadShiftPhoto, deleteShiftPhoto } from "@/lib/shift-photo-storage";
+import { isNativePlatform, takePhotoNative } from "@/lib/capacitor-camera";
 
 interface PhotoCaptureCardProps {
   photoId: string;
@@ -39,79 +25,113 @@ export function PhotoCaptureCard({
   onUploaded,
   onRemoved,
 }: PhotoCaptureCardProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+  const awaitingCaptureRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const isNative = isNativePlatform();
 
-  const hasLocalPreview = Boolean(localPreview);
-  const hasStoredPhoto = Boolean(storedPath);
-  const hasPhoto = hasLocalPreview || hasStoredPhoto;
+  useEffect(() => {
+    return () => {
+      if (localPreview && localPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreview);
+      }
+    };
+  }, [localPreview]);
 
-  const previewSrc = useMemo(() => {
-    return localPreview ?? storedPath ?? undefined;
-  }, [localPreview, storedPath]);
+  const hasPhoto = Boolean(storedPath) || Boolean(localPreview);
+  const previewSrc = localPreview ?? storedPath ?? undefined;
 
-  const validateSelectedFile = useCallback((file: File | null | undefined) => {
-    if (!file) {
-      return { ok: false, message: "לא נבחרה תמונה." };
+  const resetInput = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.value = "";
     }
-
-    const isImage =
-      file.type?.startsWith("image/") ||
-      /\.(heic|heif|jpg|jpeg|png|webp|bmp|gif)$/i.test(file.name || "");
-
-    if (!isImage) {
-      return { ok: false, message: "הקובץ שנבחר אינו תמונה תקינה." };
-    }
-
-    if (file.size === 0) {
-      return { ok: false, message: "התמונה שצולמה ריקה. נסה לצלם שוב." };
-    }
-
-    return { ok: true as const };
   }, []);
 
-  const photoToFile = useCallback(async (photo: Photo, fallbackName: string) => {
-    if (!photo.webPath) {
-      throw new Error("לא התקבל webPath מהמצלמה");
-    }
+  const processFile = useCallback(
+    async (file: File | null | undefined) => {
+      if (processingRef.current || uploading) return;
+      if (!file) return;
 
-    const response = await fetch(photo.webPath);
-    const blob = await response.blob();
+      processingRef.current = true;
 
-    const ext = photo.format || "jpeg";
-    const fileName = `${fallbackName}.${ext === "jpeg" ? "jpg" : ext}`;
+      console.log("[PhotoCapture] file selected", {
+        photoId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        isNative,
+      });
 
-    return new File([blob], fileName, {
-      type: blob.type || `image/${ext}`,
-      lastModified: Date.now(),
-    });
-  }, []);
+      const isImage =
+        file.type?.startsWith("image/") ||
+        /\.(heic|heif|jpg|jpeg|png|webp|bmp|gif)$/i.test(file.name || "");
 
-  const uploadFile = useCallback(
-    async (file: File) => {
+      if (!isImage) {
+        toast({
+          title: "קובץ לא תקין",
+          description: "הקובץ שנבחר אינו תמונה תקינה.",
+          variant: "destructive",
+        });
+        resetInput();
+        processingRef.current = false;
+        return;
+      }
+
+      if (file.size === 0) {
+        toast({
+          title: "קובץ לא תקין",
+          description: "התמונה שצולמה ריקה. נסה לצלם שוב.",
+          variant: "destructive",
+        });
+        resetInput();
+        processingRef.current = false;
+        return;
+      }
+
+      // Revoke old blob preview
+      if (localPreview && localPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreview);
+      }
+
+      // Generate preview via FileReader (stable on all mobile browsers)
+      try {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          console.log("[PhotoCapture] preview ready for", photoId);
+          setLocalPreview(dataUrl);
+        };
+        reader.onerror = () => {
+          console.error("[PhotoCapture] FileReader preview failed for", photoId);
+          setLocalPreview(null);
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        console.error("[PhotoCapture] FileReader exception for", photoId);
+        setLocalPreview(null);
+      }
+
+      // Upload immediately
       setUploading(true);
-      setUploadError(null);
 
       try {
         const previousStoredPath = storedPath;
         const path = await uploadShiftPhoto({ file, photoId });
 
+        console.log("[PhotoCapture] upload success", photoId, path);
         onUploaded(photoId, path);
 
         if (previousStoredPath && previousStoredPath !== path) {
           await deleteShiftPhoto(previousStoredPath).catch(() => {});
         }
 
-        toast({
-          title: "✅ התמונה הועלתה בהצלחה",
-          description: label,
-        });
+        toast({ title: "✅ התמונה הועלתה בהצלחה", description: label });
       } catch (error) {
+        setLocalPreview(null);
         const message = error instanceof Error ? error.message : "אירעה שגיאה";
-        setUploadError(message);
-
+        console.error("[PhotoCapture] upload failed", photoId, message);
         toast({
           title: "❌ העלאת התמונה נכשלה",
           description: `${label} - ${message}`,
@@ -119,99 +139,145 @@ export function PhotoCaptureCard({
         });
       } finally {
         setUploading(false);
+        resetInput();
+        processingRef.current = false;
       }
     },
-    [label, onUploaded, photoId, storedPath]
+    [label, localPreview, onUploaded, photoId, resetInput, storedPath, uploading, isNative]
   );
 
-  const capturePhoto = useCallback(async () => {
-    if (disabled || uploading) return;
+  // --- Capacitor native camera flow ---
+  const openNativeCamera = useCallback(async () => {
+    if (disabled || uploading || processingRef.current) return;
 
     try {
-      setUploadError(null);
-
-      const image = await Camera.getPhoto({
-        quality: 85,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera,
-        direction: CameraDirection.Rear,
-        correctOrientation: true,
-        saveToGallery: false,
-      });
-
-      if (!image.webPath) {
-        throw new Error("לא התקבלה תמונה מהמצלמה");
+      const file = await takePhotoNative();
+      if (file) {
+        await processFile(file);
       }
-
-      setLocalPreview(image.webPath);
-
-      const file = await photoToFile(image, `${photoId}-${Date.now()}`);
-      const validation = validateSelectedFile(file);
-
-      if (!validation.ok) {
-        throw new Error(validation.message);
-      }
-
-      setSelectedFile(file);
-      await uploadFile(file);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "שגיאה בצילום מהמצלמה";
-
-      setUploadError(message);
-
+      console.error("[PhotoCapture] native camera error", error);
       toast({
-        title: "❌ צילום או העלאה נכשלו",
-        description: `${label} - ${message}`,
+        title: "שגיאה במצלמה",
+        description: "לא ניתן לפתוח את המצלמה. נסה שוב.",
         variant: "destructive",
       });
     }
-  }, [disabled, label, photoId, photoToFile, uploadFile, uploading, validateSelectedFile]);
+  }, [disabled, uploading, processFile]);
 
-  const handleRetry = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+  // --- Web file input flow ---
+  const processSelectedFileFromInput = useCallback(async (): Promise<boolean> => {
+    const selectedFile = inputRef.current?.files?.[0];
+    if (!selectedFile) return false;
+    awaitingCaptureRef.current = false;
+    await processFile(selectedFile);
+    return true;
+  }, [processFile]);
 
-    if (uploading || !selectedFile) return;
-    await uploadFile(selectedFile);
-  };
+  // Fallback for Android browsers that don't fire onChange
+  useEffect(() => {
+    if (isNative) return; // Skip for Capacitor native
 
-  const handleRemove = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
+    const handleVisible = () => {
+      if (!awaitingCaptureRef.current) return;
+      window.setTimeout(() => {
+        void processSelectedFileFromInput().then((processed) => {
+          if (processed || document.visibilityState === "visible") {
+            awaitingCaptureRef.current = false;
+          }
+        });
+      }, 120);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") handleVisible();
+    };
+
+    window.addEventListener("focus", handleVisible);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleVisible);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [processSelectedFileFromInput, isNative]);
+
+  const openWebFilePicker = useCallback(() => {
+    if (disabled || uploading) return;
+    const input = inputRef.current;
+    if (!input) return;
+
+    resetInput();
+    awaitingCaptureRef.current = true;
 
     try {
-      if (storedPath) {
-        await deleteShiftPhoto(storedPath).catch(() => {});
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
       }
-    } finally {
-      setSelectedFile(null);
-      setUploadError(null);
-      setLocalPreview(null);
-      onRemoved(photoId);
+    } catch {
+      input.click();
     }
+
+    window.setTimeout(() => {
+      if (!awaitingCaptureRef.current) return;
+      void processSelectedFileFromInput().then((processed) => {
+        if (!processed) awaitingCaptureRef.current = false;
+      });
+    }, 1400);
+  }, [disabled, processSelectedFileFromInput, resetInput, uploading]);
+
+  const handleCardClick = useCallback(() => {
+    if (disabled || uploading) return;
+
+    if (isNative) {
+      void openNativeCamera();
+    } else {
+      openWebFilePicker();
+    }
+  }, [disabled, uploading, isNative, openNativeCamera, openWebFilePicker]);
+
+  const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    awaitingCaptureRef.current = false;
+    await processFile(event.currentTarget.files?.[0] ?? inputRef.current?.files?.[0]);
+  };
+
+  const handleInput = async (event: React.FormEvent<HTMLInputElement>) => {
+    awaitingCaptureRef.current = false;
+    await processFile(event.currentTarget.files?.[0] ?? inputRef.current?.files?.[0]);
+  };
+
+  const handleRemove = async (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (localPreview) {
+      if (localPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(localPreview);
+      }
+      setLocalPreview(null);
+    }
+    if (storedPath) {
+      await deleteShiftPhoto(storedPath).catch(() => {});
+    }
+    onRemoved(photoId);
   };
 
   const isDisabled = disabled || uploading;
 
   return (
-    <div
-      className="animate-fade-in"
-      style={{ animationDelay: `${animationDelayMs}ms` }}
-    >
+    <div className="relative animate-fade-in" style={{ animationDelay: `${animationDelayMs}ms` }}>
       <div
         role="button"
         tabIndex={isDisabled ? -1 : 0}
-        onClick={() => {
-          if (!isDisabled) {
-            void capturePhoto();
-          }
-        }}
+        aria-label={label}
+        onClick={handleCardClick}
         onKeyDown={(event) => {
           if (isDisabled) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            void capturePhoto();
+            handleCardClick();
           }
         }}
         className={cn(
@@ -223,131 +289,81 @@ export function PhotoCaptureCard({
         )}
       >
         {uploading ? (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/30 p-4 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <div className="text-sm font-medium">מעלה תמונה...</div>
-            <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-muted/50 p-4 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <span className="text-sm font-medium text-muted-foreground">מעלה תמונה...</span>
           </div>
         ) : hasPhoto && previewSrc ? (
-          previewSrc.startsWith("http") ||
-          previewSrc.startsWith("data:") ||
-          previewSrc.startsWith("blob:") ||
-          previewSrc.startsWith("capacitor:") ? (
-            <img
-              src={previewSrc}
-              alt={label}
-              className="h-full w-full object-cover"
-            />
+          previewSrc.startsWith("blob:") || previewSrc.startsWith("data:") ? (
+            <img src={previewSrc} alt={label} className="h-full w-full object-cover" loading="lazy" />
           ) : (
             <StorageImage
               src={previewSrc}
               bucket="shift-photos"
               alt={label}
               className="h-full w-full object-cover"
+              loading="lazy"
+              showLoader={false}
+              fallback={<div className="h-full w-full bg-muted" />}
             />
           )
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
-            <div className="rounded-full bg-primary/10 p-3">
-              <CameraIcon className="h-7 w-7 text-primary" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+              <ImagePlus className="h-7 w-7 text-primary" />
             </div>
-            <div className="space-y-1">
-              <div className="text-sm font-semibold">{label}</div>
-              <div className="text-xs text-muted-foreground">
-                צילום מהמצלמה בלבד
-              </div>
-            </div>
+            <span className="text-sm font-bold text-foreground">{label}</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {isNative ? "לחץ לצילום" : "צילום מהמצלמה בלבד"}
+            </span>
           </div>
         )}
 
         {hasPhoto && !uploading && (
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 text-white">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 flex-col text-right">
-                <span className="truncate text-xs font-medium">{label}</span>
-                <span className="text-[11px] opacity-90">
-                  {uploadError
-                    ? "התמונה צולמה, ההעלאה נכשלה"
-                    : hasStoredPhoto
-                    ? "הועלה בהצלחה"
-                    : "התמונה צולמה מקומית"}
-                </span>
-              </div>
-
-              {!uploadError ? (
-                <div className="rounded-full bg-emerald-500/90 p-1.5">
-                  <Check className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="rounded-full bg-amber-500/90 p-1.5">
-                  <ImagePlus className="h-4 w-4" />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {uploadError && !uploading && (
-          <div className="absolute inset-x-2 top-2 rounded-xl border border-destructive/30 bg-background/95 p-2 text-right shadow-lg">
-            <div className="text-xs font-semibold text-destructive">
-              העלאת התמונה נכשלה
-            </div>
-            <div className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">
-              {uploadError}
-            </div>
-
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium hover:bg-muted"
-              >
-                <RefreshCcw className="h-3.5 w-3.5" />
-                נסה שוב
-              </button>
-            </div>
-          </div>
-        )}
-
-        {hasPhoto && !uploading && (
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="absolute left-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white shadow transition hover:bg-black/85"
-            aria-label={`הסר תמונה - ${label}`}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="mt-2 flex min-h-5 items-center justify-between px-1">
-        <span className="text-xs text-muted-foreground">
-          {uploading
-            ? "מעלה לשרת..."
-            : uploadError
-            ? "התמונה נשמרה מקומית בלבד"
-            : hasStoredPhoto
-            ? "נשמר בשרת"
-            : hasLocalPreview
-            ? "צולם וממתין להעלאה"
-            : "טרם צולם"}
-        </span>
-
-        {hasPhoto && !uploading && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              void capturePhoto();
-            }}
-            className="text-xs font-medium text-primary hover:underline"
-          >
+          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-10 rounded-lg border border-primary/20 bg-card/85 px-2 py-1 text-center text-xs font-medium text-primary backdrop-blur-sm">
             לחץ לצילום מחדש
-          </button>
+          </div>
+        )}
+
+        {!hasPhoto && !uploading && (
+          <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-full border border-primary/20 bg-card/85 px-2 py-1 text-xs font-medium text-primary backdrop-blur-sm">
+            <Camera className="mr-1 inline h-3.5 w-3.5" />
+            מצלמה
+          </div>
         )}
       </div>
+
+      {/* Web fallback input - only used when NOT native */}
+      {!isNative && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*,.heic,.heif"
+          capture="environment"
+          disabled={isDisabled}
+          onInput={handleInput}
+          onChange={handleChange}
+          className="hidden"
+          aria-label={`צלם ${label}`}
+        />
+      )}
+
+      {hasPhoto && !uploading && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          className="absolute -left-2 -top-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg transition-transform hover:scale-110"
+          aria-label={`הסר ${label}`}
+        >
+          <X className="h-5 w-5" />
+        </button>
+      )}
+
+      {hasPhoto && !uploading && (
+        <div className="absolute -right-2 -top-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg animate-scale-in">
+          <Check className="h-5 w-5" />
+        </div>
+      )}
     </div>
   );
 }
