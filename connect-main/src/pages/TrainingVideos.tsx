@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignedUrl } from "@/lib/storage-utils";
 import { AddEditDialog, FieldConfig } from "@/components/admin/AddEditDialog";
 import { DeleteConfirmDialog } from "@/components/admin/DeleteConfirmDialog";
 import trainingVideoThumbnail from "@/assets/training-video-thumbnail.png";
@@ -131,11 +132,28 @@ export default function TrainingVideos() {
     setDeleteDialogOpen(true);
   };
 
-  const openVideo = (video: TrainingVideo) => {
-    if (video.video_url) {
-      window.open(video.video_url, "_blank");
-    } else {
+  const openVideo = async (video: TrainingVideo) => {
+    if (!video.video_url) {
       toast.info("אין קישור לסרטון");
+      return;
+    }
+
+    // If it's a YouTube link or external URL (not a Supabase storage URL), open directly
+    if (video.video_url.includes('youtube.com') || video.video_url.includes('youtu.be') || !video.video_url.includes('supabase.co/storage')) {
+      window.open(video.video_url, "_blank");
+      return;
+    }
+
+    // It's a Supabase storage signed URL - regenerate a fresh one
+    try {
+      const freshUrl = await getSignedUrl(video.video_url, "content-images");
+      if (freshUrl) {
+        window.open(freshUrl, "_blank");
+      } else {
+        toast.error("שגיאה בפתיחת הסרטון");
+      }
+    } catch {
+      toast.error("שגיאה בפתיחת הסרטון");
     }
   };
 
