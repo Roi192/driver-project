@@ -61,7 +61,7 @@ export function MediaUpload({
       });
 
       setPreview(result.signedUrl);
-      onChange(result.signedUrl);
+      onChange(result.path);
       toast.success("הקובץ הועלה בהצלחה");
     } catch (error) {
       console.error('Error uploading file:', error);

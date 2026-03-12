@@ -138,13 +138,13 @@ export default function TrainingVideos() {
       return;
     }
 
-    // If it's a YouTube link or external URL (not a Supabase storage URL), open directly
-    if (video.video_url.includes('youtube.com') || video.video_url.includes('youtu.be') || !video.video_url.includes('supabase.co/storage')) {
+    // If it's a YouTube link or external URL, open directly
+    if (video.video_url.includes('youtube.com') || video.video_url.includes('youtu.be')) {
       window.open(video.video_url, "_blank");
       return;
     }
 
-    // It's a Supabase storage signed URL - regenerate a fresh one
+    // Generate a fresh signed URL from the stored path
     try {
       const freshUrl = await getSignedUrl(video.video_url, "content-images");
       if (freshUrl) {
@@ -273,7 +273,7 @@ export default function TrainingVideos() {
                 </div>
                 
                 <div className="p-5">
-                  <h3 className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors duration-300">
+                  <h3 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors duration-300">
                     {video.title}
                   </h3>
                 </div>

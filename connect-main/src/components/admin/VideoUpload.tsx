@@ -48,7 +48,7 @@ export function VideoUpload({
       });
 
       setPreview(result.signedUrl);
-      onChange(result.signedUrl);
+      onChange(result.path);
       toast.success("הסרטון הועלה בהצלחה");
     } catch (error) {
       console.error('Error uploading video:', error);
