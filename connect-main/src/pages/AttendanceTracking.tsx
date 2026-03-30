@@ -526,8 +526,8 @@ export default function AttendanceTracking() {
                 חיילים
               </TabsTrigger>
               <TabsTrigger value="months" className="flex items-center gap-2 text-sm text-slate-700 data-[state=active]:bg-white data-[state=active]:text-slate-900 rounded-lg">
-                <Layers className="w-4 h-4" />
-                מחזורי תוכן
+                <Calendar className="w-4 h-4" />
+                חודשים
               </TabsTrigger>
             </TabsList>
 

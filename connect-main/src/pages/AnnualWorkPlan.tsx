@@ -178,13 +178,14 @@ export default function AnnualWorkPlan() {
   const [dateEventsDialogOpen, setDateEventsDialogOpen] = useState(false);
   const [attendanceRotationFilter, setAttendanceRotationFilter] = useState<string>("expected");
   const [manualAddSoldierId, setManualAddSoldierId] = useState<string>("");
+  const [detailAttendanceView, setDetailAttendanceView] = useState<"attended" | "absent" | "not_in_rotation" | null>(null);
 
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     event_date: "",
     end_date: "",
-    status: "pending" as "pending" | "in_progress" | "completed",
+    status: "completed" as "pending" | "in_progress" | "completed",
     category: "platoon",
     is_recurring: false,
     recurring_count: 6,
@@ -360,7 +361,7 @@ export default function AnnualWorkPlan() {
       description: "",
       event_date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
       end_date: "",
-      status: "pending",
+      status: "completed",
       category: "platoon",
       is_recurring: false,
       recurring_count: 6,
@@ -1167,7 +1168,7 @@ export default function AnnualWorkPlan() {
         </Dialog>
 
         {/* Event Detail Dialog */}
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <Dialog open={detailDialogOpen} onOpenChange={(open) => { setDetailDialogOpen(open); if (!open) setDetailAttendanceView(null); }}>
           <DialogContent className="max-w-md" dir="rtl">
             {selectedEvent && (
               <>
@@ -1216,27 +1217,88 @@ export default function AnnualWorkPlan() {
                     </div>
                   )}
 
-                  {/* Attendance Stats */}
+                  {/* Attendance Stats - Clickable to show soldier lists */}
                   {(() => {
                     const stats = getEventAttendanceStats(selectedEvent.id);
+                    const eventAttendance = getRelevantEventAttendance(selectedEvent.id);
                     if (stats.total > 0) {
+                      const attendedSoldiers = eventAttendance.filter(a => a.status === "attended" || a.completed);
+                      const absentSoldiers = eventAttendance.filter(a => a.status === "absent" && !a.completed);
+                      const notInRotationSoldiers = eventAttendance.filter(a => a.status === "not_in_rotation");
+
                       return (
                         <div className="p-3 bg-slate-50 rounded-xl space-y-2">
                           <p className="font-medium text-slate-700">סיכום נוכחות:</p>
                           <div className="grid grid-cols-3 gap-2">
-                            <div className="text-center p-2 rounded-lg bg-emerald-100">
+                            <div className="text-center p-2 rounded-lg bg-emerald-100 cursor-pointer hover:bg-emerald-200 transition-colors" onClick={() => setDetailAttendanceView(prev => prev === "attended" ? null : "attended")}>
                               <p className="text-lg font-bold text-emerald-700">{stats.attended}</p>
                               <p className="text-xs text-emerald-600">נכחו</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-red-100">
+                            <div className="text-center p-2 rounded-lg bg-red-100 cursor-pointer hover:bg-red-200 transition-colors" onClick={() => setDetailAttendanceView(prev => prev === "absent" ? null : "absent")}>
                               <p className="text-lg font-bold text-red-700">{stats.absent}</p>
                               <p className="text-xs text-red-600">נעדרו</p>
                             </div>
-                            <div className="text-center p-2 rounded-lg bg-blue-100">
+                            <div className="text-center p-2 rounded-lg bg-blue-100 cursor-pointer hover:bg-blue-200 transition-colors" onClick={() => setDetailAttendanceView(prev => prev === "not_in_rotation" ? null : "not_in_rotation")}>
                               <p className="text-lg font-bold text-blue-700">{stats.notInRotation}</p>
                               <p className="text-xs text-blue-600">לא בסבב</p>
                             </div>
                           </div>
+
+                          {/* Expandable soldier lists */}
+                          {detailAttendanceView === "attended" && attendedSoldiers.length > 0 && (
+                            <div className="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                              <p className="text-xs font-bold text-emerald-700 mb-1.5">נכחו ({attendedSoldiers.length}):</p>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {attendedSoldiers.map(a => {
+                                  const s = soldiers.find(sol => sol.id === a.soldier_id);
+                                  return s ? (
+                                    <div key={s.id} className="flex items-center gap-2 py-1 px-2 rounded bg-white text-sm">
+                                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                      <span className="text-slate-800">{s.full_name}</span>
+                                      {a.completed && <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">השלמה</Badge>}
+                                    </div>
+                                  ) : null;
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {detailAttendanceView === "absent" && absentSoldiers.length > 0 && (
+                            <div className="mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
+                              <p className="text-xs font-bold text-red-700 mb-1.5">נעדרו ({absentSoldiers.length}):</p>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {absentSoldiers.map(a => {
+                                  const s = soldiers.find(sol => sol.id === a.soldier_id);
+                                  return s ? (
+                                    <div key={s.id} className="flex items-center justify-between py-1 px-2 rounded bg-white text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                        <span className="text-slate-800">{s.full_name}</span>
+                                      </div>
+                                      {a.absence_reason && <span className="text-xs text-amber-600">{a.absence_reason}</span>}
+                                    </div>
+                                  ) : null;
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {detailAttendanceView === "not_in_rotation" && notInRotationSoldiers.length > 0 && (
+                            <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                              <p className="text-xs font-bold text-blue-700 mb-1.5">לא בסבב ({notInRotationSoldiers.length}):</p>
+                              <div className="space-y-1 max-h-40 overflow-y-auto">
+                                {notInRotationSoldiers.map(a => {
+                                  const s = soldiers.find(sol => sol.id === a.soldier_id);
+                                  return s ? (
+                                    <div key={s.id} className="flex items-center gap-2 py-1 px-2 rounded bg-white text-sm">
+                                      <MinusCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                      <span className="text-slate-800">{s.full_name}</span>
+                                    </div>
+                                  ) : null;
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     }
