@@ -437,10 +437,8 @@ export default function AnnualWorkPlan() {
     
     if (dayEvents.length === 0 && dayHolidays.length === 0) {
       openAddDialogForDate(day);
-    } else if (dayEvents.length === 1 && dayHolidays.length === 0) {
-      setSelectedEvent(dayEvents[0]);
-      setDetailDialogOpen(true);
     } else {
+      // Always open the date events dialog so user can see existing events AND add new ones
       setSelectedDate(day);
       setDateEventsDialogOpen(true);
     }
@@ -1449,9 +1447,10 @@ export default function AnnualWorkPlan() {
                 <SelectContent>
                   {soldiers
                     .filter(s => {
-                      // Only show soldiers not already in the filtered list
+                      // Show soldiers not in expected list and not already manually added with attended/absent
                       const expectedSoldiers = selectedEvent?.expected_soldiers || [];
-                      return !expectedSoldiers.includes(s.id);
+                      const alreadyAdded = selectedSoldierAttendance[s.id]?.status === "attended" || selectedSoldierAttendance[s.id]?.status === "absent";
+                      return !expectedSoldiers.includes(s.id) && !alreadyAdded;
                     })
                     .map(s => (
                       <SelectItem key={s.id} value={s.id}>
@@ -1470,8 +1469,10 @@ export default function AnnualWorkPlan() {
                       ...prev,
                       [manualAddSoldierId]: { status: "attended", reason: "", completed: false }
                     }));
+                    // Switch to "all" filter so the added soldier is visible
+                    setAttendanceRotationFilter("all");
                     setManualAddSoldierId("");
-                    toast.success("חייל נוסף");
+                    toast.success("חייל נוסף לרשימת הנוכחות");
                   }
                 }}
               >
