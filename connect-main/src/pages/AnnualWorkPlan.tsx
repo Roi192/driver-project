@@ -520,14 +520,20 @@ export default function AnnualWorkPlan() {
   const saveAttendance = async () => {
     if (!selectedEvent) return;
 
+    const expectedSoldierIds = new Set(selectedEvent.expected_soldiers || []);
+
     // Log all current attendance state for debugging
     const allStatuses = Object.entries(selectedSoldierAttendance).map(([id, d]) => `${id.slice(0,8)}:${d.status}`);
     console.log("All soldier statuses:", allStatuses);
 
-    // Build records - include ALL statuses except "not_updated"
+    // Build records - keep only meaningful overrides/attendance rows
     const recordsMap = new Map<string, any>();
     Object.entries(selectedSoldierAttendance)
-      .filter(([_, data]) => data.status !== "not_updated")
+      .filter(([soldierId, data]) => {
+        if (data.status === "not_updated") return false;
+        if (data.status === "not_in_rotation" && !expectedSoldierIds.has(soldierId)) return false;
+        return true;
+      })
       .forEach(([soldierId, data]) => {
         recordsMap.set(soldierId, {
           event_id: selectedEvent.id,
@@ -581,23 +587,59 @@ export default function AnnualWorkPlan() {
     setAttendanceDialogOpen(false);
   };
 
+  const getRelevantEventAttendance = (eventId: string) => {
+    const event = events.find(e => e.id === eventId);
+    if (!event) return [];
+
+    const expectedSoldiers = event.expected_soldiers || [];
+    const attendanceRecords = attendance.filter(a => a.event_id === eventId);
+    const attendanceBySoldier = new Map(attendanceRecords.map(record => [record.soldier_id, record]));
+    const soldierIds = new Set<string>([
+      ...expectedSoldiers,
+      ...attendanceRecords.map(record => record.soldier_id),
+    ]);
+
+    return Array.from(soldierIds).map((soldierId) => {
+      const record = attendanceBySoldier.get(soldierId);
+
+      if (record) {
+        return {
+          soldier_id: soldierId,
+          status: record.status as AttendanceStatus,
+          absence_reason: record.absence_reason,
+          completed: record.completed,
+        };
+      }
+
+      return {
+        soldier_id: soldierId,
+        status: expectedSoldiers.includes(soldierId) ? "not_updated" as AttendanceStatus : "not_in_rotation" as AttendanceStatus,
+        absence_reason: null,
+        completed: false,
+      };
+    });
+  };
+
   const getEventAttendanceStats = (eventId: string) => {
-    const eventAttendance = attendance.filter(a => a.event_id === eventId);
-    const attended = eventAttendance.filter(a => a.status === "attended").length;
+    const eventAttendance = getRelevantEventAttendance(eventId);
+    const attended = eventAttendance.filter(a => a.status === "attended" || a.completed).length;
     
     // נעדרים שמשפיעים על אחוז הנוכחות (רק גימלים ונעדר ללא סיבה)
     const countableAbsent = eventAttendance.filter(a => 
       a.status === "absent" && 
+      !a.completed &&
       !NON_COUNTABLE_ABSENCE_REASONS.includes(a.absence_reason as AbsenceReason)
     ).length;
     
     // נעדרים שלא משפיעים על אחוז הנוכחות (קורס, גימלים ממושכים, נפקד, כלא)
     const nonCountableAbsent = eventAttendance.filter(a => 
       a.status === "absent" && 
+      !a.completed &&
       NON_COUNTABLE_ABSENCE_REASONS.includes(a.absence_reason as AbsenceReason)
     ).length;
     
     const notInRotation = eventAttendance.filter(a => a.status === "not_in_rotation").length;
+    const total = eventAttendance.filter(a => a.status !== "not_in_rotation" && a.status !== "not_updated").length;
     
     // אחוז נוכחות - רק מחושב מאלו שהיו יכולים להגיע
     const totalCountable = attended + countableAbsent;
@@ -608,7 +650,7 @@ export default function AnnualWorkPlan() {
       absent: countableAbsent, 
       nonCountableAbsent,
       notInRotation, 
-      total: eventAttendance.length,
+      total,
       attendancePercent 
     };
   };
