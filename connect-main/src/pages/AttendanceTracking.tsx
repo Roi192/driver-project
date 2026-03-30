@@ -128,6 +128,7 @@ export default function AttendanceTracking() {
   const [viewMode, setViewMode] = useState<"soldiers" | "months">("soldiers");
 
   // Months view state
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [expandedCycle, setExpandedCycle] = useState<string | null>(null);
   const [expandedCycleEvent, setExpandedCycleEvent] = useState<string | null>(null);
 
@@ -137,19 +138,45 @@ export default function AttendanceTracking() {
 
   useEffect(() => { fetchData(); }, []);
 
+  const fetchAllAttendance = async () => {
+    const allRows: EventAttendance[] = [];
+    let offset = 0;
+    const batchSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("event_attendance")
+        .select("*")
+        .range(offset, offset + batchSize - 1);
+
+      if (error) {
+        console.error("Failed to fetch attendance batch:", error);
+        return allRows;
+      }
+
+      const batch = (data || []) as EventAttendance[];
+      allRows.push(...batch);
+      hasMore = batch.length === batchSize;
+      offset += batchSize;
+    }
+
+    return allRows;
+  };
+
   const fetchData = async () => {
     setLoading(true);
-    const [soldiersRes, eventsRes, attendanceRes, overridesRes, coursesRes] = await Promise.all([
+    const [soldiersRes, eventsRes, attendanceRows, overridesRes, coursesRes] = await Promise.all([
       supabase.from("soldiers").select("*").eq("is_active", true).order("full_name"),
       supabase.from("work_plan_events").select("*").neq("category", "holiday").order("event_date", { ascending: false }),
-      supabase.from("event_attendance").select("*"),
+      fetchAllAttendance(),
       supabase.from("content_cycle_overrides").select("*"),
       supabase.from("soldier_courses").select("id, soldier_id, start_date, end_date, status, courses(name)").eq("status", "in_progress"),
     ]);
 
     if (!soldiersRes.error) setSoldiers(soldiersRes.data || []);
     if (!eventsRes.error) setEvents((eventsRes.data || []) as WorkPlanEvent[]);
-    if (!attendanceRes.error) setAttendance(attendanceRes.data || []);
+    setAttendance(attendanceRows || []);
     if (!overridesRes.error) setOverrides((overridesRes.data || []) as ContentCycleOverride[]);
     if (!coursesRes.error) setSoldierCourses((coursesRes.data || []) as SoldierCourse[]);
     setLoading(false);
@@ -175,8 +202,46 @@ export default function AttendanceTracking() {
     return Array.from(years).sort((a, b) => b - a);
   }, [events]);
 
+  const attendanceLookup = useMemo(() => {
+    const map = new Map<string, EventAttendance>();
+    attendance.forEach((record) => {
+      map.set(`${record.event_id}:${record.soldier_id}`, record);
+    });
+    return map;
+  }, [attendance]);
+
+  const attendanceByEvent = useMemo(() => {
+    const map = new Map<string, EventAttendance[]>();
+    attendance.forEach((record) => {
+      const existing = map.get(record.event_id);
+      if (existing) {
+        existing.push(record);
+        return;
+      }
+      map.set(record.event_id, [record]);
+    });
+    return map;
+  }, [attendance]);
+
+  const getAttendanceRecord = (eventId: string, soldierId: string) => {
+    return attendanceLookup.get(`${eventId}:${soldierId}`);
+  };
+
+  const getRelevantSoldierIdsForEvent = (event: WorkPlanEvent) => {
+    const directAttendance = attendanceByEvent.get(event.id) || [];
+    return new Set<string>([
+      ...(event.expected_soldiers || []),
+      ...directAttendance.map((record) => record.soldier_id),
+    ]);
+  };
+
   // Get soldier status for a specific event - checks attendance DB + overrides + courses
   const getSoldierEventStatus = (soldier: Soldier, event: WorkPlanEvent): { status: AttendanceStatus; reason: string | null; completed: boolean } => {
+    const att = getAttendanceRecord(event.id, soldier.id);
+    if (att) {
+      return { status: att.status as AttendanceStatus, reason: att.absence_reason, completed: att.completed };
+    }
+
     if (!wasSoldierQualifiedAtDate(soldier, event.event_date)) {
       return { status: "not_qualified", reason: null, completed: false };
     }
@@ -184,7 +249,6 @@ export default function AttendanceTracking() {
     const { inCourse } = isSoldierInCourse(soldier.id, event.event_date);
     if (inCourse) return { status: "absent", reason: "קורס", completed: false };
 
-    // Check content_cycle_overrides (synced from work plan summary)
     const cycleName = event.content_cycle || event.title;
     const override = overrides.find(o => o.soldier_id === soldier.id && o.content_cycle === cycleName);
     if (override?.override_type === "completed") {
@@ -192,11 +256,6 @@ export default function AttendanceTracking() {
     }
     if (override?.override_type === "absent") {
       return { status: "absent", reason: override.absence_reason, completed: false };
-    }
-
-    const att = attendance.find(a => a.event_id === event.id && a.soldier_id === soldier.id);
-    if (att) {
-      return { status: att.status as AttendanceStatus, reason: att.absence_reason, completed: att.completed };
     }
 
     const isExpected = (event.expected_soldiers || []).includes(soldier.id);
@@ -225,13 +284,15 @@ export default function AttendanceTracking() {
     filteredEvents.forEach(event => {
       const { status, completed, reason } = getSoldierEventStatus(soldier, event);
       const isExpected = (event.expected_soldiers || []).includes(soldierId);
-      const attRecord = attendance.find(a => a.event_id === event.id && a.soldier_id === soldierId);
+      const attRecord = getAttendanceRecord(event.id, soldierId);
 
       if (isExpected || attRecord) {
         if (completed || status === "attended") attended++;
         else if (status === "absent") {
           const isNonCountable = reason && NON_COUNTABLE_ABSENCE_REASONS.includes(reason as AbsenceReason);
           if (!isNonCountable) absent++;
+        } else if (status === "not_in_rotation") {
+          notInRotation++;
         }
       } else if (status === "not_in_rotation") {
         notInRotation++;
@@ -251,7 +312,7 @@ export default function AttendanceTracking() {
     const soldier = soldiers.find(s => s.id === soldierId);
     if (!soldier) return [];
 
-    const monthlyMap = new Map<string, { month: number; year: number; events: { event: WorkPlanEvent; status: AttendanceStatus; reason: string | null; completed: boolean; isExpected: boolean }[]; attended: number; absent: number }>();
+    const monthlyMap = new Map<string, { month: number; year: number; events: { event: WorkPlanEvent; status: AttendanceStatus; reason: string | null; completed: boolean; isExpected: boolean }[]; attended: number; absent: number; notInRotation: number }>();
 
     filteredEvents.forEach(event => {
       const date = parseISO(event.event_date);
@@ -260,14 +321,16 @@ export default function AttendanceTracking() {
       const key = `${year}-${month}`;
 
       const { status, reason, completed } = getSoldierEventStatus(soldier, event);
-      if (status === "not_in_rotation") return;
+      const hasDirectAttendance = !!getAttendanceRecord(event.id, soldierId);
+      if (status === "not_in_rotation" && !hasDirectAttendance) return;
 
-      if (!monthlyMap.has(key)) monthlyMap.set(key, { month, year, events: [], attended: 0, absent: 0 });
+      if (!monthlyMap.has(key)) monthlyMap.set(key, { month, year, events: [], attended: 0, absent: 0, notInRotation: 0 });
       const record = monthlyMap.get(key)!;
       const isExpected = (event.expected_soldiers || []).includes(soldierId);
       record.events.push({ event, status: completed ? "attended" : status, reason, completed, isExpected });
       if (completed || status === "attended") record.attended++;
       else if (status === "absent") record.absent++;
+      else if (status === "not_in_rotation") record.notInRotation++;
     });
 
     return Array.from(monthlyMap.values()).sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month);
@@ -302,11 +365,7 @@ export default function AttendanceTracking() {
       const cycle = monthData.cycles.get(cycleName)!;
       cycle.events.push(event);
 
-      // For each soldier in expected_soldiers or with attendance records
-      const relevantSoldierIds = new Set<string>([
-        ...(event.expected_soldiers || []),
-        ...attendance.filter(a => a.event_id === event.id).map(a => a.soldier_id),
-      ]);
+      const relevantSoldierIds = getRelevantSoldierIdsForEvent(event);
 
       relevantSoldierIds.forEach(soldierId => {
         const soldier = soldiers.find(s => s.id === soldierId);
@@ -315,13 +374,13 @@ export default function AttendanceTracking() {
         if (status === "not_in_rotation" || status === "not_qualified") return;
 
         const existing = cycle.soldierStatuses.get(soldierId);
-        // If soldier attended any event in this cycle, mark as attended
-        if (!existing || (completed || status === "attended")) {
-          if (!existing || existing.status !== "attended") {
-            cycle.soldierStatuses.set(soldierId, { status: completed ? "attended" : status, reason, completed });
-          }
-        } else if (!existing) {
+        if (!existing) {
           cycle.soldierStatuses.set(soldierId, { status, reason, completed });
+          return;
+        }
+
+        if (completed || status === "attended") {
+          cycle.soldierStatuses.set(soldierId, { status: completed ? "attended" : status, reason, completed });
         }
       });
     });
@@ -330,7 +389,10 @@ export default function AttendanceTracking() {
       .sort((a, b) => a.year !== b.year ? b.year - a.year : b.month - a.month)
       .map(m => ({
         ...m,
-        cycles: Array.from(m.cycles.values()),
+        cycles: Array.from(m.cycles.values()).map((cycle) => ({
+          ...cycle,
+          events: [...cycle.events].sort((a, b) => a.event_date.localeCompare(b.event_date)),
+        })),
       }));
   }, [filteredEvents, soldiers, attendance, overrides, soldierCourses]);
 
@@ -592,17 +654,53 @@ export default function AttendanceTracking() {
               ) : (
                 monthsCycleData.map(monthData => (
                   <Card key={`${monthData.year}-${monthData.month}`} className="border-0 shadow-lg bg-white rounded-xl overflow-hidden">
-                    <CardHeader className="pb-2 bg-gradient-to-l from-slate-100 to-slate-50">
-                      <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-600" />
-                          <span className="text-sm font-bold text-slate-800">{hebrewMonths[monthData.month]} {monthData.year}</span>
-                        </div>
-                        <Badge variant="outline" className="text-xs text-slate-600">{monthData.cycles.length} מחזורים</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 space-y-2">
-                      {monthData.cycles.map(cycle => {
+                    {(() => {
+                      const monthKey = `${monthData.year}-${monthData.month}`;
+                      const isMonthExpanded = expandedMonth === monthKey;
+                      const monthEventSummaries = monthData.cycles.flatMap((cycle) =>
+                        cycle.events.map((event) => getEventSummaryForMonthView(getEventAttendanceForMonthView(event))),
+                      );
+                      const monthAttended = monthEventSummaries.reduce((sum, item) => sum + item.attended, 0);
+                      const monthTotal = monthEventSummaries.reduce((sum, item) => sum + item.total, 0);
+                      const monthPercent = monthTotal > 0 ? Math.round((monthAttended / monthTotal) * 100) : 100;
+
+                      return (
+                        <>
+                          <CardHeader
+                            className="pb-3 bg-gradient-to-l from-slate-100 to-slate-50 cursor-pointer"
+                            onClick={() => {
+                              setExpandedMonth(isMonthExpanded ? null : monthKey);
+                              if (isMonthExpanded) {
+                                setExpandedCycle(null);
+                                setExpandedCycleEvent(null);
+                              }
+                            }}
+                          >
+                            <CardTitle className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-slate-600" />
+                                <div>
+                                  <span className="block text-sm font-bold text-slate-800">{hebrewMonths[monthData.month]} {monthData.year}</span>
+                                  <span className="text-[11px] font-medium text-slate-500">{monthData.cycles.length} מחזורים</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={`text-xs ${
+                                  monthPercent >= 80 ? "bg-emerald-100 text-emerald-700" :
+                                  monthPercent >= 50 ? "bg-amber-100 text-amber-700" :
+                                  "bg-red-100 text-red-700"
+                                }`}>
+                                  {monthPercent}%
+                                </Badge>
+                                <span className="text-xs text-slate-500">{monthAttended}/{monthTotal}</span>
+                                {isMonthExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                              </div>
+                            </CardTitle>
+                          </CardHeader>
+
+                          {isMonthExpanded && (
+                            <CardContent className="p-3 space-y-2">
+                              {monthData.cycles.map(cycle => {
                         const statusEntries = Array.from(cycle.soldierStatuses.entries());
                         const attendedCount = statusEntries.filter(([, s]) => s.completed || s.status === "attended").length;
                         const absentEntries = statusEntries.filter(([, s]) => s.status === "absent" && !s.completed);
@@ -617,7 +715,10 @@ export default function AttendanceTracking() {
                           <div key={cycleKey} className="border border-slate-200 rounded-lg overflow-hidden">
                             <div
                               className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 transition-colors"
-                              onClick={() => setExpandedCycle(isExpanded ? null : cycleKey)}
+                              onClick={() => {
+                                setExpandedCycle(isExpanded ? null : cycleKey);
+                                if (isExpanded) setExpandedCycleEvent(null);
+                              }}
                             >
                               <div className="flex items-center gap-2">
                                 <Layers className="w-4 h-4 text-slate-500" />
@@ -639,71 +740,13 @@ export default function AttendanceTracking() {
 
                             {isExpanded && (
                               <div className="border-t border-slate-200 p-3 bg-slate-50/50 space-y-3">
-                                {/* Missing soldiers */}
-                                {absentEntries.length > 0 && (
-                                  <div>
-                                    <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1.5">
-                                      <XCircle className="w-3.5 h-3.5" />
-                                      חסרים ({absentEntries.length})
-                                    </p>
-                                    <div className="space-y-1">
-                                      {absentEntries.map(([soldierId, s]) => {
-                                        const soldier = soldiers.find(sl => sl.id === soldierId);
-                                        if (!soldier) return null;
-                                        return (
-                                          <div key={soldierId} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-white border border-slate-200">
-                                            <div>
-                                              <span className="text-sm text-slate-800 font-medium">{soldier.full_name}</span>
-                                              {s.reason && (
-                                                <span className="text-xs text-amber-600 flex items-center gap-1 mt-0.5">
-                                                  <AlertTriangle className="w-3 h-3" />
-                                                  {s.reason}
-                                                </span>
-                                              )}
-                                            </div>
-                                            <XCircle className="w-4 h-4 text-red-400" />
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Attended soldiers */}
-                                {attendedCount > 0 && (
-                                  <div>
-                                    <p className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
-                                      <CheckCircle className="w-3.5 h-3.5" />
-                                      נכחו ({attendedCount})
-                                    </p>
-                                    <div className="space-y-1">
-                                      {statusEntries
-                                        .filter(([, s]) => s.completed || s.status === "attended")
-                                        .map(([soldierId, s]) => {
-                                          const soldier = soldiers.find(sl => sl.id === soldierId);
-                                          if (!soldier) return null;
-                                          return (
-                                            <div key={soldierId} className="flex items-center justify-between py-1.5 px-3 rounded-lg bg-white border border-slate-200">
-                                              <span className="text-sm text-slate-800">{soldier.full_name}</span>
-                                              <div className="flex items-center gap-1.5">
-                                                {s.completed && <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">השלמה</Badge>}
-                                                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Individual events breakdown */}
                                 <div>
                                   <p className="text-xs font-bold text-slate-600 mb-2">מופעים בפירוט</p>
                                   <div className="space-y-1">
-                                    {cycle.events.map(event => {
+                                     {cycle.events.map(event => {
                                       const isEventExpanded = expandedCycleEvent === event.id;
-                                      const eventAttList = getEventAttendanceForMonthView(event);
-                                      const evAttended = eventAttList.filter(a => a.status === "attended" || a.completed).length;
+                                       const eventAttList = getEventAttendanceForMonthView(event);
+                                       const { attended: evAttended, total: eventTotal } = getEventSummaryForMonthView(eventAttList);
 
                                       return (
                                         <div key={event.id} className="border border-slate-200 rounded-lg bg-white overflow-hidden">
@@ -714,9 +757,12 @@ export default function AttendanceTracking() {
                                             <div className="flex items-center gap-2">
                                               <span className="text-xs text-slate-700">{event.title}</span>
                                               <span className="text-[10px] text-slate-400">{format(parseISO(event.event_date), "dd/MM")}</span>
+                                              <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">
+                                                {cycle.cycleName}
+                                              </Badge>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                              <span className="text-xs text-slate-500">{evAttended}/{eventAttList.length}</span>
+                                               <span className="text-xs text-slate-500">{evAttended}/{eventTotal}</span>
                                               {isEventExpanded ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
                                             </div>
                                           </div>
@@ -748,7 +794,11 @@ export default function AttendanceTracking() {
                           </div>
                         );
                       })}
-                    </CardContent>
+                            </CardContent>
+                          )}
+                        </>
+                      );
+                    })()}
                   </Card>
                 ))
               )}
@@ -796,7 +846,7 @@ export default function AttendanceTracking() {
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                    {monthlyRecords.map(record => {
+                      {monthlyRecords.map(record => {
                       const monthPct = record.attended + record.absent > 0
                         ? Math.round((record.attended / (record.attended + record.absent)) * 100) : 100;
                       return (
@@ -806,16 +856,19 @@ export default function AttendanceTracking() {
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-emerald-600">{record.attended} נכח</span>
                               {record.absent > 0 && <span className="text-xs text-red-500">{record.absent} נעדר</span>}
+                              {record.notInRotation > 0 && <span className="text-xs text-blue-600">{record.notInRotation} לא בסבב</span>}
                               <Progress value={monthPct} className={`w-12 h-1.5 ${monthPct >= 80 ? '[&>div]:bg-emerald-500' : '[&>div]:bg-red-500'}`} />
                             </div>
                           </div>
                           <div className="p-2 space-y-1">
                             {record.events.map(er => (
-                              <div key={er.event.id} className={`flex items-center justify-between py-1.5 px-2 rounded text-sm ${er.status === "absent" && !er.completed ? 'bg-red-50' : ''}`}>
+                              <div key={er.event.id} className={`flex items-center justify-between py-1.5 px-2 rounded text-sm ${
+                                er.status === "absent" && !er.completed ? 'bg-red-50' : er.status === "not_in_rotation" ? 'bg-blue-50' : ''
+                              }`}>
                                 <div className="flex items-center gap-2">
                                   <div className={`w-1.5 h-1.5 rounded-full ${
                                     er.completed || er.status === "attended" ? 'bg-emerald-500' :
-                                    er.status === "absent" ? 'bg-red-500' : 'bg-slate-300'
+                                    er.status === "absent" ? 'bg-red-500' : er.status === "not_in_rotation" ? 'bg-blue-500' : 'bg-slate-300'
                                   }`} />
                                   <span className="text-slate-700">{er.event.title}</span>
                                   {er.reason && <span className="text-[10px] text-amber-600">({er.reason})</span>}
@@ -823,6 +876,9 @@ export default function AttendanceTracking() {
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-slate-400">{format(parseISO(er.event.event_date), "dd/MM")}</span>
                                   {er.completed && <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">הושלם</Badge>}
+                                  {!er.completed && er.status === "not_in_rotation" && (
+                                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">לא בסבב</Badge>
+                                  )}
                                   <button
                                     onClick={(e) => { e.stopPropagation(); openEditDialog(selectedSoldier, er.event, er.status, er.reason, er.completed); }}
                                     className="p-1 hover:bg-slate-200 rounded"
@@ -906,16 +962,41 @@ export default function AttendanceTracking() {
 
   // Helper for months view event attendance
   function getEventAttendanceForMonthView(event: WorkPlanEvent) {
-    const expectedSoldiers = event.expected_soldiers || [];
-    const attendanceRecords = attendance.filter(a => a.event_id === event.id);
-    const soldierIds = new Set<string>([...expectedSoldiers, ...attendanceRecords.map(a => a.soldier_id)]);
+    const soldierIds = getRelevantSoldierIdsForEvent(event);
+    const statusOrder: Record<AttendanceStatus, number> = {
+      attended: 0,
+      absent: 1,
+      not_in_rotation: 2,
+      not_updated: 3,
+      not_qualified: 4,
+    };
 
     return Array.from(soldierIds).map(soldierId => {
       const soldier = soldiers.find(s => s.id === soldierId);
       if (!soldier) return null;
       const { status, reason, completed } = getSoldierEventStatus(soldier, event);
-      if (status === "not_in_rotation") return null;
       return { soldierId, soldierName: soldier.full_name, status, reason, completed };
-    }).filter(Boolean) as { soldierId: string; soldierName: string; status: AttendanceStatus; reason: string | null; completed: boolean }[];
+    })
+      .filter((item): item is { soldierId: string; soldierName: string; status: AttendanceStatus; reason: string | null; completed: boolean } => {
+        return !!item && item.status !== "not_qualified";
+      })
+      .sort((a, b) => {
+        const byStatus = statusOrder[a.status] - statusOrder[b.status];
+        if (byStatus !== 0) return byStatus;
+        return a.soldierName.localeCompare(b.soldierName, "he");
+      });
+  }
+
+  function getEventSummaryForMonthView(eventAttList: { soldierId: string; soldierName: string; status: AttendanceStatus; reason: string | null; completed: boolean }[]) {
+    const attended = eventAttList.filter(item => item.completed || item.status === "attended").length;
+    const countableAbsent = eventAttList.filter(item => {
+      if (item.status !== "absent" || item.completed) return false;
+      return !(item.reason && NON_COUNTABLE_ABSENCE_REASONS.includes(item.reason as AbsenceReason));
+    }).length;
+
+    return {
+      attended,
+      total: attended + countableAbsent,
+    };
   }
 }
