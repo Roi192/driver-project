@@ -1,4 +1,8 @@
 (function () {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw-push.js').catch(function () {});
+  }
+
   var c = window.__INSTALL_CONFIG__;
   if (!c) return;
 
