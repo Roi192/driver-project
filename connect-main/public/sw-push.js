@@ -1,39 +1,65 @@
-// Service Worker for Push Notifications
-const CACHE_NAME = 'bvt-driving-v1';
+import { clientsClaim } from "workbox-core";
+import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
+import { registerRoute, NavigationRoute } from "workbox-routing";
+import { NetworkFirst, StaleWhileRevalidate } from "workbox-strategies";
 
-self.addEventListener('install', (event) => {
-  console.log('Push Service Worker installed');
-  self.skipWaiting();
+self.skipWaiting();
+clientsClaim();
+
+precacheAndRoute(self.__WB_MANIFEST || []);
+cleanupOutdatedCaches();
+
+const navigationHandler = new NetworkFirst({
+  cacheName: "pages-cache",
 });
 
-self.addEventListener('activate', (event) => {
-  console.log('Push Service Worker activated');
-  event.waitUntil(self.clients.claim());
-});
+registerRoute(new NavigationRoute(navigationHandler));
 
-// Handle push notifications
-self.addEventListener('push', (event) => {
-  console.log('Push notification received:', event);
-  
+registerRoute(
+  ({ request }) =>
+    request.destination === "style" ||
+    request.destination === "script" ||
+    request.destination === "worker",
+  new StaleWhileRevalidate({
+    cacheName: "assets-cache",
+  })
+);
+
+registerRoute(
+  ({ request }) => request.destination === "image",
+  new StaleWhileRevalidate({
+    cacheName: "images-cache",
+  })
+);
+
+registerRoute(
+  ({ url }) => url.origin === "https://rapaezkfrbsswbwyvbfr.supabase.co",
+  new NetworkFirst({
+    cacheName: "supabase-cache",
+    networkTimeoutSeconds: 10,
+  })
+);
+
+self.addEventListener("push", (event) => {
   let data = {
-    title: 'התראה',
-    body: 'יש לך עדכון חדש',
-    icon: '/pwa-192x192.png',
-    badge: '/pwa-192x192.png',
+    title: "התראה",
+    body: "יש לך עדכון חדש",
+    icon: "/pwa-192x192.png",
+    badge: "/pwa-192x192.png",
     vibrate: [200, 100, 200],
-    tag: 'default-notification',
+    tag: "default-notification",
     renotify: true,
     requireInteraction: true,
-    dir: 'rtl',
-    lang: 'he',
-    data: { url: '/' }
+    dir: "rtl",
+    lang: "he",
+    data: { url: "/" },
   };
 
   if (event.data) {
     try {
       const payload = event.data.json();
       data = { ...data, ...payload };
-    } catch (e) {
+    } catch {
       data.body = event.data.text();
     }
   }
@@ -43,36 +69,33 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: data.icon,
       badge: data.badge,
-      vibrate: data.vibrate || [200, 100, 200],
+      vibrate: data.vibrate,
       tag: data.tag,
-      renotify: data.renotify !== false,
-      requireInteraction: data.requireInteraction !== false,
-      dir: data.dir || 'rtl',
-      lang: data.lang || 'he',
-      data: data.data || { url: '/' }
+      renotify: data.renotify,
+      requireInteraction: data.requireInteraction,
+      dir: data.dir,
+      lang: data.lang,
+      data: data.data,
     })
   );
 });
 
-// Handle notification click
-self.addEventListener('notificationclick', (event) => {
-  console.log('Notification clicked:', event);
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = event.notification.data?.url || "/";
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if (client.url.includes(self.registration.scope) && 'focus' in client) {
-            client.navigate(targetUrl);
-            return client.focus();
-          }
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
         }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl);
-        }
-      })
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
   );
 });
