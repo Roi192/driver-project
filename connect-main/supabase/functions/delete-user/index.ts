@@ -59,6 +59,21 @@ Deno.serve(async (req) => {
       throw new Error('Cannot delete your own account')
     }
 
+    // Get profile to find personal_number for soldier matching
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('personal_number')
+      .eq('user_id', targetUserId)
+      .maybeSingle()
+
+    // Delete soldier record if personal_number matches
+    if (profile?.personal_number) {
+      await supabaseAdmin
+        .from('soldiers')
+        .delete()
+        .eq('personal_number', profile.personal_number)
+    }
+
     // Delete related records first to avoid FK constraint errors
     await supabaseAdmin.from('user_roles').delete().eq('user_id', targetUserId)
     await supabaseAdmin.from('profiles').delete().eq('user_id', targetUserId)

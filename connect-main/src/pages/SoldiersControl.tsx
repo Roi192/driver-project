@@ -152,6 +152,7 @@ export default function SoldiersControl() {
   const [licenseTypeFilter, setLicenseTypeFilter] = useState<string>("all");
   const [permitFilter, setPermitFilter] = useState<string>("all");
   const [shootingRangeFilter, setShootingRangeFilter] = useState<string>("all");
+  const [correctDrivingFilter, setCorrectDrivingFilter] = useState<string>("all");
   const [rotationGroupFilter, setRotationGroupFilter] = useState<string>("all");
 
   const [formData, setFormData] = useState({
@@ -440,6 +441,15 @@ export default function SoldiersControl() {
       if (shootingRangeFilter === "unknown" && status !== "unknown") return false;
     }
     
+    // Correct driving in service filter
+    if (correctDrivingFilter !== "all") {
+      const status = getCorrectDrivingStatus(soldier).status;
+      if (correctDrivingFilter === "valid" && status !== "valid") return false;
+      if (correctDrivingFilter === "warning" && status !== "warning") return false;
+      if (correctDrivingFilter === "expired" && status !== "expired") return false;
+      if (correctDrivingFilter === "unknown" && status !== "unknown") return false;
+    }
+    
     // Rotation group filter
     if (rotationGroupFilter !== "all") {
       if (rotationGroupFilter === "none" && (soldier as any).rotation_group) return false;
@@ -696,6 +706,21 @@ export default function SoldiersControl() {
                       {PERMITS_LIST.map(permit => (
                         <SelectItem key={permit} value={permit} className="text-slate-700">{permit}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500 mb-1 block">נהיגה נכונה בשירות</Label>
+                  <Select value={correctDrivingFilter} onValueChange={setCorrectDrivingFilter}>
+                    <SelectTrigger className="rounded-xl bg-white text-slate-700 border-slate-300">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border border-slate-200">
+                      <SelectItem value="all" className="text-slate-700">הכל</SelectItem>
+                      <SelectItem value="valid" className="text-slate-700">תקף</SelectItem>
+                      <SelectItem value="warning" className="text-slate-700">עומד לפוג</SelectItem>
+                      <SelectItem value="expired" className="text-slate-700">פג תוקף</SelectItem>
+                      <SelectItem value="unknown" className="text-slate-700">לא הוזן</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

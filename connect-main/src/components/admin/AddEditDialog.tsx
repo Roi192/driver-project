@@ -127,7 +127,13 @@ export function AddEditDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(value) => {
+      // Prevent dialog from closing when file picker opens on mobile
+      if (!value && document.activeElement?.tagName === 'INPUT' && (document.activeElement as HTMLInputElement).type === 'file') {
+        return;
+      }
+      onOpenChange(value);
+    }}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-gradient-to-br from-card via-card/98 to-primary/5 border-2 border-primary/20 shadow-2xl rounded-3xl">
         <DialogHeader className="pb-4 border-b border-border/30">
           <DialogTitle className="text-2xl font-black flex items-center gap-3">
