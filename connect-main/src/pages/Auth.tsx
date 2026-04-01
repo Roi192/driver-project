@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Shield, Loader2, Car, Users, Building2 } from 'lucide-react';
+import { Shield, Loader2, Car } from 'lucide-react';
 import unitLogo from '@/assets/unit-logo.png';
 import bgVehicles from '@/assets/bg-vehicles.png';
 import { OUTPOSTS } from '@/lib/constants';
@@ -23,6 +23,10 @@ export default function Auth() {
   
   const { signIn, signUp, signOut, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    localStorage.setItem('install_department', 'drivers');
+  }, []);
 
   useEffect(() => {
     if (user) {

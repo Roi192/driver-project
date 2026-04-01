@@ -51,6 +51,10 @@ export default function HagmarAuth() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    localStorage.setItem('install_department', 'hagmar');
+  }, []);
+
+  useEffect(() => {
     if (user) {
       navigate("/hagmar");
     }

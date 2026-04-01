@@ -13,13 +13,30 @@ const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [departmentChecked, setDepartmentChecked] = useState(false);
-  const [isHagmarUser, setIsHagmarUser] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   
-  // Only redirect from "/" root path, not from "/planag"
   const isRootPath = location.pathname === '/';
 
-  // Reset departmentChecked when user changes to prevent stale state
+  // Redirect unauthenticated users to their department's auth page (from PWA install)
+  useEffect(() => {
+    if (!loading && !user && isRootPath) {
+      const dept = localStorage.getItem("install_department");
+      if (dept === "battalion") {
+        navigate('/auth/gdud', { replace: true });
+        return;
+      }
+      if (dept === "hagmar") {
+        navigate('/auth/hagmar', { replace: true });
+        return;
+      }
+      if (dept === "drivers") {
+        navigate('/auth', { replace: true });
+        return;
+      }
+    }
+  }, [loading, user, isRootPath, navigate]);
+
+  // Reset departmentChecked when user changes
   useEffect(() => {
     setDepartmentChecked(false);
     setIsRedirecting(false);
@@ -27,10 +44,7 @@ const Index = () => {
 
   useEffect(() => {
     const checkDepartment = async () => {
-      // Wait for role to be resolved before checking redirects
       if (!user || !isRootPath) { setDepartmentChecked(true); return; }
-      
-      // If role is still null (not yet fetched), wait for it
       if (role === null) return;
       
       if (isSuperAdmin) {
@@ -44,7 +58,6 @@ const Index = () => {
         return;
       }
       
-      // Check department for regular hagmar users (who have 'driver' role)
       const { data } = await supabase
         .from('profiles')
         .select('department')
@@ -52,7 +65,6 @@ const Index = () => {
         .maybeSingle();
       
       if (data?.department === 'hagmar') {
-        setIsHagmarUser(true);
         setIsRedirecting(true);
         navigate('/hagmar', { replace: true });
         return;

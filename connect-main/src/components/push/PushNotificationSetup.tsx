@@ -13,12 +13,13 @@ interface PushNotificationSetupProps {
 export function PushNotificationSetup({ className }: PushNotificationSetupProps) {
   const [soldierId, setSoldierId] = useState<string | undefined>();
   const [soldierName, setSoldierName] = useState<string>('');
+  const [loading, setLoading] = useState(true);
   
   const { 
     isSupported, 
     isSubscribed, 
     permission, 
-    loading, 
+    loading: pushLoading, 
     subscribe, 
     unsubscribe 
   } = usePushNotifications(soldierId);
@@ -28,30 +29,42 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
   }, []);
 
   const fetchCurrentSoldier = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-    // Get profile to find personal number
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('personal_number, full_name')
-      .eq('user_id', user.id)
-      .single();
-
-    if (profile?.personal_number) {
-      // Find matching soldier
-      const { data: soldier } = await supabase
-        .from('soldiers')
-        .select('id, full_name')
-        .eq('personal_number', profile.personal_number)
+      // Get profile to find personal number
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('personal_number, full_name')
+        .eq('user_id', user.id)
         .single();
 
-      if (soldier) {
-        setSoldierId(soldier.id);
-        setSoldierName(soldier.full_name);
+      if (profile?.personal_number) {
+        // Find matching soldier
+        const { data: soldier } = await supabase
+          .from('soldiers')
+          .select('id, full_name')
+          .eq('personal_number', profile.personal_number)
+          .single();
+
+        if (soldier) {
+          setSoldierId(soldier.id);
+          setSoldierName(soldier.full_name);
+        }
       }
+    } catch (err) {
+      console.error('Error fetching soldier:', err);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Still loading soldier info
+  if (loading) return null;
 
   if (!isSupported) {
     return (
@@ -62,7 +75,7 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
             <div>
               <p className="font-medium text-destructive">התראות לא נתמכות</p>
               <p className="text-sm text-muted-foreground">
-                יש להשתמש בדפדפן תומך או להתקין את האפליקציה
+                יש להתקין את האפליקציה למסך הבית ולהשתמש בדפדפן תומך
               </p>
             </div>
           </div>
@@ -71,8 +84,23 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
     );
   }
 
+  // Show setup even if no soldier linked - just prompt to enable
   if (!soldierId) {
-    return null; // User is not linked to a soldier
+    return (
+      <Card className={`border-amber-500/20 bg-amber-500/5 ${className}`}>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <Bell className="w-5 h-5 text-amber-500" />
+            <div>
+              <p className="font-medium text-amber-700">התראות זמינות</p>
+              <p className="text-sm text-muted-foreground">
+                יש לקשר את המשתמש לחייל בניהול משתמשים כדי לקבל התראות
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -80,18 +108,18 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary" />
-          התראות משמרת
+          התראות חכמות
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          קבל התראה 15 דקות לפני תחילת המשמרת שלך
+          קבל התראות על משמרות, רישיונות שפגים, טפסים חסרים ועוד
         </p>
 
         {isSubscribed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-success text-white">
+              <Badge variant="default" className="bg-green-600 text-white">
                 <CheckCircle className="w-3 h-3 ml-1" />
                 התראות פעילות
               </Badge>
@@ -100,10 +128,10 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
               variant="outline"
               size="sm"
               onClick={unsubscribe}
-              disabled={loading}
+              disabled={pushLoading}
               className="w-full"
             >
-              {loading ? (
+              {pushLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin ml-2" />
               ) : (
                 <BellOff className="w-4 h-4 ml-2" />
@@ -120,10 +148,10 @@ export function PushNotificationSetup({ className }: PushNotificationSetupProps)
             ) : (
               <Button
                 onClick={subscribe}
-                disabled={loading}
+                disabled={pushLoading}
                 className="w-full bg-gradient-to-r from-primary to-primary/80"
               >
-                {loading ? (
+                {pushLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin ml-2" />
                 ) : (
                   <Bell className="w-4 h-4 ml-2" />

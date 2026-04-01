@@ -163,10 +163,8 @@ export function QuickActions() {
           </div>
         </div>
         
-        {/* Push Notification Setup for Drivers */}
-        {!isBattalionUser && (
-          <PushNotificationSetup className="mb-6" />
-        )}
+        {/* Push Notification Setup for all users */}
+        <PushNotificationSetup className="mb-6" />
 
         {/* Note: Cleaning parade info removed - shown in DriverHomeContent */}
 

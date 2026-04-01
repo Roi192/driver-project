@@ -2,6 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// VAPID public key (publishable - safe in client code)
+const VAPID_PUBLIC_KEY = 'BB-ERTopQnMocIHOoi3infXShHMGKYTQyHVn3lZD14CrDB6Psc6mJM4o5QBKhT7YcQEJpq5F7I_KCGGhKqpLD7U';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 interface PushSubscriptionState {
   isSupported: boolean;
   isSubscribed: boolean;
@@ -22,21 +36,13 @@ export function usePushNotifications(soldierId?: string) {
   }, [soldierId]);
 
   const checkSupport = async () => {
-    // Check if notifications are supported
-    if (!('Notification' in window)) {
-      setState(prev => ({ ...prev, isSupported: false, loading: false }));
-      return;
-    }
-
-    // Check if service workers are supported
-    if (!('serviceWorker' in navigator)) {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setState(prev => ({ ...prev, isSupported: false, loading: false }));
       return;
     }
 
     const permission = Notification.permission;
     
-    // Check if already subscribed
     let isSubscribed = false;
     if (soldierId && permission === 'granted') {
       const { data } = await supabase
@@ -65,7 +71,6 @@ export function usePushNotifications(soldierId?: string) {
     setState(prev => ({ ...prev, loading: true }));
 
     try {
-      // Request permission
       const permission = await Notification.requestPermission();
       
       if (permission !== 'granted') {
@@ -78,17 +83,30 @@ export function usePushNotifications(soldierId?: string) {
       const registration = await navigator.serviceWorker.register('/sw-push.js');
       await navigator.serviceWorker.ready;
 
-      // Get current user for user_id association
+      // Subscribe to Web Push with VAPID key
+      let pushSubscription = await registration.pushManager.getSubscription();
+      
+      if (!pushSubscription) {
+        const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+        pushSubscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: appServerKey as BufferSource,
+        });
+      }
+
+      const subscriptionJson = pushSubscription.toJSON();
+      const keys = subscriptionJson.keys || {};
+
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Create a simple subscription record (without VAPID for now)
       const subscriptionData = {
         soldier_id: soldierId,
         user_id: user.id,
-        endpoint: `${window.location.origin}/push/${soldierId}`,
-        p256dh: 'placeholder-key',
-        auth: 'placeholder-auth',
+        endpoint: pushSubscription.endpoint,
+        p256dh: keys.p256dh || '',
+        auth: keys.auth || '',
       };
 
       const { error } = await supabase
@@ -99,10 +117,10 @@ export function usePushNotifications(soldierId?: string) {
 
       if (error) throw error;
 
-      // Show a test notification to confirm it's working
+      // Show confirmation notification
       if (registration.showNotification) {
         await registration.showNotification('התראות הופעלו! 🎉', {
-          body: 'תקבל התראות לפני משמרות',
+          body: 'תקבל התראות חכמות על משמרות, רישיונות ועוד',
           icon: '/pwa-192x192.png',
           badge: '/pwa-192x192.png',
           dir: 'rtl',
@@ -134,6 +152,15 @@ export function usePushNotifications(soldierId?: string) {
     setState(prev => ({ ...prev, loading: true }));
 
     try {
+      // Unsubscribe from browser push
+      const registration = await navigator.serviceWorker.getRegistration('/sw-push.js');
+      if (registration) {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+      }
+
       const { error } = await supabase
         .from('push_subscriptions')
         .delete()

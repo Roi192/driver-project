@@ -1,13 +1,13 @@
 {
-  "id": "/drivers-app",
-  "name": "נהגי בט\"ש - חטיבת בנימין",
-  "short_name": "נהגי בט\"ש",
-  "description": "מערכת ניהול נהגי בט״ש לחטיבת בנימין - דיווחים, תרגולות ובטיחות",
-  "start_url": "/auth",
+  "id": "/battalion-app",
+  "name": "גדוד תע\"ם - חטיבת בנימין",
+  "short_name": "גדוד תע\"ם",
+  "description": "מערכת גדוד תע״ם לחטיבת בנימין - ניהול, הרשמה ומעקב",
+  "start_url": "/auth/gdud",
   "scope": "/",
   "display": "standalone",
   "background_color": "hsl(222 22% 12%)",
-  "theme_color": "hsl(222 22% 12%)",
+  "theme_color": "hsl(217 91% 60%)",
   "orientation": "portrait-primary",
   "dir": "rtl",
   "lang": "he",
@@ -35,14 +35,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshot-1.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow"
     }
   ],
   "categories": ["productivity", "utilities"],

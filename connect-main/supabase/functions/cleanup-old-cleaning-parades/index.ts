@@ -15,43 +15,8 @@ Deno.serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    const authHeader = req.headers.get('Authorization')
-    const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`
-
-    if (!isServiceRole) {
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Unauthorized - missing authorization header' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-        )
-      }
-
-      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } }
-      })
-
-      const token = authHeader.replace('Bearer ', '')
-      const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token)
-      if (userError || !user) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Unauthorized - invalid token' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-        )
-      }
-
-      const { data: roleData } = await supabaseUser
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .in('role', ['admin', 'platoon_commander', 'super_admin'])
-
-      if (!roleData || roleData.length === 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Forbidden - admin access required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-        )
-      }
-    }
+    // This is a scheduled cleanup function invoked by pg_cron.
+    // verify_jwt is already false in config.toml; no user auth needed.
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 

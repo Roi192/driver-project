@@ -16,16 +16,17 @@ self.addEventListener('push', (event) => {
   console.log('Push notification received:', event);
   
   let data = {
-    title: 'התראת משמרת',
-    body: 'יש לך משמרת בקרוב',
+    title: 'התראה',
+    body: 'יש לך עדכון חדש',
     icon: '/pwa-192x192.png',
     badge: '/pwa-192x192.png',
     vibrate: [200, 100, 200],
-    tag: 'shift-notification',
+    tag: 'default-notification',
     renotify: true,
     requireInteraction: true,
     dir: 'rtl',
-    lang: 'he'
+    lang: 'he',
+    data: { url: '/' }
   };
 
   if (event.data) {
@@ -42,15 +43,13 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: data.icon,
       badge: data.badge,
-      vibrate: data.vibrate,
+      vibrate: data.vibrate || [200, 100, 200],
       tag: data.tag,
-      renotify: data.renotify,
-      requireInteraction: data.requireInteraction,
-      dir: data.dir,
-      lang: data.lang,
-      data: {
-        url: '/'
-      }
+      renotify: data.renotify !== false,
+      requireInteraction: data.requireInteraction !== false,
+      dir: data.dir || 'rtl',
+      lang: data.lang || 'he',
+      data: data.data || { url: '/' }
     })
   );
 });
@@ -60,31 +59,20 @@ self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked:', event);
   event.notification.close();
 
+  const targetUrl = event.notification.data?.url || '/';
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If there's already a window open, focus it
         for (const client of clientList) {
           if (client.url.includes(self.registration.scope) && 'focus' in client) {
+            client.navigate(targetUrl);
             return client.focus();
           }
         }
-        // Otherwise, open a new window
         if (self.clients.openWindow) {
-          return self.clients.openWindow('/');
+          return self.clients.openWindow(targetUrl);
         }
       })
   );
 });
-
-// Background sync for checking notifications
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'check-shifts') {
-    event.waitUntil(checkForUpcomingShifts());
-  }
-});
-
-async function checkForUpcomingShifts() {
-  // This would be called periodically to check for upcoming shifts
-  console.log('Checking for upcoming shifts...');
-}
