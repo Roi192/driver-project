@@ -27,6 +27,7 @@ import HolidaysManagement from "./pages/HolidaysManagement";
 import AccidentsTracking from "./pages/AccidentsTracking";
 import KnowTheArea from "./pages/KnowTheArea";
 import Install from "./pages/Install";
+import DepartmentInstallPage from "./pages/DepartmentInstallPage";
 import UsersManagement from "./pages/UsersManagement";
 import CleaningParades from "./pages/CleaningParades";
 import CleaningParadesAdmin from "./pages/CleaningParadesAdmin";
@@ -81,6 +82,9 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/install" element={<Install />} />
+            <Route path="/install/drivers" element={<DepartmentInstallPage department="drivers" />} />
+            <Route path="/install/gdud" element={<DepartmentInstallPage department="gdud" />} />
+            <Route path="/install/hagmar" element={<DepartmentInstallPage department="hagmar" />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/gdud" element={<AuthBattalion />} />
             <Route path="/auth/hagmar" element={<HagmarAuth />} />

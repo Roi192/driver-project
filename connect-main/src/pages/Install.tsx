@@ -1,280 +1,97 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Download, Smartphone, Share, CheckCircle2, ArrowDown, Truck, Shield, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Truck, Shield, Users } from "lucide-react";
 import unitLogo from "@/assets/unit-logo.png";
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-type Department = "drivers" | "battalion" | "hagmar";
-
-const DEPARTMENT_CONFIG: Record<Department, { title: string; subtitle: string; icon: React.ReactNode; authPath: string; installPath: string; color: string }> = {
-  drivers: {
+const departments = [
+  {
+    key: "drivers",
     title: "נהגי בט״ש",
     subtitle: "פלנ\"ג - חטיבת בנימין",
-    icon: <Truck className="w-6 h-6" />,
-    authPath: "/auth",
-    installPath: "/install/drivers/",
-    color: "bg-primary",
+    icon: <Truck className="w-7 h-7" />,
+    href: "/install/drivers",
+    gradient: "from-blue-600 to-blue-400",
+    glow: "shadow-blue-500/30",
+    emoji: "🚛",
   },
-  battalion: {
+  {
+    key: "battalion",
     title: "גדוד תע״ם",
     subtitle: "חטיבת בנימין",
-    icon: <Users className="w-6 h-6" />,
-    authPath: "/auth/gdud",
-    installPath: "/install/gdud/",
-    color: "bg-blue-600",
+    icon: <Users className="w-7 h-7" />,
+    href: "/install/gdud",
+    gradient: "from-indigo-600 to-indigo-400",
+    glow: "shadow-indigo-500/30",
+    emoji: "🎖️",
   },
-  hagmar: {
+  {
+    key: "hagmar",
     title: "הגמ״ר",
-    subtitle: "חטיבת בנימין",
-    icon: <Shield className="w-6 h-6" />,
-    authPath: "/auth/hagmar",
-    installPath: "/install/hagmar/",
-    color: "bg-emerald-600",
+    subtitle: "הגנת המרחב - חטיבת בנימין",
+    icon: <Shield className="w-7 h-7" />,
+    href: "/install/hagmar",
+    gradient: "from-emerald-600 to-emerald-400",
+    glow: "shadow-emerald-500/30",
+    emoji: "🛡️",
   },
-};
+];
 
 export default function Install() {
-  const [searchParams] = useSearchParams();
-  const deptParam = searchParams.get("dept") as Department | null;
-  
-  const [selectedDept, setSelectedDept] = useState<Department | null>(deptParam);
-
-  useEffect(() => {
-    if (deptParam && DEPARTMENT_CONFIG[deptParam]) {
-      window.location.replace(DEPARTMENT_CONFIG[deptParam].installPath);
-    }
-  }, [deptParam]);
-
-  // Save department choice to localStorage for post-install routing
-  useEffect(() => {
-    if (selectedDept) {
-      localStorage.setItem("install_department", selectedDept);
-    }
-  }, [selectedDept]);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
-
-  useEffect(() => {
-    const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    setIsStandalone(standalone);
-    setIsInstalled(standalone);
-
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    setIsIOS(ios);
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", () => setIsInstalled(true));
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    };
-  }, []);
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") setIsInstalled(true);
-    setDeferredPrompt(null);
-  };
-
-  const config = selectedDept ? DEPARTMENT_CONFIG[selectedDept] : null;
-
-  // Department selection screen
-  if (!selectedDept) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl scale-150" />
-            <img src={unitLogo} alt="לוגו חטיבת בנימין" className="relative w-28 h-28 object-contain" />
-          </div>
-
-          <h1 className="text-3xl font-bold text-foreground mb-2">התקנת האפליקציה</h1>
-          <p className="text-muted-foreground mb-8">בחר את המחלקה שלך</p>
-
-          <div className="grid gap-4 w-full max-w-sm">
-            {(Object.entries(DEPARTMENT_CONFIG) as [Department, typeof DEPARTMENT_CONFIG["drivers"]][]).map(([key, dept]) => (
-              <button
-                key={key}
-                onClick={() => setSelectedDept(key)}
-                className="flex items-center gap-4 bg-card border border-border rounded-2xl p-5 text-right hover:border-primary/50 transition-all active:scale-[0.98]"
-              >
-                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-white", dept.color)}>
-                  {dept.icon}
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-foreground">{dept.title}</p>
-                  <p className="text-sm text-muted-foreground">{dept.subtitle}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          <p>© 2024 חטיבת בנימין</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        {/* Back button */}
-        <button
-          onClick={() => setSelectedDept(null)}
-          className="self-start mb-4 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← חזרה לבחירת מחלקה
-        </button>
-
-        {/* Logo */}
-        <div className="relative mb-6">
-          <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl scale-150" />
-          <img src={unitLogo} alt="לוגו חטיבת בנימין" className="relative w-28 h-28 object-contain" />
-        </div>
-
-        <h1 className="text-3xl font-bold text-foreground mb-1">{config!.title}</h1>
-        <p className="text-lg text-muted-foreground mb-6">{config!.subtitle}</p>
-
-        {isInstalled || isStandalone ? (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-6 mb-6 w-full max-w-sm">
-            <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-            <h2 className="text-xl font-bold text-green-500 mb-2">האפליקציה מותקנת!</h2>
-            <p className="text-muted-foreground mb-4">תוכל למצוא אותה במסך הבית שלך</p>
-            <a
-              href={config!.authPath}
-              className={cn("inline-block px-6 py-3 rounded-xl text-white font-semibold", config!.color)}
-            >
-              כניסה / הרשמה
-            </a>
-          </div>
-        ) : (
-          <>
-            {/* Features */}
-            <div className="grid gap-3 mb-6 w-full max-w-sm">
-              {[
-                { icon: "⚡", text: "גישה מהירה מהמסך הראשי" },
-                { icon: "📱", text: "חווית אפליקציה מלאה" },
-                { icon: "🔔", text: "התראות ועדכונים" },
-                { icon: "📶", text: "עובד גם אופליין" },
-              ].map((feature, i) => (
-                <div key={i} className="flex items-center gap-3 bg-card/50 rounded-xl p-3 text-right">
-                  <span className="text-2xl">{feature.icon}</span>
-                  <span className="text-foreground text-sm">{feature.text}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Install Instructions */}
-            {isIOS ? (
-              <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm">
-                <h2 className="text-lg font-bold text-foreground mb-4">כיצד להתקין באייפון</h2>
-                <div className="space-y-4 text-right">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">1</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">לחץ על כפתור השיתוף</p>
-                      <div className="flex items-center gap-2 mt-1 text-muted-foreground text-sm">
-                        <Share className="w-4 h-4" />
-                        <span>בתחתית המסך</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">2</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">גלול ובחר</p>
-                      <p className="text-primary font-semibold">"הוסף למסך הבית"</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">3</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">לחץ "הוסף" בפינה הימנית העליונה</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-border flex justify-center">
-                  <ArrowDown className="w-6 h-6 text-muted-foreground animate-bounce" />
-                </div>
-              </div>
-            ) : deferredPrompt ? (
-              <Button
-                onClick={handleInstall}
-                size="lg"
-                className={cn("w-full max-w-sm h-14 text-lg text-white", config!.color)}
-              >
-                <Download className="w-5 h-5 ml-2" />
-                התקן את האפליקציה
-              </Button>
-            ) : (
-              <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm">
-                <Smartphone className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-lg font-bold text-foreground mb-4">כיצד להתקין</h2>
-                <div className="space-y-4 text-right">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">1</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">לחץ על תפריט הדפדפן</p>
-                      <p className="text-muted-foreground text-sm">3 נקודות ⋮ בפינה העליונה</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">2</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">בחר</p>
-                      <p className="text-primary font-semibold">"התקן אפליקציה"</p>
-                      <p className="text-muted-foreground text-sm">או "הוסף למסך הבית"</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-bold text-primary">3</span>
-                    </div>
-                    <div>
-                      <p className="text-foreground">אשר את ההתקנה</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-border">
-                  <p className="text-xs text-muted-foreground text-center">
-                    💡 פתח דף זה בדפדפן Chrome או Edge לחוויה הטובה ביותר
-                  </p>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+    <div className="min-h-screen bg-[hsl(222,22%,8%)] flex flex-col overflow-hidden relative">
+      {/* Background effects */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-120px] right-[-80px] w-[350px] h-[350px] rounded-full bg-blue-500/10 blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[-100px] left-[-60px] w-[300px] h-[300px] rounded-full bg-emerald-500/8 blur-[80px] animate-pulse" style={{ animationDelay: "2s" }} />
       </div>
 
-      <div className="p-6 text-center text-sm text-muted-foreground">
-        <p>© 2024 חטיבת בנימין</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-5 text-center relative z-10">
+        {/* Logo */}
+        <div className="relative mb-8">
+          <div className="absolute inset-[-20px] bg-blue-500/15 rounded-full blur-[40px] animate-pulse" />
+          <img
+            src={unitLogo}
+            alt="לוגו חטיבת בנימין"
+            className="relative w-24 h-24 object-contain drop-shadow-[0_8px_24px_rgba(59,130,246,0.3)]"
+          />
+        </div>
+
+        <h1 className="text-[clamp(1.8rem,6vw,2.6rem)] font-black text-transparent bg-clip-text bg-gradient-to-l from-white to-blue-200 mb-2 leading-tight">
+          התקנת האפליקציה
+        </h1>
+        <p className="text-[hsl(214,20%,55%)] text-sm mb-10 max-w-[300px]">
+          בחר את המחלקה שלך כדי להתקין את האפליקציה בטלפון
+        </p>
+
+        {/* Department cards */}
+        <div className="grid gap-4 w-full max-w-sm">
+          {departments.map((dept) => (
+            <a
+              key={dept.key}
+              href={dept.href}
+              className={`group relative flex items-center gap-4 rounded-2xl p-5 text-right
+                bg-[hsl(222,24%,12%)]/80 backdrop-blur-xl
+                border border-[hsl(216,15%,20%)] hover:border-white/20
+                transition-all duration-300 active:scale-[0.97]
+                shadow-lg hover:shadow-xl ${dept.glow}`}
+            >
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${dept.gradient} 
+                flex items-center justify-center text-white shrink-0
+                shadow-lg group-hover:scale-105 transition-transform duration-300`}>
+                <span className="text-2xl">{dept.emoji}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-lg font-bold text-white">{dept.title}</p>
+                <p className="text-xs text-[hsl(214,20%,55%)] mt-0.5">{dept.subtitle}</p>
+              </div>
+              <div className="text-[hsl(214,20%,40%)] group-hover:text-white/60 transition-colors text-lg">
+                ←
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-5 text-center text-xs text-[hsl(214,20%,35%)] relative z-10">
+        © חטיבת בנימין
       </div>
     </div>
   );
