@@ -1258,4 +1258,4 @@ export default function SoldiersControl() {
       </div>
     </AppLayout>
   );
-}
+}// redeploy trigger 04/26/2026 22:46:19
